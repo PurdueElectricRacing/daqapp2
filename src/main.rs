@@ -1,5 +1,10 @@
 mod app;
 mod sidebar;
+mod workspace;
+mod widgets;
+mod can_viewer;
+mod bootloader;
+mod live_plot;
 
 fn main() -> eframe::Result<()> {
     eframe::run_native(

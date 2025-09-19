@@ -6,6 +6,20 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
         .show_animated(ctx, app.is_sidebar_open, |ui| {
             ui.heading("Side bar");
             ui.separator();
-            ui.label("• CAN Viewer\n• Bootloader\n• Live plot");
+            
+            // Widget spawn controls
+            ui.heading("Spawn Widgets");
+            
+            if ui.button("Add CAN Viewer").clicked() {
+                app.spawn_can_viewer();
+            }
+            
+            if ui.button("Add Bootloader").clicked() {
+                app.spawn_bootloader();
+            }
+            
+            if ui.button("Add Live Plot").clicked() {
+                app.spawn_live_plot();
+            }
         });
 }
