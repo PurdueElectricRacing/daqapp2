@@ -26,27 +26,27 @@ impl Default for DAQApp {
 }
 
 impl DAQApp {
-    /// Add a widget to the tile tree, handling root management and tab containers
     fn add_widget_to_tree(&mut self, widget: Widget) {
         let new_tile_id = self.tile_tree.tiles.insert_pane(widget);
         
-        if let Some(root_id) = self.tile_tree.root {
-            // If we have a root, create a new tab container or add to existing one
-            if let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) = 
-                self.tile_tree.tiles.get_mut(root_id) 
-            {
-                // Root is already a tab container, add to it
-                tabs.add_child(new_tile_id);
-                tabs.set_active(new_tile_id);
-            } else {
-                // Root is not a tab container, create one
-                let tab_container = self.tile_tree.tiles.insert_tab_tile(vec![root_id, new_tile_id]);
-                self.tile_tree.root = Some(tab_container);
-            }
-        } else {
-            // No root yet, this becomes the root
+        // No root yet, this becomes the root
+        let Some(root_id) = self.tile_tree.root else {
             self.tile_tree.root = Some(new_tile_id);
-        }
+            return;
+        };
+        
+        // Check if root is already a tab container
+        let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) = 
+            self.tile_tree.tiles.get_mut(root_id) else {
+            // Root is not a tab container, create one
+            let tab_container = self.tile_tree.tiles.insert_tab_tile(vec![root_id, new_tile_id]);
+            self.tile_tree.root = Some(tab_container);
+            return;
+        };
+        
+        // Root is already a tab container, add to it
+        tabs.add_child(new_tile_id);
+        tabs.set_active(new_tile_id);
     }
     
     pub fn spawn_can_viewer(&mut self) {
@@ -97,13 +97,6 @@ impl eframe::App for DAQApp {
                 }
             }
         }
-        
-        // // a tiny toolbar button to toggle the sidebar
-        // egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
-        //     if ui.button(if self.is_sidebar_open { "Hide side bar" } else { "Show sidebar" }).clicked() {
-        //         self.is_sidebar_open = !self.is_sidebar_open;
-        //     }
-        // });
 
         // sidebar
         crate::sidebar::show(self, ctx);
