@@ -5,6 +5,7 @@ mod widgets;
 mod can_viewer;
 mod bootloader;
 mod live_plot;
+mod shortcuts;
 
 fn main() -> eframe::Result<()> {
     eframe::run_native(
