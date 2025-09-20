@@ -1,13 +1,13 @@
 use eframe::egui;
 use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
-use crate::live_plot::LivePlot;
+use crate::scope::Scope;
 
 #[derive(Debug)]
 pub enum Widget {
     CanViewer(CanViewer),
     Bootloader(Bootloader),
-    LivePlot(LivePlot),
+    Scope(Scope),
 }
 
 impl Widget {
@@ -15,7 +15,7 @@ impl Widget {
         match self {
             Widget::CanViewer(w) => &w.title,
             Widget::Bootloader(w) => &w.title,
-            Widget::LivePlot(w) => &w.title,
+            Widget::Scope(w) => &w.title,
         }
     }
 
@@ -23,7 +23,7 @@ impl Widget {
         match self {
             Widget::CanViewer(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
-            Widget::LivePlot(w) => w.show(ui),
+            Widget::Scope(w) => w.show(ui),
         }
     }
 }

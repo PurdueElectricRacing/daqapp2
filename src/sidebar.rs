@@ -7,9 +7,6 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.heading("Side bar");
             ui.separator();
             
-            // Widget spawn controls
-            ui.heading("Spawn Widgets");
-            
             if ui.button("Add CAN Viewer").clicked() {
                 app.spawn_can_viewer();
             }
@@ -18,8 +15,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 app.spawn_bootloader();
             }
             
-            if ui.button("Add Live Plot").clicked() {
-                app.spawn_live_plot();
+            if ui.button("Add Scope").clicked() {
+                app.spawn_scope();
             }
         });
 }

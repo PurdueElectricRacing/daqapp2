@@ -2,7 +2,7 @@ use eframe::egui;
 use crate::widgets::Widget;
 use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
-use crate::live_plot::LivePlot;
+use crate::scope::Scope;
 use crate::shortcuts::{ShortcutHandler, ShortcutAction};
 
 pub struct DAQApp {
@@ -10,7 +10,7 @@ pub struct DAQApp {
     pub tile_tree: egui_tiles::Tree<Widget>,
     pub next_can_viewer_num: usize,
     pub next_bootloader_num: usize,
-    pub next_live_plot_num: usize,
+    pub next_scope_num: usize,
 }
 
 impl Default for DAQApp {
@@ -20,7 +20,7 @@ impl Default for DAQApp {
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
             next_bootloader_num: 1,
-            next_live_plot_num: 1,
+            next_scope_num: 1,
         }
     }
 }
@@ -61,23 +61,20 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
     
-    pub fn spawn_live_plot(&mut self) {
-        let widget = Widget::LivePlot(LivePlot::new(self.next_live_plot_num));
-        self.next_live_plot_num += 1;
+    pub fn spawn_scope(&mut self) {
+        let widget = Widget::Scope(Scope::new(self.next_scope_num));
+        self.next_scope_num += 1;
         self.add_widget_to_tree(widget);
     }
     
-    /// Close the currently active widget in the tile tree
+    // Close the currently active widget in the tile tree
     pub fn close_active_widget(&mut self) {
-        // Get all active tiles (tiles that are currently visible/selected)
         let active_tiles = self.tile_tree.active_tiles();
         
-        // Find the first active pane (widget) to close
         for tile_id in active_tiles {
             if let Some(egui_tiles::Tile::Pane(_)) = self.tile_tree.tiles.get(tile_id) {
-                // Found an active pane, remove it
                 self.tile_tree.tiles.remove(tile_id);
-                break; // Only close one widget at a time
+                break;
             }
         }
     }

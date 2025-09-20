@@ -4,7 +4,7 @@ mod workspace;
 mod widgets;
 mod can_viewer;
 mod bootloader;
-mod live_plot;
+mod scope;
 mod shortcuts;
 
 fn main() -> eframe::Result<()> {
