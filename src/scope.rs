@@ -1,24 +1,30 @@
 use std::collections::VecDeque;
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
+use rfd::FileDialog;
 
-#[derive(Debug)]
+// TODO time based instead of sample based?
+// TODO add trigger
+
 pub struct Scope {
     pub title: String,
-    window_size: usize,
-    window: VecDeque<f64>,
     signal_name: String,
+    window: VecDeque<f64>,
+    window_size: usize,
     is_paused: bool,
+    show_line: bool,
 }
 
 impl Scope {
+    // TODO pass arguments containing signal data, signal_name, dt, 
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("Scope #{}", instance_num),
-            window_size: 1000,
-            window: VecDeque::new(),
             signal_name: String::from("Signal"),
+            window: VecDeque::new(),
+            window_size: 1000,
             is_paused: false,
+            show_line: false,
         }
     }
 
@@ -31,6 +37,28 @@ impl Scope {
 
         if self.window.len() > self.window_size {
             self.window.pop_front();
+        }
+    }
+
+    fn export_csv(&self) {
+        // Create CSV content from the window data
+        let mut csv_content = String::from("Sample,Value\n");
+        
+        for (index, &value) in self.window.iter().enumerate() {
+            csv_content.push_str(&format!("{},{}\n", index, value));
+        }
+        
+        // Open file dialog to save CSV
+        if let Some(path) = FileDialog::new()
+            .set_file_name(&format!("{}_data.csv", self.title.replace(" ", "_")))
+            .add_filter("CSV Files", &["csv"])
+            .save_file()
+        {
+            if let Err(e) = std::fs::write(&path, csv_content) {
+                eprintln!("Failed to save CSV file: {}", e);
+            } else {
+                println!("CSV exported to: {}", path.display());
+            }
         }
     }
 
@@ -49,13 +77,13 @@ impl Scope {
             
             // Window size slider
             ui.label("Window Size:");
-            ui.add(egui::Slider::new(&mut self.window_size, 10..=10000).suffix(" samples"));
+            ui.add(egui::Slider::new(&mut self.window_size, 10..=1000).suffix(" samples"));
             
             ui.separator();
             
             // Export button
             if ui.button("📄 Export CSV").clicked() {
-                // TODO: Implement CSV export functionality
+                self.export_csv();
             }
             
             ui.separator();
@@ -64,6 +92,11 @@ impl Scope {
             if ui.button("🗑 Clear").clicked() {
                 self.window.clear();
             }
+
+            ui.separator();
+
+            // Show line checkbox
+            ui.checkbox(&mut self.show_line, "Show Line");
         });
 
         ui.separator();
@@ -72,20 +105,25 @@ impl Scope {
             .view_aspect(2.0)
             .auto_bounds(egui::Vec2b::TRUE)
             .show(ui, |plot_ui| {
-                if !self.window.is_empty() {
-                    let points: PlotPoints = self.window
-                        .iter()
-                        .enumerate()
-                        .map(|(i, &value)| [i as f64, value])
-                        .collect();
-                    
-                    // Create line with nice styling
-                    let line = Line::new(&self.signal_name, points)
-                        .color(egui::Color32::from_rgb(100, 200, 100))
-                        .stroke(egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 200, 100)));
-                    
-                    plot_ui.line(line);
+                if self.window.is_empty() {
+                    return;
                 }
+
+                let points: PlotPoints = self.window
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &value)| [i as f64, value])
+                    .collect();
+
+                if !self.show_line {
+                    return;
+                }
+                
+                let line = Line::new(&self.signal_name, points)
+                    .color(egui::Color32::from_rgb(100, 200, 100))
+                    .stroke(egui::Stroke::new(2.0, egui::Color32::from_rgb(100, 200, 100)));
+                
+                plot_ui.line(line);
             });
 
         egui_tiles::UiResponse::None

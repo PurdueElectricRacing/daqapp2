@@ -1,6 +1,5 @@
 use eframe::egui;
 
-#[derive(Debug)]
 pub struct Bootloader {
     pub title: String,
 }

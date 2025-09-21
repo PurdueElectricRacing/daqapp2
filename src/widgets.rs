@@ -3,7 +3,6 @@ use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
 use crate::scope::Scope;
 
-#[derive(Debug)]
 pub enum Widget {
     CanViewer(CanViewer),
     Bootloader(Bootloader),
