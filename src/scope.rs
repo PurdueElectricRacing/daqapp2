@@ -5,6 +5,7 @@ use rfd::FileDialog;
 
 // TODO time based instead of sample based?
 // TODO add trigger
+// TODO fft view
 
 pub struct Scope {
     pub title: String,

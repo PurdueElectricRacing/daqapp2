@@ -2,11 +2,13 @@ use eframe::egui;
 use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
 use crate::scope::Scope;
+use crate::log_parser::LogParser;
 
 pub enum Widget {
     CanViewer(CanViewer),
     Bootloader(Bootloader),
     Scope(Scope),
+    LogParser(LogParser),
 }
 
 impl Widget {
@@ -15,6 +17,7 @@ impl Widget {
             Widget::CanViewer(w) => &w.title,
             Widget::Bootloader(w) => &w.title,
             Widget::Scope(w) => &w.title,
+            Widget::LogParser(w) => &w.title,
         }
     }
 
@@ -23,6 +26,7 @@ impl Widget {
             Widget::CanViewer(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
+            Widget::LogParser(w) => w.show(ui),
         }
     }
 }

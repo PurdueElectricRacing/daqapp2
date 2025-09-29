@@ -6,7 +6,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
         if app.tile_tree.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.label("No widgets in workspace yet.");
-                ui.label("CMD+S to open the sidebar.");
+                ui.label("CMD+S to toggle the sidebar.");
                 ui.label("Use the sidebar to spawn widgets.");
             });
         } else {

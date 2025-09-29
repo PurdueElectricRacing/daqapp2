@@ -5,6 +5,7 @@ mod widgets;
 mod can_viewer;
 mod bootloader;
 mod scope;
+mod log_parser;
 mod shortcuts;
 
 fn main() -> eframe::Result<()> {

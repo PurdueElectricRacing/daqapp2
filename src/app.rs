@@ -3,6 +3,7 @@ use crate::widgets::Widget;
 use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
 use crate::scope::Scope;
+use crate::log_parser::LogParser;
 use crate::shortcuts::{ShortcutHandler, ShortcutAction};
 
 pub struct DAQApp {
@@ -11,6 +12,7 @@ pub struct DAQApp {
     pub next_can_viewer_num: usize,
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
+    pub next_log_parser_num: usize
 }
 
 impl Default for DAQApp {
@@ -21,6 +23,7 @@ impl Default for DAQApp {
             next_can_viewer_num: 1,
             next_bootloader_num: 1,
             next_scope_num: 1,
+            next_log_parser_num: 1,
         }
     }
 }
@@ -66,6 +69,12 @@ impl DAQApp {
         self.next_scope_num += 1;
         self.add_widget_to_tree(widget);
     }
+
+    pub fn spawn_log_parser(&mut self) {
+        let widget = Widget::LogParser(LogParser::new(self.next_log_parser_num));
+        self.next_log_parser_num += 1;
+        self.add_widget_to_tree(widget);
+    }
     
     // Close the currently active widget in the tile tree
     pub fn close_active_widget(&mut self) {
@@ -95,10 +104,8 @@ impl eframe::App for DAQApp {
             }
         }
 
-        // sidebar
         crate::sidebar::show(self, ctx);
 
-        // workspace (central panel)
         crate::workspace::show(self, ctx);
     }
 }
