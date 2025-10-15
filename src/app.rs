@@ -1,10 +1,10 @@
-use eframe::egui;
-use crate::widgets::Widget;
-use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
-use crate::scope::Scope;
+use crate::can_viewer::CanViewer;
 use crate::log_parser::LogParser;
-use crate::shortcuts::{ShortcutHandler, ShortcutAction};
+use crate::scope::Scope;
+use crate::shortcuts::{ShortcutAction, ShortcutHandler};
+use crate::widgets::Widget;
+use eframe::egui;
 
 pub struct DAQApp {
     pub is_sidebar_open: bool,
@@ -12,7 +12,7 @@ pub struct DAQApp {
     pub next_can_viewer_num: usize,
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
-    pub next_log_parser_num: usize
+    pub next_log_parser_num: usize,
 }
 
 impl Default for DAQApp {
@@ -31,39 +31,43 @@ impl Default for DAQApp {
 impl DAQApp {
     fn add_widget_to_tree(&mut self, widget: Widget) {
         let new_tile_id = self.tile_tree.tiles.insert_pane(widget);
-        
+
         // No root yet, this becomes the root
         let Some(root_id) = self.tile_tree.root else {
             self.tile_tree.root = Some(new_tile_id);
             return;
         };
-        
+
         // Check if root is already a tab container
-        let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) = 
-            self.tile_tree.tiles.get_mut(root_id) else {
+        let Some(egui_tiles::Tile::Container(egui_tiles::Container::Tabs(tabs))) =
+            self.tile_tree.tiles.get_mut(root_id)
+        else {
             // Root is not a tab container, create one
-            let tab_container = self.tile_tree.tiles.insert_tab_tile(vec![root_id, new_tile_id]);
+            let tab_container = self
+                .tile_tree
+                .tiles
+                .insert_tab_tile(vec![root_id, new_tile_id]);
             self.tile_tree.root = Some(tab_container);
             return;
         };
-        
+
         // Root is already a tab container, add to it
         tabs.add_child(new_tile_id);
         tabs.set_active(new_tile_id);
     }
-    
+
     pub fn spawn_can_viewer(&mut self) {
         let widget = Widget::CanViewer(CanViewer::new(self.next_can_viewer_num));
         self.next_can_viewer_num += 1;
         self.add_widget_to_tree(widget);
     }
-    
+
     pub fn spawn_bootloader(&mut self) {
         let widget = Widget::Bootloader(Bootloader::new(self.next_bootloader_num));
         self.next_bootloader_num += 1;
         self.add_widget_to_tree(widget);
     }
-    
+
     pub fn spawn_scope(&mut self) {
         let widget = Widget::Scope(Scope::new(self.next_scope_num));
         self.next_scope_num += 1;
@@ -75,11 +79,11 @@ impl DAQApp {
         self.next_log_parser_num += 1;
         self.add_widget_to_tree(widget);
     }
-    
+
     // Close the currently active widget in the tile tree
     pub fn close_active_widget(&mut self) {
         let active_tiles = self.tile_tree.active_tiles();
-        
+
         for tile_id in active_tiles {
             if let Some(egui_tiles::Tile::Pane(_)) = self.tile_tree.tiles.get(tile_id) {
                 self.tile_tree.tiles.remove(tile_id);

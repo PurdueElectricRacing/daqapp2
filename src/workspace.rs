@@ -1,5 +1,5 @@
-use eframe::egui;
 use crate::widgets::Widget;
+use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -39,7 +39,11 @@ impl egui_tiles::Behavior<Widget> for WorkspaceTileBehavior {
         }
     }
 
-    fn is_tab_closable(&self, _tiles: &egui_tiles::Tiles<Widget>, _tile_id: egui_tiles::TileId) -> bool {
+    fn is_tab_closable(
+        &self,
+        _tiles: &egui_tiles::Tiles<Widget>,
+        _tile_id: egui_tiles::TileId,
+    ) -> bool {
         true
     }
 }

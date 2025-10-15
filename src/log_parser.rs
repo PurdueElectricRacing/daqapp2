@@ -1,6 +1,6 @@
+use can_decode;
 use eframe::egui;
 use rfd::FileDialog;
-use can_decode;
 
 pub struct LogParser {
     pub title: String,
@@ -18,7 +18,7 @@ impl LogParser {
             output_dir: None,
         }
     }
-    
+
     fn select_dbc(&mut self) {
         if let Some(path) = FileDialog::new()
             .add_filter("DBC Files", &["dbc"])
@@ -73,7 +73,7 @@ impl LogParser {
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
-        
+
         // DBC file selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select DBC").clicked() {
@@ -85,9 +85,9 @@ impl LogParser {
                 ui.label("DBC: None selected");
             }
         });
-        
+
         ui.separator();
-        
+
         // Log directory selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select Logs Dir").clicked() {
@@ -99,9 +99,9 @@ impl LogParser {
                 ui.label("Logs: None selected");
             }
         });
-        
+
         ui.separator();
-        
+
         // Output directory selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select Output Dir").clicked() {
@@ -113,14 +113,14 @@ impl LogParser {
                 ui.label("Output: None selected");
             }
         });
-        
+
         ui.separator();
-        
+
         // Parse button
         if ui.button("▶ Parse Logs").clicked() {
             self.parse_logs();
         }
-        
+
         egui_tiles::UiResponse::None
     }
 }
