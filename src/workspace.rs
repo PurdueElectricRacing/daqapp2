@@ -1,4 +1,4 @@
-use crate::widgets::Widget;
+use crate::widgets;
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
@@ -18,17 +18,17 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
 struct WorkspaceTileBehavior {}
 
-impl egui_tiles::Behavior<Widget> for WorkspaceTileBehavior {
+impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior {
     fn pane_ui(
         &mut self,
         ui: &mut egui::Ui,
         _tile_id: egui_tiles::TileId,
-        widget: &mut Widget,
+        widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
         widget.show(ui)
     }
 
-    fn tab_title_for_pane(&mut self, widget: &Widget) -> egui::WidgetText {
+    fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
         widget.title().into()
     }
 
@@ -41,7 +41,7 @@ impl egui_tiles::Behavior<Widget> for WorkspaceTileBehavior {
 
     fn is_tab_closable(
         &self,
-        _tiles: &egui_tiles::Tiles<Widget>,
+        _tiles: &egui_tiles::Tiles<widgets::Widget>,
         _tile_id: egui_tiles::TileId,
     ) -> bool {
         true

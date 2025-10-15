@@ -1,6 +1,5 @@
 use can_decode;
 use eframe::egui;
-use rfd::FileDialog;
 
 pub struct LogParser {
     pub title: String,
@@ -20,7 +19,7 @@ impl LogParser {
     }
 
     fn select_dbc(&mut self) {
-        if let Some(path) = FileDialog::new()
+        if let Some(path) = rfd::FileDialog::new()
             .add_filter("DBC Files", &["dbc"])
             .pick_file()
         {
@@ -29,13 +28,13 @@ impl LogParser {
     }
 
     fn select_logs_dir(&mut self) {
-        if let Some(path) = FileDialog::new().pick_folder() {
+        if let Some(path) = rfd::FileDialog::new().pick_folder() {
             self.logs_dir = Some(path);
         }
     }
 
     fn select_output_dir(&mut self) {
-        if let Some(path) = FileDialog::new().pick_folder() {
+        if let Some(path) = rfd::FileDialog::new().pick_folder() {
             self.output_dir = Some(path);
         }
     }
