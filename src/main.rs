@@ -1,10 +1,6 @@
 mod app;
-mod bootloader;
-mod can_viewer;
-mod log_parser;
-mod scope;
 mod shortcuts;
-mod sidebar;
+mod ui;
 mod widgets;
 mod workspace;
 

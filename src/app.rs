@@ -1,9 +1,7 @@
-use crate::bootloader::Bootloader;
-use crate::can_viewer::CanViewer;
-use crate::log_parser::LogParser;
-use crate::scope::Scope;
 use crate::shortcuts::{ShortcutAction, ShortcutHandler};
+use crate::ui;
 use crate::widgets::Widget;
+use crate::workspace;
 use eframe::egui;
 
 pub struct DAQApp {
@@ -57,25 +55,25 @@ impl DAQApp {
     }
 
     pub fn spawn_can_viewer(&mut self) {
-        let widget = Widget::CanViewer(CanViewer::new(self.next_can_viewer_num));
+        let widget = Widget::CanViewer(ui::can_viewer::CanViewer::new(self.next_can_viewer_num));
         self.next_can_viewer_num += 1;
         self.add_widget_to_tree(widget);
     }
 
     pub fn spawn_bootloader(&mut self) {
-        let widget = Widget::Bootloader(Bootloader::new(self.next_bootloader_num));
+        let widget = Widget::Bootloader(ui::bootloader::Bootloader::new(self.next_bootloader_num));
         self.next_bootloader_num += 1;
         self.add_widget_to_tree(widget);
     }
 
     pub fn spawn_scope(&mut self) {
-        let widget = Widget::Scope(Scope::new(self.next_scope_num));
+        let widget = Widget::Scope(ui::scope::Scope::new(self.next_scope_num));
         self.next_scope_num += 1;
         self.add_widget_to_tree(widget);
     }
 
     pub fn spawn_log_parser(&mut self) {
-        let widget = Widget::LogParser(LogParser::new(self.next_log_parser_num));
+        let widget = Widget::LogParser(ui::log_parser::LogParser::new(self.next_log_parser_num));
         self.next_log_parser_num += 1;
         self.add_widget_to_tree(widget);
     }
@@ -108,8 +106,8 @@ impl eframe::App for DAQApp {
             }
         }
 
-        crate::sidebar::show(self, ctx);
+        ui::sidebar::show(self, ctx);
 
-        crate::workspace::show(self, ctx);
+        workspace::show(self, ctx);
     }
 }
