@@ -1,6 +1,5 @@
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
-use rfd::FileDialog;
 use std::collections::VecDeque;
 
 // TODO time based instead of sample based?
@@ -50,8 +49,8 @@ impl Scope {
         }
 
         // Open file dialog to save CSV
-        if let Some(path) = FileDialog::new()
-            .set_file_name(&format!("{}_data.csv", self.title.replace(" ", "_")))
+        if let Some(path) = rfd::FileDialog::new()
+            .set_file_name(format!("{}_data.csv", self.title.replace(" ", "_")))
             .add_filter("CSV Files", &["csv"])
             .save_file()
         {
