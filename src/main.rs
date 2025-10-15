@@ -1,16 +1,16 @@
 mod app;
-mod sidebar;
-mod workspace;
-mod widgets;
-mod can_viewer;
 mod bootloader;
-mod scope;
+mod can_viewer;
 mod log_parser;
+mod scope;
 mod shortcuts;
+mod sidebar;
+mod widgets;
+mod workspace;
 
 fn main() -> eframe::Result<()> {
     eframe::run_native(
-        "DAQ App",
+        "DaqApp2",
         eframe::NativeOptions::default(),
         Box::new(|_cc| Ok(Box::new(app::DAQApp::default()))),
     )

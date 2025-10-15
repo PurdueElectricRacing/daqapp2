@@ -1,8 +1,8 @@
-use eframe::egui;
-use crate::can_viewer::CanViewer;
 use crate::bootloader::Bootloader;
-use crate::scope::Scope;
+use crate::can_viewer::CanViewer;
 use crate::log_parser::LogParser;
+use crate::scope::Scope;
+use eframe::egui;
 
 pub enum Widget {
     CanViewer(CanViewer),
