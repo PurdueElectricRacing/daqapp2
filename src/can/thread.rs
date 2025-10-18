@@ -11,6 +11,7 @@ pub fn start_can_thread(
     // read from CAN and send to can_sender
     // UI receiver -> set up can can_decode::Parser based on the path to the DBC
 
-
-    todo!()
+    std::thread::spawn(move || {
+        todo!()
+    })
 }
