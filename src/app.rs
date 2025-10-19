@@ -1,4 +1,4 @@
-use crate::{shortcuts, ui, widgets, workspace};
+use crate::{shortcuts, ui, widgets, workspace, can};
 use eframe::egui;
 
 pub struct DAQApp {
@@ -8,10 +8,15 @@ pub struct DAQApp {
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
+    pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
+    pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
 }
 
-impl Default for DAQApp {
-    fn default() -> Self {
+impl DAQApp {
+    pub fn new (
+        can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
+        ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    ) -> Self {
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -19,11 +24,11 @@ impl Default for DAQApp {
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
+            can_receiver,
+            ui_sender,
         }
     }
-}
 
-impl DAQApp {
     fn add_widget_to_tree(&mut self, widget: widgets::Widget) {
         let new_tile_id = self.tile_tree.tiles.insert_pane(widget);
 
