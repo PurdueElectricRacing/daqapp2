@@ -2,14 +2,11 @@ import os
 import time
 import random
 import threading
-import subprocess
-import warnings
-
 import can
 import cantools
 
 DBC_PATH = "per_dbc_VCAN.dbc"   # path to your DBC
-CHANNEL = "vcan0"          # virtual CAN channel
+CHANNEL = "vcan0"               # virtual CAN channel
 BITRATE = 500000
 
 
@@ -20,45 +17,20 @@ def setup_vcan():
     os.system(f"sudo ip link set up {CHANNEL}")
 
 
-def start_slcanpty():
-    """Expose the virtual interface as a PTY SLCAN device."""
-    print("[slcanpty] Starting...")
-    proc = subprocess.Popen(["slcanpty", CHANNEL],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True)
-
-    # Wait for PTY to appear
-    time.sleep(0.5)
-    pty_path = None
-    if proc.stderr:
-        for line in proc.stderr.readlines():
-            if "/dev/pts/" in line:
-                pty_path = line.strip()
-                break
-
-    if not pty_path:
-        pty_path = "/dev/pts/unknown"
-    print(f"[slcanpty] PTY device: {pty_path}")
-    return proc, pty_path
-
-
-def send_random_frames(dbc_path, bus):
+def send_random_frames(dbc_path, bus, stop_event):
     """Continuously send randomized CAN frames using a DBC file."""
     db = cantools.database.load_file(dbc_path)
     messages = db.messages
     print(f"[sim] Loaded {len(messages)} messages from {dbc_path}")
 
-    while True:
+    while not stop_event.is_set():
         msg = random.choice(messages)
         signal_values = {}
 
         for sig in msg.signals:
-            # Compute a safe min/max range
             if sig.minimum is not None and sig.maximum is not None:
                 low, high = sig.minimum, sig.maximum
             else:
-                # Derive from bit length and signedness
                 if sig.is_signed:
                     low = -(2 ** (sig.length - 1))
                     high = (2 ** (sig.length - 1)) - 1
@@ -66,14 +38,11 @@ def send_random_frames(dbc_path, bus):
                     low = 0
                     high = (2 ** sig.length) - 1
 
-            # Generate a value safely within that range
-            if sig.is_float:
-                val = random.uniform(low, high * 0.9999)
-            elif sig.is_signed:
-                val = random.randint(int(low), int(high))
-            else:
-                val = random.randint(int(low), int(high))
-
+            val = (
+                random.uniform(low, high * 0.9999)
+                if sig.is_float
+                else random.randint(int(low), int(high))
+            )
             signal_values[sig.name] = val
 
         try:
@@ -97,21 +66,22 @@ def main():
     print("[sim] Opening virtual CAN bus...")
     bus = can.Bus(channel=CHANNEL, interface="socketcan")
 
-    slcan_proc, pty_path = start_slcanpty()
+    stop_event = threading.Event()
 
-    # Start traffic generator
-    sender = threading.Thread(target=send_random_frames, args=(DBC_PATH, bus), daemon=True)
+    sender = threading.Thread(target=send_random_frames, args=(DBC_PATH, bus, stop_event), daemon=True)
     sender.start()
 
-    print(f"[sim] Running. Connect to {pty_path} in your Rust app.")
+    print(f"[sim] Running on {CHANNEL}.")
+    print("[sim] Press Ctrl+C to stop.")
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("\n[sim] Shutting down...")
     finally:
-        slcan_proc.terminate()
-        os.system(f"sudo ip link del {CHANNEL}")
+        stop_event.set()
+        os.system(f"sudo ip link del {CHANNEL} || true")
+        print("[sim] Clean exit.")
 
 
 if __name__ == "__main__":
