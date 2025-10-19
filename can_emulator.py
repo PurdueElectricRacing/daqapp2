@@ -4,6 +4,7 @@ import random
 import threading
 import can
 import cantools
+from datetime import datetime
 
 DBC_PATH = "per_dbc_VCAN.dbc"   # path to your DBC
 CHANNEL = "vcan0"               # virtual CAN channel
@@ -15,6 +16,11 @@ def setup_vcan():
     os.system("sudo modprobe vcan")
     os.system(f"sudo ip link add dev {CHANNEL} type vcan || true")
     os.system(f"sudo ip link set up {CHANNEL}")
+
+
+def timestamp_now():
+    """Return current local time with milliseconds as a string."""
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
 
 def send_random_frames(dbc_path, bus, stop_event):
@@ -53,9 +59,9 @@ def send_random_frames(dbc_path, bus, stop_event):
                 is_extended_id=msg.is_extended_frame,
             )
             bus.send(frame)
-            print(f"[sim] {msg.name:<20} ID=0x{msg.frame_id:03X} {signal_values}")
+            print(f"[{timestamp_now()}] [sim] {msg.name:<20} ID=0x{msg.frame_id:03X} {signal_values}")
         except Exception as e:
-            print(f"[sim] Send failed for {msg.name}: {e}")
+            print(f"[{timestamp_now()}] [sim] Send failed for {msg.name}: {e}")
 
         time.sleep(0.1)
 
