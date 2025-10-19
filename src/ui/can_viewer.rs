@@ -1,4 +1,4 @@
-use crate::can;
+use crate::{can, ui};
 use eframe::egui;
 use std::collections::VecDeque;
 
@@ -61,5 +61,17 @@ impl CanViewer {
             });
 
         egui_tiles::UiResponse::None
+    }
+
+    pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
+        match msg {
+            can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
+                if self.decoded_msgs.len() == CAN_VIEWER_MAX_DECODED_MSGS {
+                    self.decoded_msgs.pop_front();
+                }
+                self.decoded_msgs.push_back(parsed_msg.clone());
+            }
+            _ => {}
+        }
     }
 }
