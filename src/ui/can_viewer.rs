@@ -38,9 +38,11 @@ impl CanViewer {
                 });
             })
             .body(|body| {
+                let row_count = self.decoded_msgs.len();
                 // rows is more performant than iter + row
-                body.rows(18.0, self.decoded_msgs.len(), |mut row| {
-                    let msg = &self.decoded_msgs[row.index()];
+                body.rows(18.0, row_count, |mut row| {
+                    let idx = row_count - row.index() - 1; // Reverse order
+                    let msg = &self.decoded_msgs[idx];
                     row.col(|ui| {
                         ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
                     });
