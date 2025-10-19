@@ -1,6 +1,5 @@
 use crate::{can, ui};
 use eframe::egui;
-// use std::collections::VecDeque;
 use hashbrown::HashMap;
 
 pub struct CanViewer {
@@ -24,7 +23,8 @@ impl CanViewer {
             .striped(true)
             .column(egui_extras::Column::auto().at_least(100.0).resizable(true)) // Timestamp
             .column(egui_extras::Column::auto().at_least(300.0).resizable(true)) // Msg (ID)
-            .column(egui_extras::Column::remainder().resizable(true)) // Decoded Content
+            .column(egui_extras::Column::auto().at_least(200.0).resizable(true)) // Signal
+            .column(egui_extras::Column::remainder().resizable(true)) // Decoded Signal
             .header(20.0, |mut header| {
                 header.col(|ui| {
                     ui.label("Timestamp");
@@ -33,29 +33,44 @@ impl CanViewer {
                     ui.label("Msg (ID)");
                 });
                 header.col(|ui| {
+                    ui.label("Signal");
+                });
+                header.col(|ui| {
                     ui.label("Decoded Content");
                 });
             })
             .body(|mut body| {
-                for msg in self.decoded_msgs.values() {
-                    body.row(18.0, |mut row| {
-                        row.col(|ui| {
-                            ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
+                let msg_keys = self.decoded_msgs.keys().cloned().collect::<Vec<_>>();
+                let mut sorted_msg_keys = msg_keys;
+                sorted_msg_keys.sort();
+                for msg_id in sorted_msg_keys {
+                    let msg = &self.decoded_msgs[&msg_id];
+                    let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
+                    signal_keys.sort();
+                    for signal_name in signal_keys {
+                        let signal = &msg.decoded.signals[&signal_name];
+                        body.row(18.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
+                            });
+                            row.col(|ui| {
+                                ui.label(format!(
+                                    "{} (0x{:X})",
+                                    msg.decoded.name, msg.decoded.msg_id
+                                ));
+                            });
+                            row.col(|ui| {
+                                ui.label(signal.name.to_string());
+                            });
+                            row.col(|ui| {
+                                if signal.unit.is_empty() {
+                                    ui.label(format!("{}", signal.value));
+                                } else {
+                                    ui.label(format!("{} {}", signal.value, signal.unit));
+                                }
+                            });
                         });
-                        row.col(|ui| {
-                            ui.label(format!("{} (0x{:X})", msg.decoded.name, msg.decoded.msg_id));
-                        });
-                        row.col(|ui| {
-                            let signals_str = msg
-                                .decoded
-                                .signals
-                                .iter()
-                                .map(|(name, sig)| format!("{}: {} {}", name, sig.value, sig.unit))
-                                .collect::<Vec<String>>()
-                                .join(", ");
-                            ui.label(signals_str.to_string());
-                        });
-                    });
+                    }
                 }
             });
 
