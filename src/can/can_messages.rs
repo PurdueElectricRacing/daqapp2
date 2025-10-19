@@ -1,6 +1,5 @@
+use crate::can;
+
 pub enum CanMessage {
-    DecodedMessage {
-        timestamp: u64,
-        decoded: can_decode::DecodedMessage,
-    },
+    ParsedMessage(can::message::ParsedMessage),
 }

@@ -1,4 +1,4 @@
-use can_decode;
+use crate::ui;
 use eframe::egui;
 
 pub struct LogParser {
@@ -18,12 +18,17 @@ impl LogParser {
         }
     }
 
-    fn select_dbc(&mut self) {
+    fn select_dbc(&mut self, ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>) {
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("DBC Files", &["dbc"])
             .pick_file()
         {
             self.dbc_path = Some(path);
+            ui_sender
+                .send(ui::ui_messages::UiMessage::DbcSelected(
+                    self.dbc_path.clone().unwrap(),
+                ))
+                .expect("Failed to send DBC selected message");
         }
     }
 
@@ -69,14 +74,18 @@ impl LogParser {
         println!("Output to: {}", output_dir.display());
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
 
         // DBC file selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select DBC").clicked() {
-                self.select_dbc();
+                self.select_dbc(ui_sender);
             }
             if let Some(path) = &self.dbc_path {
                 ui.label(format!("DBC: {}", path.display()));

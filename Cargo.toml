@@ -7,8 +7,10 @@ edition = "2024"
 eframe = "0.33.0"
 egui_tiles = "0.14.0"
 egui_plot = "0.34.0"
+egui_extras = "0.33.0"
 rfd = "0.15.4"
 can_decode = "0.3.0"
+chrono = "0.4"
 
 slcan = { git = "https://github.com/LelsersLasers/slcan", features = ["sync"] }
 serialport = "4.8.1"
