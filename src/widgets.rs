@@ -18,8 +18,10 @@ impl Widget {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui,
-        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     ) -> egui_tiles::UiResponse {
         match self {
             Widget::CanViewer(w) => w.show(ui),

@@ -1,4 +1,4 @@
-use crate::{widgets, ui};
+use crate::{ui, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {

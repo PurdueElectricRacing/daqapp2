@@ -1,4 +1,4 @@
-use crate::{shortcuts, ui, widgets, workspace, can};
+use crate::{can, shortcuts, ui, widgets, workspace};
 use eframe::egui;
 
 pub struct DAQApp {
@@ -13,7 +13,7 @@ pub struct DAQApp {
 }
 
 impl DAQApp {
-    pub fn new (
+    pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     ) -> Self {
