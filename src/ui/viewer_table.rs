@@ -2,15 +2,15 @@ use crate::{can, ui};
 use eframe::egui;
 use hashbrown::HashMap;
 
-pub struct CanViewer {
+pub struct ViewerTable {
     pub title: String,
     pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
 }
 
-impl CanViewer {
+impl ViewerTable {
     pub fn new(instance_num: usize) -> Self {
         Self {
-            title: format!("CAN Viewer #{}", instance_num),
+            title: format!("CAN Viewer Table #{}", instance_num),
             decoded_msgs: HashMap::new(),
         }
     }
