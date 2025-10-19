@@ -5,6 +5,8 @@ use hashbrown::HashMap;
 pub struct ViewerTable {
     pub title: String,
     pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
+    pub frozen_msgs: Option<HashMap<u32, can::message::ParsedMessage>>,
+    pub paused: bool,
 }
 
 impl ViewerTable {
@@ -12,11 +14,25 @@ impl ViewerTable {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
             decoded_msgs: HashMap::new(),
+            frozen_msgs: None,
+            paused: false,
         }
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
+        if ui
+            .button(if self.paused { "Resume" } else { "Pause" })
+            .clicked()
+        {
+            self.paused = !self.paused;
+            if self.paused {
+                self.frozen_msgs = Some(self.decoded_msgs.clone());
+            } else {
+                self.frozen_msgs = None;
+            }
+        }
+
         ui.separator();
 
         egui_extras::TableBuilder::new(ui)
@@ -40,11 +56,17 @@ impl ViewerTable {
                 });
             })
             .body(|mut body| {
-                let msg_keys = self.decoded_msgs.keys().cloned().collect::<Vec<_>>();
+                let msgs = if let Some(frozen) = &self.frozen_msgs {
+                    frozen
+                } else {
+                    &self.decoded_msgs
+                };
+
+                let msg_keys = msgs.keys().cloned().collect::<Vec<_>>();
                 let mut sorted_msg_keys = msg_keys;
                 sorted_msg_keys.sort();
                 for msg_id in sorted_msg_keys {
-                    let msg = &self.decoded_msgs[&msg_id];
+                    let msg = &msgs[&msg_id];
                     let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
                     signal_keys.sort();
                     for signal_name in signal_keys {
