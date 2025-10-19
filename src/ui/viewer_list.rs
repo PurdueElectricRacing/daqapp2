@@ -1,17 +1,20 @@
+
 use crate::can;
 use eframe::egui;
-use hashbrown::HashMap;
+use std::collections::VecDeque;
 
-pub struct ViewerTable {
+const MAX_MESSAGES: usize = 200;
+
+pub struct ViewerList {
     pub title: String,
-    pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
+    pub decoded_msgs: VecDeque<can::message::ParsedMessage>,
 }
 
-impl ViewerTable {
+impl ViewerList {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
-            decoded_msgs: HashMap::new(),
+            decoded_msgs: VecDeque::new(),
         }
     }
 
@@ -40,11 +43,7 @@ impl ViewerTable {
                 });
             })
             .body(|mut body| {
-                let msg_keys = self.decoded_msgs.keys().cloned().collect::<Vec<_>>();
-                let mut sorted_msg_keys = msg_keys;
-                sorted_msg_keys.sort();
-                for msg_id in sorted_msg_keys {
-                    let msg = &self.decoded_msgs[&msg_id];
+                for msg in self.decoded_msgs.iter().rev() {
                     let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
                     signal_keys.sort();
                     for signal_name in signal_keys {
@@ -82,8 +81,10 @@ impl ViewerTable {
     pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
         match msg {
             can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
-                self.decoded_msgs
-                    .insert(parsed_msg.decoded.msg_id, parsed_msg.clone());
+                while self.decoded_msgs.len() >= MAX_MESSAGES - 1 {
+                    self.decoded_msgs.pop_front();
+                }
+                self.decoded_msgs.push_back(parsed_msg.clone());
             }
             _ => {}
         }

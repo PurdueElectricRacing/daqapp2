@@ -8,7 +8,11 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.separator();
 
             if ui.button("Add CAN Viewer Table").clicked() {
-                app.spawn_can_viewer();
+                app.spawn_viewer_table();
+            }
+
+            if ui.button("Add CAN Viewer List").clicked() {
+                app.spawn_can_viewer_list();
             }
 
             if ui.button("Add Bootloader").clicked() {
