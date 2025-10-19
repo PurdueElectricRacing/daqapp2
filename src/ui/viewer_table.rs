@@ -91,6 +91,7 @@ impl ViewerTable {
                             msg.decoded.msg_id,
                             raw_bytes_str.as_str(),
                             &signals,
+                            &self.search,
                         );
                         ui.add_space(8.0);
                     }
@@ -117,6 +118,7 @@ fn message_card(
     msg_id: u32,
     raw_bytes: &str,
     signals: &[(&str, String)],
+    search: &str,
 ) {
     // Header (outside card)
     ui.horizontal(|ui| {
@@ -124,7 +126,15 @@ fn message_card(
         ui.label(
             egui::RichText::new(format!("{}  (0x{:03X})", msg_name, msg_id))
                 .strong()
-                .size(16.0),
+                .size(16.0)
+                .color(
+                    if search.is_empty() || msg_name.to_lowercase().contains(&search.to_lowercase())
+                    {
+                        ui.visuals().text_color()
+                    } else {
+                        ui.visuals().weak_text_color()
+                    },
+                ),
         );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
@@ -146,7 +156,15 @@ fn message_card(
             ui.vertical(|ui| {
                 for (i, (sig_name, value)) in signals.iter().enumerate() {
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(*sig_name).monospace());
+                        ui.label(egui::RichText::new(*sig_name).monospace().color(
+                            if search.is_empty()
+                                || sig_name.to_lowercase().contains(&search.to_lowercase())
+                            {
+                                ui.visuals().text_color()
+                            } else {
+                                ui.visuals().weak_text_color()
+                            },
+                        ));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.label(egui::RichText::new(value).monospace());
                         });
