@@ -7,8 +7,12 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.heading("Side bar");
             ui.separator();
 
-            if ui.button("Add CAN Viewer").clicked() {
-                app.spawn_can_viewer();
+            if ui.button("Add CAN Viewer Table").clicked() {
+                app.spawn_viewer_table();
+            }
+
+            if ui.button("Add CAN Viewer List").clicked() {
+                app.spawn_can_viewer_list();
             }
 
             if ui.button("Add Bootloader").clicked() {

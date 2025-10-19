@@ -2,7 +2,8 @@ use crate::{can, ui};
 use eframe::egui;
 
 pub enum Widget {
-    CanViewer(ui::can_viewer::CanViewer),
+    ViewerTable(ui::viewer_table::ViewerTable),
+    ViewerList(ui::viewer_list::ViewerList),
     Bootloader(ui::bootloader::Bootloader),
     Scope(ui::scope::Scope),
     LogParser(ui::log_parser::LogParser),
@@ -11,7 +12,8 @@ pub enum Widget {
 impl Widget {
     pub fn title(&self) -> &str {
         match self {
-            Widget::CanViewer(w) => &w.title,
+            Widget::ViewerTable(w) => &w.title,
+            Widget::ViewerList(w) => &w.title,
             Widget::Bootloader(w) => &w.title,
             Widget::Scope(w) => &w.title,
             Widget::LogParser(w) => &w.title,
@@ -29,7 +31,8 @@ impl Widget {
         }
 
         match self {
-            Widget::CanViewer(w) => w.show(ui),
+            Widget::ViewerTable(w) => w.show(ui),
+            Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, ui_sender),
@@ -38,7 +41,8 @@ impl Widget {
 
     fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
         match self {
-            Widget::CanViewer(w) => w.handle_can_message(msg),
+            Widget::ViewerTable(w) => w.handle_can_message(msg),
+            Widget::ViewerList(w) => w.handle_can_message(msg),
             _ => {}
         }
     }
