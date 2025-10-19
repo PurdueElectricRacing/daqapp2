@@ -18,12 +18,14 @@ impl Widget {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(&mut self, ui: &mut egui::Ui,
+        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>
+    ) -> egui_tiles::UiResponse {
         match self {
             Widget::CanViewer(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
-            Widget::LogParser(w) => w.show(ui),
+            Widget::LogParser(w) => w.show(ui, ui_sender),
         }
     }
 }

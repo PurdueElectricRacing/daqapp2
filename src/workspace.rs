@@ -1,4 +1,4 @@
-use crate::widgets;
+use crate::{widgets, ui};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
@@ -10,22 +10,26 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 ui.label("Use the sidebar to spawn widgets.");
             });
         } else {
-            let mut behavior = WorkspaceTileBehavior {};
+            let mut behavior = WorkspaceTileBehavior {
+                ui_sender: &app.ui_sender,
+            };
             app.tile_tree.ui(&mut behavior, ui);
         }
     });
 }
 
-struct WorkspaceTileBehavior {}
+struct WorkspaceTileBehavior<'a> {
+    ui_sender: &'a std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+}
 
-impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior {
+impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
     fn pane_ui(
         &mut self,
         ui: &mut egui::Ui,
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(ui)
+        widget.show(ui, self.ui_sender)
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
