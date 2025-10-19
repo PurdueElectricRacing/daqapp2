@@ -114,5 +114,8 @@ impl eframe::App for DAQApp {
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
+
+        // Probally could to a return chain to not always request repaint
+        ctx.request_repaint();
     }
 }
