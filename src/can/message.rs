@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct ParsedMessage {
     // Timestamp in microseconds since epoch
     pub timestamp: chrono::DateTime<chrono::Local>,

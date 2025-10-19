@@ -1,4 +1,4 @@
-use crate::{ui, widgets};
+use crate::{can, ui, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
@@ -11,6 +11,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             });
         } else {
             let mut behavior = WorkspaceTileBehavior {
+                can_receiver: &app.can_receiver,
                 ui_sender: &app.ui_sender,
             };
             app.tile_tree.ui(&mut behavior, ui);
@@ -19,6 +20,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 }
 
 struct WorkspaceTileBehavior<'a> {
+    can_receiver: &'a std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     ui_sender: &'a std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
 }
 
@@ -29,7 +31,7 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.ui_sender)
+        widget.show(ui, self.can_receiver, self.ui_sender)
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
