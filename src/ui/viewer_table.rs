@@ -7,6 +7,7 @@ pub struct ViewerTable {
     pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
     pub frozen_msgs: Option<HashMap<u32, can::message::ParsedMessage>>,
     pub paused: bool,
+    pub search: String,
 }
 
 impl ViewerTable {
@@ -16,6 +17,7 @@ impl ViewerTable {
             decoded_msgs: HashMap::new(),
             frozen_msgs: None,
             paused: false,
+            search: String::new(),
         }
     }
 
@@ -35,68 +37,88 @@ impl ViewerTable {
 
         ui.separator();
 
-        egui_extras::TableBuilder::new(ui)
-            .striped(true)
-            .column(egui_extras::Column::auto().at_least(100.0).resizable(true)) // Timestamp
-            .column(egui_extras::Column::auto().at_least(300.0).resizable(true)) // Msg (ID)
-            .column(egui_extras::Column::auto().at_least(200.0).resizable(true)) // Signal
-            .column(egui_extras::Column::remainder().resizable(true)) // Decoded Signal
-            .header(20.0, |mut header| {
-                header.col(|ui| {
-                    ui.label("Timestamp");
+        ui.add_space(4.0);
+
+        egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::symmetric(8, 6))
+            .stroke(egui::Stroke::NONE)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Search:");
+                    ui.text_edit_singleline(&mut self.search);
                 });
-                header.col(|ui| {
-                    ui.label("Msg (ID)");
-                });
-                header.col(|ui| {
-                    ui.label("Signal");
-                });
-                header.col(|ui| {
-                    ui.label("Decoded Content");
-                });
-            })
-            .body(|mut body| {
+                ui.add_space(8.0);
+              
                 let msgs = if let Some(frozen) = &self.frozen_msgs {
                     frozen
                 } else {
                     &self.decoded_msgs
                 };
 
-                let msg_keys = msgs.keys().cloned().collect::<Vec<_>>();
-                let mut sorted_msg_keys = msg_keys;
-                sorted_msg_keys.sort();
-                for msg_id in sorted_msg_keys {
-                    let msg = &msgs[&msg_id];
-                    let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
-                    signal_keys.sort();
-                    for signal_name in signal_keys {
-                        let signal = &msg.decoded.signals[&signal_name];
-                        body.row(18.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
-                            });
-                            row.col(|ui| {
-                                ui.label(format!(
-                                    "{} (0x{:X})",
-                                    msg.decoded.name, msg.decoded.msg_id
-                                ));
-                            });
-                            row.col(|ui| {
-                                ui.label(signal.name.to_string());
-                            });
-                            row.col(|ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    let low_search = self.search.to_lowercase();
+                    let mut msg_keys = self
+                        .msgs
+                        .iter()
+                        .filter_map(|(&msg_id, msg)| {
+                            if self.search.is_empty()
+                                || msg.decoded.name.to_lowercase().contains(&low_search)
+                                || msg
+                                    .decoded
+                                    .msg_id
+                                    .to_string()
+                                    .to_lowercase()
+                                    .contains(&low_search)
+                                || msg
+                                    .decoded
+                                    .signals
+                                    .values()
+                                    .any(|sig| sig.name.to_lowercase().contains(&low_search))
+                            {
+                                Some(msg_id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    msg_keys.sort();
+                    for msg_id in msg_keys {
+                        let msg = &self.msgs[&msg_id];
+                        let mut signal_keys =
+                            msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
+                        signal_keys.sort();
+                        let signals: Vec<(&str, String)> = signal_keys
+                            .iter()
+                            .map(|sig_name| {
+                                let signal = &msg.decoded.signals[sig_name];
                                 if signal.unit.is_empty() {
-                                    ui.label(format!("{}", signal.value));
+                                    (signal.name.as_str(), format!("{}", signal.value))
                                 } else {
-                                    ui.label(format!("{} {}", signal.value, signal.unit));
+                                    (
+                                        signal.name.as_str(),
+                                        format!("{} {}", signal.value, signal.unit),
+                                    )
                                 }
-                            });
-                        });
+                            })
+                            .collect();
+                        let raw_bytes_str = msg
+                            .raw_bytes
+                            .iter()
+                            .map(|b| format!("{:02X}", b))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        message_card(
+                            ui,
+                            &msg.decoded.name,
+                            msg.decoded.msg_id,
+                            raw_bytes_str.as_str(),
+                            &signals,
+                            &self.search,
+                        );
+                        ui.add_space(8.0);
                     }
-                }
+                });
             });
-
-        ui.scroll_to_cursor(Some(egui::Align::Min));
 
         egui_tiles::UiResponse::None
     }
@@ -110,4 +132,69 @@ impl ViewerTable {
             _ => {}
         }
     }
+}
+
+fn message_card(
+    ui: &mut egui::Ui,
+    msg_name: &str,
+    msg_id: u32,
+    raw_bytes: &str,
+    signals: &[(&str, String)],
+    search: &str,
+) {
+    // Header (outside card)
+    ui.horizontal(|ui| {
+        // Left-aligned: message name and ID
+        ui.label(
+            egui::RichText::new(format!("{}  (0x{:03X})", msg_name, msg_id))
+                .strong()
+                .size(16.0)
+                .color(
+                    if search.is_empty() || msg_name.to_lowercase().contains(&search.to_lowercase())
+                    {
+                        ui.visuals().text_color()
+                    } else {
+                        ui.visuals().weak_text_color()
+                    },
+                ),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(
+                egui::RichText::new(raw_bytes)
+                    .monospace()
+                    .color(ui.visuals().text_color()),
+            );
+        });
+    });
+
+    ui.add_space(4.0);
+
+    // Card container
+    egui::Frame::group(ui.style())
+        .fill(ui.visuals().faint_bg_color)
+        .corner_radius(egui::CornerRadius::same(8))
+        .inner_margin(egui::Margin::symmetric(8, 6))
+        .show(ui, |ui| {
+            ui.vertical(|ui| {
+                for (i, (sig_name, value)) in signals.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(*sig_name).monospace().color(
+                            if search.is_empty()
+                                || sig_name.to_lowercase().contains(&search.to_lowercase())
+                            {
+                                ui.visuals().text_color()
+                            } else {
+                                ui.visuals().weak_text_color()
+                            },
+                        ));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(egui::RichText::new(value).monospace());
+                        });
+                    });
+                    if i < signals.len() - 1 {
+                        ui.separator();
+                    }
+                }
+            });
+        });
 }

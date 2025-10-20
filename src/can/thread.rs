@@ -11,16 +11,17 @@ pub fn start_can_thread(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
-        let serial_path = "/dev/pts/2";
+        let serial_path = "/dev/pts/4";
         let baud_rate = 115_200u32;
 
         // --- Open serial port ---
-        let mut port = match serialport::new(serial_path, baud_rate)
+        let port = match serialport::new(serial_path, baud_rate)
             .timeout(Duration::from_millis(10))
             .open()
         {
             Ok(p) => p,
             Err(e) => {
+                eprintln!("[can-thread] Failed to open serialport {e}");
                 return;
             }
         };
@@ -44,45 +45,7 @@ pub fn start_can_thread(
         state.is_connected = true;
 
         // --- Main loop ---
-        let mut raw_buf = [0u8; 128];
         loop {
-            match port.read(&mut raw_buf) {
-                Ok(n) if n > 0 => {
-                    let data = &raw_buf[..n];
-                    let hex_str = data
-                        .iter()
-                        .map(|b| format!("{:02X} ", b))
-                        .collect::<String>();
-                    let ascii_str = data
-                        .iter()
-                        .map(|b| {
-                            if b.is_ascii_graphic() {
-                                *b as char
-                            } else {
-                                '.'
-                            }
-                        })
-                        .collect::<String>();
-                    println!(
-                        "[can-thread][RAW] {} bytes: [{}]  ASCII: \"{}\"",
-                        n,
-                        hex_str.trim_end(),
-                        ascii_str
-                    );
-                }
-                Ok(_) => {}
-                Err(ref e)
-                    if e.kind() == io::ErrorKind::WouldBlock
-                        || e.kind() == io::ErrorKind::TimedOut =>
-                {
-                    // no data ready yet
-                }
-                Err(e) => {
-                    eprintln!("[can-thread] Serial read error: {e}");
-                    break;
-                }
-            }
-
             // Process UI messages first (DBC load, etc.)
             for msg in state.ui_receiver.try_iter() {
                 match msg {
@@ -102,14 +65,14 @@ pub fn start_can_thread(
             match can.read() {
                 Ok(frame) => match frame {
                     CanFrame::Can2(frame2) => {
-                        println!("[can-thread] Received frame: {:?}", frame2);
-                        if let Some(parser) = state.parser.as_ref() {
-                            let id = match frame2.id() {
-                                slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                                slcan::Id::Extended(eid) => eid.as_raw(),
-                            };
-                            let data = frame2.data();
+                        // println!("[can-thread] Received frame: {:?}", frame2);
+                        let id = match frame2.id() {
+                            slcan::Id::Standard(sid) => sid.as_raw() as u32,
+                            slcan::Id::Extended(eid) => eid.as_raw(),
+                        };
+                        let data = frame2.data();
 
+                        if let Some(parser) = state.parser.as_ref() {
                             if let Some(decoded) = parser.decode_msg(id, data.expect("")) {
                                 let parsed_msg = can::message::ParsedMessage {
                                     timestamp: Local::now(),
@@ -118,6 +81,18 @@ pub fn start_can_thread(
                                 let _ = state
                                     .can_sender
                                     .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                            }
+                        } else {
+                            if let Some(bytes) = data {
+                                println!(
+                                    "[can-thread] Failed to parse frame with ID 0x{:X}, data: {:02X?}",
+                                    id, bytes
+                                );
+                            } else {
+                                println!(
+                                    "[can-thread] Failed to parse frame with ID 0x{:X}, no data field",
+                                    id
+                                );
                             }
                         }
                     }
