@@ -1,4 +1,6 @@
-use std::io::Write as _;
+use std::collections::HashMap;
+use std::io::{BufWriter, Write};
+use std::path::{Path, PathBuf};
 
 use crate::logs;
 
@@ -7,27 +9,22 @@ struct TableHeader {
     node_row: Vec<String>,
     message_row: Vec<String>,
     signal_row: Vec<String>,
-    indexer: std::collections::HashMap<(String, String), usize>, // key is (msg, signal), value is column index
+    indexer: HashMap<(String, String), usize>,
 }
 
 impl TableHeader {
-    pub fn create(parser: &can_decode::Parser) -> Self {
+    fn new(parser: &can_decode::Parser) -> Self {
         let mut message_defs = parser.msg_defs();
         message_defs.sort_by_key(|m| match m.message_id() {
             can_dbc::MessageId::Standard(id) => *id as u32,
             can_dbc::MessageId::Extended(id) => *id,
         });
 
-        let mut bus_row = Vec::with_capacity(message_defs.len() + 1);
-        let mut node_row = Vec::with_capacity(message_defs.len() + 1);
-        let mut message_row = Vec::with_capacity(message_defs.len() + 1);
-        let mut signal_row = Vec::with_capacity(message_defs.len() + 1);
-        let mut indexer = std::collections::HashMap::new();
-
-        bus_row.push("Bus".to_string());
-        node_row.push("Node".to_string());
-        message_row.push("Message".to_string());
-        signal_row.push("Signal".to_string());
+        let mut bus_row = vec!["Bus".to_string()];
+        let mut node_row = vec!["Node".to_string()];
+        let mut message_row = vec!["Message".to_string()];
+        let mut signal_row = vec!["Signal".to_string()];
+        let mut indexer = HashMap::new();
 
         let mut col_idx = 1;
 
@@ -61,202 +58,215 @@ impl TableHeader {
             indexer,
         }
     }
+
+    fn write_headers(&self, writer: &mut BufWriter<std::fs::File>) -> std::io::Result<()> {
+        write_csv_row(writer, &self.bus_row)?;
+        write_csv_row(writer, &self.node_row)?;
+        write_csv_row(writer, &self.message_row)?;
+        write_csv_row(writer, &self.signal_row)?;
+        Ok(())
+    }
 }
 
-fn join_csv_row(cells: &[String]) -> String {
-    // Minimal escaping: wrap cells containing comma or quote in double quotes and escape quotes
-    let mut out = String::new();
+fn write_csv_row(writer: &mut impl Write, cells: &[String]) -> std::io::Result<()> {
     for (i, cell) in cells.iter().enumerate() {
         if i > 0 {
-            out.push(',');
+            writer.write_all(b",")?;
         }
         if cell.contains(',') || cell.contains('"') || cell.contains('\n') {
             let escaped = cell.replace('"', "\"\"");
-            out.push('"');
-            out.push_str(&escaped);
-            out.push('"');
+            write!(writer, "\"{}\"", escaped)?;
         } else {
-            out.push_str(cell);
+            writer.write_all(cell.as_bytes())?;
         }
     }
-    out.push('\n');
-    out
+    writer.write_all(b"\n")?;
+    Ok(())
+}
+
+struct OutputFile {
+    writer: BufWriter<std::fs::File>,
+}
+
+impl OutputFile {
+    fn new(output_dir: &Path, counter: usize, header: &TableHeader) -> std::io::Result<Self> {
+        println!("Creating output file #{} in {:?}", counter, output_dir);
+        let fname = output_dir.join(format!("out_{}.csv", counter));
+        let file = std::fs::File::create(&fname)?;
+        let mut writer = BufWriter::new(file);
+        header.write_headers(&mut writer)?;
+        Ok(Self { writer })
+    }
+
+    fn write_row(&mut self, row: &[Option<String>]) -> std::io::Result<()> {
+        let cells: Vec<String> = row
+            .iter()
+            .map(|opt| opt.as_deref().unwrap_or("").to_string())
+            .collect();
+        write_csv_row(&mut self.writer, &cells)
+    }
+}
+
+struct RowBuilder {
+    data: Vec<Option<String>>,
+    current_time_ms: u64,
+}
+
+impl RowBuilder {
+    fn new(num_cols: usize, start_time_ms: u64) -> Self {
+        let bin_aligned =
+            (start_time_ms / logs::consts::BIN_WIDTH_MS as u64) * logs::consts::BIN_WIDTH_MS as u64;
+        let mut data = vec![None; num_cols];
+        data[0] = Some(format_time(bin_aligned));
+
+        Self {
+            data,
+            current_time_ms: bin_aligned,
+        }
+    }
+
+    fn clear_signals(&mut self) {
+        for value in self.data.iter_mut().skip(1) {
+            *value = None;
+        }
+    }
+
+    fn advance_time(&mut self) {
+        self.current_time_ms += logs::consts::BIN_WIDTH_MS as u64;
+        self.data[0] = Some(format_time(self.current_time_ms));
+    }
+
+    fn set_signal(&mut self, col_idx: usize, value: String) {
+        if col_idx < self.data.len() {
+            self.data[col_idx] = Some(value);
+        } else {
+            eprintln!(
+                "Column index {} out of range for row length {}",
+                col_idx,
+                self.data.len()
+            );
+        }
+    }
+
+    fn should_advance(&self, timestamp_ms: u64) -> bool {
+        timestamp_ms >= self.current_time_ms + logs::consts::BIN_WIDTH_MS as u64
+    }
+}
+
+fn format_time(time_ms: u64) -> String {
+    format!("{:.5}", time_ms as f64 / 1000.0)
+}
+
+struct TimingState {
+    last_timestamp_ms: Option<u32>,
+    initialized: bool,
+}
+
+impl TimingState {
+    fn new() -> Self {
+        Self {
+            last_timestamp_ms: None,
+            initialized: false,
+        }
+    }
+
+    fn should_start_new_file(&self, current_timestamp: u32) -> bool {
+        !self.initialized
+            || self
+                .last_timestamp_ms
+                .map(|last| {
+                    current_timestamp < last
+                        || current_timestamp.wrapping_sub(last) >= logs::consts::MAX_JUMP_MS
+                })
+                .unwrap_or(false)
+    }
+
+    fn update(&mut self, timestamp: u32) {
+        self.last_timestamp_ms = Some(timestamp);
+        self.initialized = true;
+    }
 }
 
 pub fn build_and_output_tables(
     parser: &can_decode::Parser,
     decoded_messages: impl Iterator<Item = logs::parse::LogMessage>,
-    output_dir: std::path::PathBuf,
+    output_dir: PathBuf,
 ) {
-    // Create header (keeps only the header in memory besides one row)
-    let header = TableHeader::create(parser);
-
-    let header_bus_line = join_csv_row(&header.bus_row);
-    let header_node_line = join_csv_row(&header.node_row);
-    let header_message_line = join_csv_row(&header.message_row);
-    let header_signal_line = join_csv_row(&header.signal_row);
-
-    // Number of columns (first column reserved for time)
+    let header = TableHeader::new(parser);
     let num_cols = 1 + header.indexer.len();
 
-    // Row storage: Vec<Option<String>>; index 0 is time as string, rest are signal values
-    let mut row: Vec<Option<String>> = vec![None; num_cols];
+    let mut output_file: Option<OutputFile> = None;
+    let mut file_counter = 0;
+    let mut timing = TimingState::new();
+    let mut row: Option<RowBuilder> = None;
 
-    // File management
-    let mut out_file: Option<std::io::BufWriter<std::fs::File>> = None;
-    let mut out_file_cnt: usize = 0;
+    for log_msg in decoded_messages {
+        let timestamp_ms = log_msg.timestamp;
 
-    // Timing state (timestamps are assumed to be in milliseconds as u32)
-    let mut start_t_valid = false;
-    let mut last_t_ms: Option<u32> = None;
-    let mut cur_row_t_ms: u64 = 0; // current row aligned time in ms
-
-    // default behaviour: clear values after writing a row (like Python's fill_empty_vals=True)
-    let fill_empty = true;
-
-    // Helper: open a new output file and write header
-    let new_out_file =
-        |out_dir: &std::path::PathBuf,
-         out_file_cnt: &mut usize,
-         out_file_slot: &mut Option<std::io::BufWriter<std::fs::File>>| {
-            if let Some(writer) = out_file_slot.take() {
-                // flush and drop previous
-                let _ = writer.into_inner().map(|mut f| f.flush());
-            }
-            let fname = out_dir.join(format!("out_{}.csv", out_file_cnt));
-            *out_file_cnt += 1;
-            let f = match std::fs::File::create(&fname) {
-                Ok(f) => f,
-                Err(e) => {
-                    eprintln!("Failed to create output file {:?}: {}", fname, e);
-                    return;
+        // Check if we need to start a new file
+        if timing.should_start_new_file(timestamp_ms) {
+            // Create new file
+            match OutputFile::new(&output_dir, file_counter, &header) {
+                Ok(file) => {
+                    output_file = Some(file);
+                    file_counter += 1;
                 }
-            };
-            let mut writer = std::io::BufWriter::new(f);
-            // write header lines
-            if let Err(e) = writer.write_all(header_bus_line.as_bytes()) {
-                eprintln!("Failed to write header to {:?}: {}", fname, e);
+                Err(e) => {
+                    eprintln!("Failed to create output file: {}", e);
+                    timing.update(timestamp_ms);
+                    continue;
+                }
             }
-            if let Err(e) = writer.write_all(header_node_line.as_bytes()) {
-                eprintln!("Failed to write header to {:?}: {}", fname, e);
-            }
-            if let Err(e) = writer.write_all(header_message_line.as_bytes()) {
-                eprintln!("Failed to write header to {:?}: {}", fname, e);
-            }
-            if let Err(e) = writer.write_all(header_signal_line.as_bytes()) {
-                eprintln!("Failed to write header to {:?}: {}", fname, e);
-            }
-            *out_file_slot = Some(writer);
+
+            // Initialize row builder
+            row = Some(RowBuilder::new(num_cols, timestamp_ms as u64));
+            timing.update(timestamp_ms);
+        }
+
+        let Some(ref mut file) = output_file else {
+            eprintln!("No output file available; skipping message");
+            timing.update(timestamp_ms);
+            continue;
         };
 
-    // Helper: write the current row to file
-    let write_row_to_file = |writer_opt: &mut Option<std::io::BufWriter<std::fs::File>>,
-                             row_vec: &Vec<Option<String>>| {
-        if writer_opt.is_none() {
-            return;
-        }
-        let writer = writer_opt.as_mut().unwrap();
-        // convert row Vec<Option<String>> to Vec<String> where None -> ""
-        let cells: Vec<String> = row_vec
-            .iter()
-            .map(|opt| match opt {
-                Some(s) => s.clone(),
-                None => "".to_string(),
-            })
-            .collect();
-        let line = join_csv_row(&cells);
-        if let Err(e) = writer.write_all(line.as_bytes()) {
-            eprintln!("Failed to write row: {}", e);
-        }
-        // flush not required every row; BufWriter will buffer
-    };
-
-    // iterate incoming decoded messages
-    for log_msg in decoded_messages {
-        // Assumption: log_msg.timestamp is milliseconds (u32)
-        let t_ms = log_msg.timestamp;
-
-        // When message arrives, determine if we need to start a new output file
-        if !start_t_valid
-            || last_t_ms
-                .map(|last| t_ms < last || t_ms.wrapping_sub(last) >= logs::consts::MAX_JUMP_MS)
-                .unwrap_or(false)
-        {
-            // start a new file
-            new_out_file(&output_dir, &mut out_file_cnt, &mut out_file);
-
-            // Clear row values after starting new file
-            for v in row.iter_mut() {
-                *v = None;
-            }
-
-            start_t_valid = true;
-            // align cur_row_t_ms to bin size floor
-            cur_row_t_ms = (t_ms as u64 / logs::consts::BIN_WIDTH_MS as u64)
-                * logs::consts::BIN_WIDTH_MS as u64;
-            // set time column as seconds with 5 decimals
-            let secs = (cur_row_t_ms as f64) / 1000.0;
-            row[0] = Some(format!("{:.5}", secs));
-        }
-
-        // ensure out_file exists (in case new_out_file failed)
-        if out_file.is_none() {
-            eprintln!("No output file available; skipping message");
-            last_t_ms = Some(t_ms);
+        let Some(ref mut current_row) = row else {
+            eprintln!("Row builder not initialized; skipping message");
+            timing.update(timestamp_ms);
             continue;
-        }
+        };
 
-        // If message falls beyond current bin, flush rows until message fits
-        // while t_ms >= cur_row_t_ms + bin_width
-        while (t_ms as u64) >= (cur_row_t_ms + logs::consts::BIN_WIDTH_MS as u64) {
-            // write current row
-            write_row_to_file(&mut out_file, &row);
-            if fill_empty {
-                // reset values except time
-                for v in row.iter_mut().skip(1) {
-                    *v = None;
-                }
+        // Flush rows until the message fits in the current time bin
+        while current_row.should_advance(timestamp_ms as u64) {
+            if let Err(e) = file.write_row(&current_row.data) {
+                eprintln!("Failed to write row: {}", e);
             }
-            // advance cur_row_t_ms by bin width
-            cur_row_t_ms += logs::consts::BIN_WIDTH_MS as u64;
-            let secs = (cur_row_t_ms as f64) / 1000.0;
-            row[0] = Some(format!("{:.5}", secs));
+            current_row.clear_signals();
+            current_row.advance_time();
         }
 
-        let decoded = log_msg.decoded;
-
-        for (sig_name, sig_val) in decoded.signals {
-            let key = (decoded.name.to_string(), sig_name.to_string());
-            if let Some(&col) = header.indexer.get(&key) {
-                // convert sig_val to string: prefer ToString, else Debug
+        // Update row with signal values
+        for (sig_name, sig_val) in log_msg.decoded.signals {
+            let key = (log_msg.decoded.name.clone(), sig_name.clone());
+            if let Some(&col_idx) = header.indexer.get(&key) {
                 let val_str = format!("{:?}", sig_val);
-                // insert into row at the column index
-                if col < row.len() {
-                    row[col] = Some(val_str);
-                } else {
-                    eprintln!(
-                        "Column index {} out of range for row length {}",
-                        col,
-                        row.len()
-                    );
-                }
+                current_row.set_signal(col_idx, val_str);
             } else {
-                // signal not present in header/indexer -> ignore
                 eprintln!(
                     "Warning: signal {:?} of message {:?} not found in header indexer",
-                    sig_name, decoded.name
+                    sig_name, log_msg.decoded.name
                 );
             }
         }
 
-        last_t_ms = Some(t_ms);
+        timing.update(timestamp_ms);
     }
 
-    if out_file.is_some() {
-        write_row_to_file(&mut out_file, &row);
-        if let Some(mut w) = out_file.take()
-            && let Err(e) = w.flush()
-        {
+    // Write final row
+    if let (Some(file), Some(row)) = (&mut output_file, &row) {
+        if let Err(e) = file.write_row(&row.data) {
+            eprintln!("Failed to write final row: {}", e);
+        }
+        if let Err(e) = file.writer.flush() {
             eprintln!("Failed to flush final output file: {}", e);
         }
     }
