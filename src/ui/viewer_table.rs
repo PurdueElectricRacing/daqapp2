@@ -5,6 +5,8 @@ use hashbrown::HashMap;
 pub struct ViewerTable {
     pub title: String,
     pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
+    pub frozen_msgs: Option<HashMap<u32, can::message::ParsedMessage>>,
+    pub paused: bool,
     pub search: String,
 }
 
@@ -13,12 +15,26 @@ impl ViewerTable {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
             decoded_msgs: HashMap::new(),
+            frozen_msgs: None,
+            paused: false,
             search: String::new(),
         }
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
+        if ui
+            .button(if self.paused { "Resume" } else { "Pause" })
+            .clicked()
+        {
+            self.paused = !self.paused;
+            if self.paused {
+                self.frozen_msgs = Some(self.decoded_msgs.clone());
+            } else {
+                self.frozen_msgs = None;
+            }
+        }
+
         ui.separator();
 
         ui.add_space(4.0);
@@ -32,11 +48,17 @@ impl ViewerTable {
                     ui.text_edit_singleline(&mut self.search);
                 });
                 ui.add_space(8.0);
+              
+                let msgs = if let Some(frozen) = &self.frozen_msgs {
+                    frozen
+                } else {
+                    &self.decoded_msgs
+                };
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let low_search = self.search.to_lowercase();
                     let mut msg_keys = self
-                        .decoded_msgs
+                        .msgs
                         .iter()
                         .filter_map(|(&msg_id, msg)| {
                             if self.search.is_empty()
@@ -61,7 +83,7 @@ impl ViewerTable {
                         .collect::<Vec<_>>();
                     msg_keys.sort();
                     for msg_id in msg_keys {
-                        let msg = &self.decoded_msgs[&msg_id];
+                        let msg = &self.msgs[&msg_id];
                         let mut signal_keys =
                             msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
                         signal_keys.sort();

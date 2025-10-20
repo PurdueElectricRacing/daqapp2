@@ -1,4 +1,3 @@
-
 use crate::can;
 use eframe::egui;
 use std::collections::VecDeque;
@@ -8,6 +7,8 @@ const MAX_MESSAGES: usize = 200;
 pub struct ViewerList {
     pub title: String,
     pub decoded_msgs: VecDeque<can::message::ParsedMessage>,
+    pub frozen_msgs: Option<VecDeque<can::message::ParsedMessage>>,
+    pub paused: bool,
 }
 
 impl ViewerList {
@@ -15,11 +16,24 @@ impl ViewerList {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
             decoded_msgs: VecDeque::new(),
+            frozen_msgs: None,
+            paused: false,
         }
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
+        if ui
+            .button(if self.paused { "Resume" } else { "Pause" })
+            .clicked()
+        {
+            self.paused = !self.paused;
+            if self.paused {
+                self.frozen_msgs = Some(self.decoded_msgs.clone());
+            } else {
+                self.frozen_msgs = None;
+            }
+        }
         ui.separator();
 
         egui_extras::TableBuilder::new(ui)
@@ -43,7 +57,12 @@ impl ViewerList {
                 });
             })
             .body(|mut body| {
-                for msg in self.decoded_msgs.iter().rev() {
+                let msgs = if let Some(frozen) = &self.frozen_msgs {
+                    frozen
+                } else {
+                    &self.decoded_msgs
+                };
+                for msg in msgs.iter().rev() {
                     let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
                     signal_keys.sort();
                     for signal_name in signal_keys {
@@ -81,6 +100,9 @@ impl ViewerList {
     pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
         match msg {
             can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
+                if self.paused {
+                    return;
+                }
                 while self.decoded_msgs.len() >= MAX_MESSAGES - 1 {
                     self.decoded_msgs.pop_front();
                 }
