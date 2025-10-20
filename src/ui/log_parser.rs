@@ -1,4 +1,4 @@
-use crate::ui;
+use crate::{logs, ui};
 use eframe::egui;
 
 pub struct LogParser {
@@ -72,6 +72,11 @@ impl LogParser {
         // TODO: Implement log parsing
         println!("Parsing logs from: {}", logs_dir.display());
         println!("Output to: {}", output_dir.display());
+        let _handle = logs::parse::start_log_parse_thread(
+            dbc_path.clone(),
+            logs_dir.clone(),
+            output_dir.clone(),
+        );
     }
 
     pub fn show(

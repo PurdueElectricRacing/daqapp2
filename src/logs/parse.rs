@@ -20,6 +20,9 @@ pub fn start_log_parse_thread(
                 return;
             }
         };
+
+        let decoded_iter = stream_decoded(&parser, logs_dir);
+        logs::table::build_and_output_tables(&parser, decoded_iter, output_dir);
     })
 }
 

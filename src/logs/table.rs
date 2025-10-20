@@ -91,35 +91,10 @@ pub fn build_and_output_tables(
     // Create header (keeps only the header in memory besides one row)
     let header = TableHeader::create(parser);
 
-    let mut bus_row = header.bus_row.clone();
-    let mut node_row = header.node_row.clone();
-    let mut message_row = header.message_row.clone();
-    let mut signal_row = header.signal_row.clone();
-
-    let header_bus_line = join_csv_row(
-        &bus_row
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>(),
-    );
-    let header_node_line = join_csv_row(
-        &node_row
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>(),
-    );
-    let header_message_line = join_csv_row(
-        &message_row
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>(),
-    );
-    let header_signal_line = join_csv_row(
-        &signal_row
-            .iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>(),
-    );
+    let header_bus_line = join_csv_row(&header.bus_row);
+    let header_node_line = join_csv_row(&header.node_row);
+    let header_message_line = join_csv_row(&header.message_row);
+    let header_signal_line = join_csv_row(&header.signal_row);
 
     // Number of columns (first column reserved for time)
     let num_cols = 1 + header.indexer.len();
@@ -140,13 +115,13 @@ pub fn build_and_output_tables(
     let fill_empty = true;
 
     // Helper: open a new output file and write header
-    let mut new_out_file =
+    let new_out_file =
         |out_dir: &std::path::PathBuf,
          out_file_cnt: &mut usize,
          out_file_slot: &mut Option<std::io::BufWriter<std::fs::File>>| {
             if let Some(writer) = out_file_slot.take() {
                 // flush and drop previous
-                let _ = writer.into_inner().and_then(|mut f| Ok(f.flush()));
+                let _ = writer.into_inner().map(|mut f| f.flush());
             }
             let fname = out_dir.join(format!("out_{}.csv", out_file_cnt));
             *out_file_cnt += 1;
@@ -172,10 +147,6 @@ pub fn build_and_output_tables(
                 eprintln!("Failed to write header to {:?}: {}", fname, e);
             }
             *out_file_slot = Some(writer);
-            // clear row values
-            for v in row.iter_mut() {
-                *v = None;
-            }
         };
 
     // Helper: write the current row to file
@@ -203,7 +174,7 @@ pub fn build_and_output_tables(
     // iterate incoming decoded messages
     for log_msg in decoded_messages {
         // Assumption: log_msg.timestamp is milliseconds (u32)
-        let t_ms = log_msg.timestamp as u32;
+        let t_ms = log_msg.timestamp;
 
         // When message arrives, determine if we need to start a new output file
         if !start_t_valid
@@ -213,6 +184,12 @@ pub fn build_and_output_tables(
         {
             // start a new file
             new_out_file(&output_dir, &mut out_file_cnt, &mut out_file);
+
+            // Clear row values after starting new file
+            for v in row.iter_mut() {
+                *v = None;
+            }
+
             start_t_valid = true;
             // align cur_row_t_ms to bin size floor
             cur_row_t_ms = (t_ms as u64 / logs::consts::BIN_WIDTH_MS as u64)
@@ -277,10 +254,10 @@ pub fn build_and_output_tables(
 
     if out_file.is_some() {
         write_row_to_file(&mut out_file, &row);
-        if let Some(mut w) = out_file.take() {
-            if let Err(e) = w.flush() {
-                eprintln!("Failed to flush final output file: {}", e);
-            }
+        if let Some(mut w) = out_file.take()
+            && let Err(e) = w.flush()
+        {
+            eprintln!("Failed to flush final output file: {}", e);
         }
     }
 }

@@ -55,7 +55,6 @@ impl ViewerTable {
                     &self.decoded_msgs
                 };
 
-
                 if msgs.is_empty() {
                     ui.centered_and_justified(|ui| {
                         ui.label(
