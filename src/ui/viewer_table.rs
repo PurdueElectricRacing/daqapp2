@@ -48,7 +48,7 @@ impl ViewerTable {
                     ui.text_edit_singleline(&mut self.search);
                 });
                 ui.add_space(8.0);
-              
+
                 let msgs = if let Some(frozen) = &self.frozen_msgs {
                     frozen
                 } else {
@@ -57,8 +57,7 @@ impl ViewerTable {
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let low_search = self.search.to_lowercase();
-                    let mut msg_keys = self
-                        .msgs
+                    let mut msg_keys = msgs
                         .iter()
                         .filter_map(|(&msg_id, msg)| {
                             if self.search.is_empty()
@@ -83,7 +82,7 @@ impl ViewerTable {
                         .collect::<Vec<_>>();
                     msg_keys.sort();
                     for msg_id in msg_keys {
-                        let msg = &self.msgs[&msg_id];
+                        let msg = &msgs[&msg_id];
                         let mut signal_keys =
                             msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
                         signal_keys.sort();

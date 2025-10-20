@@ -56,9 +56,17 @@ impl DAQApp {
         tabs.set_active(new_tile_id);
     }
 
-    pub fn spawn_can_viewer(&mut self) {
+    pub fn spawn_viewer_table(&mut self) {
+        let widget = widgets::Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
+            self.next_can_viewer_num,
+        ));
+        self.next_can_viewer_num += 1;
+        self.add_widget_to_tree(widget);
+    }
+
+    pub fn spawn_viewer_list(&mut self) {
         let widget =
-            widgets::Widget::CanViewer(ui::can_viewer::CanViewer::new(self.next_can_viewer_num));
+            widgets::Widget::ViewerList(ui::viewer_list::ViewerList::new(self.next_can_viewer_num));
         self.next_can_viewer_num += 1;
         self.add_widget_to_tree(widget);
     }

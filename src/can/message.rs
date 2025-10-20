@@ -1,6 +1,6 @@
 #[derive(Clone)]
 pub struct ParsedMessage {
-    // Timestamp in microseconds since epoch
     pub timestamp: chrono::DateTime<chrono::Local>,
+    pub raw_bytes: Vec<u8>,
     pub decoded: can_decode::DecodedMessage,
 }

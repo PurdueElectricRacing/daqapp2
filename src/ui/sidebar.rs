@@ -12,7 +12,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             }
 
             if ui.button("Add CAN Viewer List").clicked() {
-                app.spawn_can_viewer_list();
+                app.spawn_viewer_list();
             }
 
             if ui.button("Add Bootloader").clicked() {
