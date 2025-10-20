@@ -16,7 +16,7 @@ pub fn start_log_parse_thread(
         let parser = match can_decode::Parser::from_dbc_file(&dbc_path) {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("Failed to load DBC from {:?}: {}", dbc_path, e);
+                eprintln!("Failed to load parser from DBC at {:?}: {}", dbc_path, e);
                 return;
             }
         };
@@ -37,7 +37,6 @@ fn stream_decoded<'a>(
         .collect::<Vec<_>>();
     file_paths.sort();
 
-    // Create an iterator over files, then flatten each file's iterator of parsed messages
     file_paths.into_iter().flat_map(move |path| {
         let file = std::fs::File::open(&path).expect("Failed to open log file");
         let mut reader = std::io::BufReader::new(file);
@@ -45,7 +44,7 @@ fn stream_decoded<'a>(
 
         std::iter::from_fn(move || {
             let bytes_read = match reader.read(&mut buff) {
-                Ok(0) => return None, // EOF
+                Ok(0) => return None,
                 Ok(n) => n,
                 Err(e) => {
                     eprintln!("Error reading log file {:?}: {}", path, e);
