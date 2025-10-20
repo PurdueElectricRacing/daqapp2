@@ -55,6 +55,18 @@ impl ViewerTable {
                     &self.decoded_msgs
                 };
 
+
+                if msgs.is_empty() {
+                    ui.centered_and_justified(|ui| {
+                        ui.label(
+                            egui::RichText::new("No CAN messages to display.")
+                                .italics()
+                                .weak(),
+                        );
+                    });
+                    return;
+                }
+
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let low_search = self.search.to_lowercase();
                     let mut msg_keys = msgs
