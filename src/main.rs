@@ -1,5 +1,6 @@
 mod app;
 mod can;
+mod config;
 mod shortcuts;
 mod ui;
 mod widgets;

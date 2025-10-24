@@ -1,4 +1,4 @@
-use crate::{can, shortcuts, ui, widgets, workspace};
+use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui;
 
 pub struct DAQApp {
@@ -10,6 +10,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub theme: Option<config::ThemeColors>,
 }
 
 impl DAQApp {
@@ -17,6 +18,7 @@ impl DAQApp {
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     ) -> Self {
+        let theme = config::ThemeColors::load_from_file("colors.toml");
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -26,6 +28,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_receiver,
             ui_sender,
+            theme,
         }
     }
 
@@ -107,6 +110,10 @@ impl DAQApp {
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         // Handle keyboard shortcuts
+        if let Some(theme) = &self.theme {
+            ctx.set_style(theme.to_egui_style());
+        }
+        
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
         for action in shortcuts {
             match action {
