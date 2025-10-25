@@ -1,5 +1,5 @@
-background   = "#2e3440"
-panel_bg     = "#3b4252"
+background   = "#3b4252"
+panel_bg     = "#2e3440"
 text         = "#eceff4"
 accent       = "#88c0d0"
 button       = "#434c5e"

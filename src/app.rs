@@ -109,6 +109,8 @@ impl DAQApp {
 
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(2.5);
+        
         // Handle keyboard shortcuts
         if let Some(theme) = &self.theme {
             ctx.set_style(theme.to_egui_style());
