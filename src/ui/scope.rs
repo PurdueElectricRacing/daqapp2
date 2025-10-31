@@ -8,6 +8,7 @@ use std::collections::VecDeque;
 
 pub struct Scope {
     pub title: String,
+    msg_id: u32,
     signal_name: String,
     window: VecDeque<f64>,
     window_size: usize,
@@ -16,11 +17,12 @@ pub struct Scope {
 }
 
 impl Scope {
-    // TODO pass arguments containing signal data, signal_name, dt,
-    pub fn new(instance_num: usize) -> Self {
+    pub fn new(instance_num: usize, msg_id: u32, signal_name: String) -> Self {
+        let title = format!("Scope #{}: {}", instance_num, &signal_name);
         Self {
-            title: format!("Scope #{}", instance_num),
-            signal_name: String::from("Signal"),
+            title,
+            msg_id,
+            signal_name,
             window: VecDeque::new(),
             window_size: 1000,
             is_paused: false,
@@ -135,5 +137,19 @@ impl Scope {
             });
 
         egui_tiles::UiResponse::None
+    }
+
+    pub fn handle_can_message(&mut self, msg: &crate::can::can_messages::CanMessage) {
+        let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg;
+        
+        if parsed.decoded.msg_id != self.msg_id {
+            return;
+        }
+        
+        let Some(signal) = parsed.decoded.signals.get(&self.signal_name) else {
+            return;
+        };
+        
+        self.add_point(signal.value);
     }
 }
