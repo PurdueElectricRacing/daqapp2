@@ -17,6 +17,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub pending_scope_spawns: Vec<(u32, String)>,
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
@@ -47,6 +48,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_receiver,
             ui_sender,
+            pending_scope_spawns: Vec::new(),
             theme,
             theme_selection: ThemeSelection::Default,
             pixels_per_point: default_scale,
@@ -102,8 +104,12 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
 
-    pub fn spawn_scope(&mut self) {
-        let widget = widgets::Widget::Scope(ui::scope::Scope::new(self.next_scope_num));
+    pub fn spawn_scope(&mut self, msg_id: u32, signal_name: String) {
+        let widget = widgets::Widget::Scope(ui::scope::Scope::new(
+            self.next_scope_num,
+            msg_id,
+            signal_name,
+        ));
         self.next_scope_num += 1;
         self.add_widget_to_tree(widget);
     }
