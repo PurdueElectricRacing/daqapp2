@@ -15,6 +15,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "DaqApp2",
         eframe::NativeOptions::default(),
-        Box::new(|_cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender)))),
+        Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
     )
 }
