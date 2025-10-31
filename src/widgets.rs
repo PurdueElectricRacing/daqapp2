@@ -26,8 +26,16 @@ impl Widget {
         can_receiver: &std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     ) -> egui_tiles::UiResponse {
+        let mut received_new_data = false;
+        
         for msg in can_receiver.try_iter() {
             self.handle_can_message(&msg);
+            received_new_data = true;
+        }
+
+        // Request repaint only if we received new data
+        if received_new_data {
+            ui.ctx().request_repaint();
         }
 
         match self {
