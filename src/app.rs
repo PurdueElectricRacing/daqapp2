@@ -14,12 +14,21 @@ pub struct DAQApp {
     pub pixels_per_point: f32,
 }
 
+const MIN_UI_SCALE: f32 = 0.4;
+const MAX_UI_SCALE: f32 = 5.0;
+
 impl DAQApp {
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        cc: &eframe::CreationContext,
     ) -> Self {
         let theme = config::ThemeColors::load_from_file("colors.toml");
+        
+        // Calculate a default ui scale based off the native_pixels_per_point
+        let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
+        let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
+        
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -30,7 +39,7 @@ impl DAQApp {
             can_receiver,
             ui_sender,
             theme,
-            pixels_per_point: 2.4,
+            pixels_per_point: default_scale,
         }
     }
 
@@ -128,10 +137,10 @@ impl eframe::App for DAQApp {
                     self.close_active_widget();
                 }
                 shortcuts::ShortcutAction::IncreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(5.0);
+                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
                 }
                 shortcuts::ShortcutAction::DecreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(0.4);
+                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
                 }
             }
         }
