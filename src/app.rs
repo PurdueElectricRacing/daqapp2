@@ -1,6 +1,13 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui;
 
+#[derive(Copy, Clone)]
+pub enum ThemeSelection {
+    Default,
+    Nord,
+    Catppuccin,
+}
+
 pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
@@ -10,7 +17,8 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pub theme: Option<config::ThemeColors>,
+    pub theme: egui::Style,
+    pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
 }
 
@@ -23,7 +31,8 @@ impl DAQApp {
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         cc: &eframe::CreationContext,
     ) -> Self {
-        let theme = config::ThemeColors::load_from_file("colors.toml");
+        // Boot with the egui default theme
+        let theme = egui::Style::default();
         
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
@@ -39,6 +48,7 @@ impl DAQApp {
             can_receiver,
             ui_sender,
             theme,
+            theme_selection: ThemeSelection::Default,
             pixels_per_point: default_scale,
         }
     }
@@ -105,6 +115,30 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
 
+    pub fn toggle_theme(&mut self) {
+        // Update theme selection to the next option
+        self.theme_selection = match self.theme_selection {
+            ThemeSelection::Default => ThemeSelection::Nord,
+            ThemeSelection::Nord => ThemeSelection::Catppuccin,
+            ThemeSelection::Catppuccin => ThemeSelection::Default,
+        };
+        
+        // Load the selected theme into the actual field
+        self.theme = match self.theme_selection {
+            ThemeSelection::Default => egui::Style::default(),
+            ThemeSelection::Nord => {
+                config::ThemeColors::load_from_file("nord.toml")
+                    .map(|t| t.to_egui_style())
+                    .unwrap_or_else(egui::Style::default)
+            },
+            ThemeSelection::Catppuccin => {
+                config::ThemeColors::load_from_file("catppuccin.toml")
+                    .map(|t| t.to_egui_style())
+                    .unwrap_or_else(egui::Style::default)
+            },
+        };
+    }
+
     // Close the currently active widget in the tile tree
     pub fn close_active_widget(&mut self) {
         let active_tiles = self.tile_tree.active_tiles();
@@ -121,10 +155,7 @@ impl DAQApp {
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         ctx.set_pixels_per_point(self.pixels_per_point);
-        
-        if let Some(theme) = &self.theme {
-            ctx.set_style(theme.to_egui_style());
-        }
+        ctx.set_style(self.theme.clone());
         
         // Handle keyboard shortcuts
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
