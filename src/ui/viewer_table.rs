@@ -21,7 +21,11 @@ impl ViewerTable {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        pending_scope_spawns: &mut Vec<(u32, String)>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
             .button(if self.paused { "Resume" } else { "Pause" })
@@ -125,6 +129,7 @@ impl ViewerTable {
                             raw_bytes_str.as_str(),
                             &signals,
                             &self.search,
+                            pending_scope_spawns,
                         );
                         ui.add_space(8.0);
                     }
@@ -152,6 +157,7 @@ fn message_card(
     raw_bytes: &str,
     signals: &[(&str, String)],
     search: &str,
+    pending_scope_spawns: &mut Vec<(u32, String)>,
 ) {
     // Header (outside card)
     ui.horizontal(|ui| {
@@ -200,6 +206,9 @@ fn message_card(
                         ));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.label(egui::RichText::new(value).monospace());
+                            if ui.small_button("add scope").clicked() {
+                                pending_scope_spawns.push((msg_id, sig_name.to_string()));
+                            }
                         });
                     });
                     if i < signals.len() - 1 {

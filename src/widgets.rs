@@ -25,6 +25,7 @@ impl Widget {
         ui: &mut egui::Ui,
         can_receiver: &std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        pending_scope_spawns: &mut Vec<(u32, String)>,
     ) -> egui_tiles::UiResponse {
         let mut received_new_data = false;
         
@@ -39,7 +40,7 @@ impl Widget {
         }
 
         match self {
-            Widget::ViewerTable(w) => w.show(ui),
+            Widget::ViewerTable(w) => w.show(ui, pending_scope_spawns),
             Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
@@ -51,6 +52,7 @@ impl Widget {
         match self {
             Widget::ViewerTable(w) => w.handle_can_message(msg),
             Widget::ViewerList(w) => w.handle_can_message(msg),
+            Widget::Scope(w) => w.handle_can_message(msg),
             _ => {}
         }
     }
