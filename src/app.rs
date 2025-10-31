@@ -11,6 +11,7 @@ pub struct DAQApp {
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pub theme: Option<config::ThemeColors>,
+    pub pixels_per_point: f32,
 }
 
 impl DAQApp {
@@ -29,6 +30,7 @@ impl DAQApp {
             can_receiver,
             ui_sender,
             theme,
+            pixels_per_point: 2.4,
         }
     }
 
@@ -111,11 +113,11 @@ impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         // ctx.set_pixels_per_point(2.5);
         
-        // Handle keyboard shortcuts
         if let Some(theme) = &self.theme {
             ctx.set_style(theme.to_egui_style());
         }
         
+        // Handle keyboard shortcuts
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
         for action in shortcuts {
             match action {
@@ -124,6 +126,12 @@ impl eframe::App for DAQApp {
                 }
                 shortcuts::ShortcutAction::CloseActiveWidget => {
                     self.close_active_widget();
+                }
+                shortcuts::ShortcutAction::IncreaseScale => {
+                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(5.0);
+                }
+                shortcuts::ShortcutAction::DecreaseScale => {
+                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(0.4);
                 }
             }
         }
