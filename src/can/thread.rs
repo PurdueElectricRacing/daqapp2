@@ -70,6 +70,7 @@ pub fn start_can_thread(
                             slcan::Id::Standard(sid) => sid.as_raw() as u32,
                             slcan::Id::Extended(eid) => eid.as_raw(),
                         };
+
                         let data = frame2.data().unwrap_or(&[]);
 
                         if let Some(parser) = state.parser.as_ref() {
@@ -93,7 +94,22 @@ pub fn start_can_thread(
                                 "[can-thread] No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
                                 id, id, data
                             );
-                        }
+                            continue;
+                        };
+
+                        let Some(decoded) = parser.decode_msg(id, data) else {
+                            continue;
+                        };
+
+                        let parsed_msg = can::message::ParsedMessage {
+                            timestamp: Local::now(),
+                            raw_bytes: data.to_vec(),
+                            decoded,
+                        };
+
+                        let _ = state
+                            .can_sender
+                            .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
                     }
                     CanFrame::CanFd(frame_fd) => {
                         // Optional: Handle FD frames differently or log
