@@ -4,6 +4,8 @@ use eframe::egui;
 pub enum ShortcutAction {
     ToggleSidebar,
     CloseActiveWidget,
+    IncreaseScale,
+    DecreaseScale,
 }
 
 pub struct ShortcutHandler;
@@ -23,6 +25,16 @@ impl ShortcutHandler {
         // CMD+W = close window
         if input.modifiers.command_only() && input.key_pressed(egui::Key::W) {
             actions.push(ShortcutAction::CloseActiveWidget);
+        }
+
+        // CMD+Plus = increase scale
+        if input.modifiers.command_only() && input.key_pressed(egui::Key::Equals) {
+            actions.push(ShortcutAction::IncreaseScale);
+        }
+
+        // CMD+Minus = decrease scale
+        if input.modifiers.command_only() && input.key_pressed(egui::Key::Minus) {
+            actions.push(ShortcutAction::DecreaseScale);
         }
 
         actions
