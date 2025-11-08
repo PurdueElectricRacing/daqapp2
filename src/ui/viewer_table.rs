@@ -83,6 +83,7 @@ impl ViewerTable {
                                     .to_string()
                                     .to_lowercase()
                                     .contains(&low_search)
+                                || msg.tx_node.to_lowercase().contains(&low_search)
                                 || msg
                                     .decoded
                                     .signals
@@ -125,7 +126,9 @@ impl ViewerTable {
                             ui,
                             &msg.decoded.name,
                             msg.decoded.msg_id,
+                            msg.tx_node.as_str(),
                             raw_bytes_str.as_str(),
+                            &msg.timestamp.format("%-I:%M:%S%.3f").to_string(),
                             &signals,
                             &self.search,
                             pending_scope_spawns,
@@ -153,14 +156,15 @@ fn message_card(
     ui: &mut egui::Ui,
     msg_name: &str,
     msg_id: u32,
+    tx_node: &str,
     raw_bytes: &str,
+    timestamp: &str,
     signals: &[(&str, String)],
     search: &str,
-    pending_scope_spawns: &mut Vec<(u32, String)>,
+    pending_scope_spawns: &mut Vec<(u32, String, String)>,
 ) {
     // Header (outside card)
     ui.horizontal(|ui| {
-        // Left-aligned: message name and ID
         ui.label(
             egui::RichText::new(format!("{}  (0x{:03X})", msg_name, msg_id))
                 .strong()
@@ -174,12 +178,29 @@ fn message_card(
                     },
                 ),
         );
+        ui.label(
+            egui::RichText::new(format!("from {}", tx_node))
+                .color(
+                    if search.is_empty() || tx_node.to_lowercase().contains(&search.to_lowercase())
+                    {
+                        ui.visuals().text_color()
+                    } else {
+                        ui.visuals().weak_text_color()
+                    },
+                )
+        );
+        ui.label(
+            egui::RichText::new(timestamp)
+                .italics()
+                .color(ui.visuals().weak_text_color()),
+        );
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
                 egui::RichText::new(raw_bytes)
                     .monospace()
                     .color(ui.visuals().text_color()),
             );
+            ui.add_space(2.0);
         });
     });
 
