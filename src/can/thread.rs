@@ -68,7 +68,7 @@ pub fn start_can_thread(
                         // println!("[can-thread] Received frame: {:?}", frame2);
                         let id = match frame2.id() {
                             slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                            slcan::Id::Extended(eid) => eid.as_raw(),
+                            slcan::Id::Extended(eid) => eid.as_raw() | 0x80000000,
                         };
                         let data = frame2.data().unwrap_or(&[]);
 
