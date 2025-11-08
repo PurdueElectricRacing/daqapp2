@@ -24,7 +24,7 @@ impl ViewerTable {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        pending_scope_spawns: &mut Vec<(u32, String)>,
+        pending_scope_spawns: &mut Vec<(u32, String, String)>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
@@ -58,7 +58,6 @@ impl ViewerTable {
                 } else {
                     &self.decoded_msgs
                 };
-
 
                 if msgs.is_empty() {
                     ui.centered_and_justified(|ui| {
@@ -205,10 +204,15 @@ fn message_card(
                             },
                         ));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(egui::RichText::new(value).monospace());
-                            if ui.small_button("add scope").clicked() {
-                                pending_scope_spawns.push((msg_id, sig_name.to_string()));
+                            if ui.small_button("📊").clicked() {
+                                pending_scope_spawns.push((
+                                    msg_id,
+                                    msg_name.to_string(),
+                                    sig_name.to_string(),
+                                ));
                             }
+                            ui.add_space(8.0);
+                            ui.label(egui::RichText::new(value).monospace());
                         });
                     });
                     if i < signals.len() - 1 {
