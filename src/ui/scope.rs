@@ -14,7 +14,6 @@ pub struct Scope {
     window: VecDeque<f64>,
     window_size: usize,
     is_paused: bool,
-    show_line: bool,
 }
 
 impl Scope {
@@ -28,7 +27,6 @@ impl Scope {
             window: VecDeque::new(),
             window_size: 1000,
             is_paused: false,
-            show_line: false,
         }
     }
 
@@ -105,9 +103,6 @@ impl Scope {
             }
 
             ui.separator();
-
-            // Show line checkbox
-            ui.checkbox(&mut self.show_line, "Show Line");
         });
 
         ui.separator();
@@ -126,10 +121,6 @@ impl Scope {
                     .enumerate()
                     .map(|(i, &value)| [i as f64, value])
                     .collect();
-
-                if !self.show_line {
-                    return;
-                }
 
                 let line = Line::new(&self.signal_name, points)
                     .color(egui::Color32::from_rgb(100, 200, 100))
