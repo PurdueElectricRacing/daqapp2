@@ -34,11 +34,11 @@ impl DAQApp {
     ) -> Self {
         // Boot with the egui default theme
         let theme = egui::Style::default();
-        
+
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        
+
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
