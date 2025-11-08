@@ -82,6 +82,10 @@ pub fn start_can_thread(
                         };
 
                         let Some(decoded) = parser.decode_msg(id, data) else {
+                            println!(
+                                "[can-thread] Unrecognized CAN message ID 0x{:X}, data: {:02X?}",
+                                id, data
+                            );
                             continue;
                         };
 
