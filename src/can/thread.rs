@@ -11,7 +11,7 @@ pub fn start_can_thread(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
-        let serial_path = "/dev/pts/4";
+        let serial_path = "/dev/ttyACM0";
         let baud_rate = 115_200u32;
 
         // --- Open serial port ---
@@ -68,7 +68,7 @@ pub fn start_can_thread(
                         // println!("[can-thread] Received frame: {:?}", frame2);
                         let id = match frame2.id() {
                             slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                            slcan::Id::Extended(eid) => eid.as_raw() | 0x80000000,
+                            slcan::Id::Extended(eid) => eid.as_raw(),
                         };
                         let data = frame2.data().unwrap_or(&[]);
 
@@ -90,8 +90,8 @@ pub fn start_can_thread(
                             }
                         } else {
                             println!(
-                                "[can-thread] No DBC loaded. Received frame ID 0x{:X}, data: {:02X?}",
-                                id, data
+                                "[can-thread] No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
+                                id, id, data
                             );
                         }
                     }
