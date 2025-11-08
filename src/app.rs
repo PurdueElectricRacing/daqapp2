@@ -128,20 +128,16 @@ impl DAQApp {
             ThemeSelection::Nord => ThemeSelection::Catppuccin,
             ThemeSelection::Catppuccin => ThemeSelection::Default,
         };
-        
+
         // Load the selected theme into the actual field
         self.theme = match self.theme_selection {
             ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => {
-                config::ThemeColors::load_from_file("nord.toml")
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_else(egui::Style::default)
-            },
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file("catppuccin.toml")
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_else(egui::Style::default)
-            },
+            ThemeSelection::Nord => config::ThemeColors::load_from_file("nord.toml")
+                .map(|t| t.to_egui_style())
+                .unwrap_or_else(egui::Style::default),
+            ThemeSelection::Catppuccin => config::ThemeColors::load_from_file("catppuccin.toml")
+                .map(|t| t.to_egui_style())
+                .unwrap_or_else(egui::Style::default),
         };
     }
 
@@ -162,7 +158,7 @@ impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         ctx.set_pixels_per_point(self.pixels_per_point);
         ctx.set_style(self.theme.clone());
-        
+
         // Handle keyboard shortcuts
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
         for action in shortcuts {
