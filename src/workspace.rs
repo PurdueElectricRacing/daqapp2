@@ -16,10 +16,10 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 pending_scope_spawns: &mut app.pending_scope_spawns,
             };
             app.tile_tree.ui(&mut behavior, ui);
-            
+
             // Spawn all pending scopes in the queue
-            for (msg_id, signal_name) in std::mem::take(&mut app.pending_scope_spawns) {
-                app.spawn_scope(msg_id, signal_name);
+            for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns) {
+                app.spawn_scope(msg_id, msg_name, signal_name);
             }
         }
     });
@@ -28,7 +28,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 struct WorkspaceTileBehavior<'a> {
     can_receiver: &'a std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     ui_sender: &'a std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pending_scope_spawns: &'a mut Vec<(u32, String)>,
+    pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -38,7 +38,12 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.can_receiver, self.ui_sender, self.pending_scope_spawns)
+        widget.show(
+            ui,
+            self.can_receiver,
+            self.ui_sender,
+            self.pending_scope_spawns,
+        )
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {

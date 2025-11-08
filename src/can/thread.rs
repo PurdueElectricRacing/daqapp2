@@ -105,10 +105,24 @@ pub fn start_can_thread(
                             continue;
                         };
 
+                        let tx_node = parser.msg_defs().iter()
+                            .find(|m| {
+                                let m_id = match m.message_id() {
+                                    can_dbc::MessageId::Standard(sid) => *sid as u32,
+                                    can_dbc::MessageId::Extended(eid) => *eid,
+                                };
+                                m_id == id
+                            })
+                            .map(|m| match m.transmitter() {
+                                can_dbc::Transmitter::NodeName(name) => name.clone(),
+                                can_dbc::Transmitter::VectorXXX => "Unknown".to_string(),
+                            }).unwrap_or_else(|| "Unknown".to_string());
+
                         let parsed_msg = can::message::ParsedMessage {
                             timestamp: Local::now(),
                             raw_bytes: data.to_vec(),
                             decoded,
+                            tx_node,
                         };
 
                         let _ = state

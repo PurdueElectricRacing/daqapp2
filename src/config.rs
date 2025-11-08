@@ -43,9 +43,17 @@ impl ThemeColors {
         let accent = Self::parse_hex(&self.accent);
         let button = Self::parse_hex(&self.button.clone().unwrap_or_else(|| self.accent.clone()));
         let button_hover = Self::parse_hex(
-            &self.button_hover.clone().unwrap_or_else(|| self.accent.clone()));
+            &self
+                .button_hover
+                .clone()
+                .unwrap_or_else(|| self.accent.clone()),
+        );
         let button_text = Self::parse_hex(
-            &self.button_text.clone().unwrap_or_else(|| self.text.clone()));
+            &self
+                .button_text
+                .clone()
+                .unwrap_or_else(|| self.text.clone()),
+        );
 
         // --- Base ---
         style.visuals.window_fill = bg;
@@ -64,7 +72,7 @@ impl ThemeColors {
         style.visuals.widgets.inactive.fg_stroke.color = button_text;
         style.visuals.widgets.hovered.fg_stroke.color = button_text;
         style.visuals.widgets.active.fg_stroke.color = button_text;
-        
+
         // Optional: slightly darker borders for contrast
         style.visuals.widgets.noninteractive.bg_stroke.color = accent.linear_multiply(0.3);
 
