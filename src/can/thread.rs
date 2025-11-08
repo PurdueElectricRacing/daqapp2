@@ -82,10 +82,15 @@ pub fn start_can_thread(
                                 let _ = state
                                     .can_sender
                                     .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                            } else {
+                                println!(
+                                    "[can-thread] No DBC message for frame ID 0x{:X}, data: {:02X?}",
+                                    id, data
+                                );
                             }
                         } else {
                             println!(
-                                "[can-thread] Failed to parse frame with ID 0x{:X}, data: {:02X?}",
+                                "[can-thread] No DBC loaded. Received frame ID 0x{:X}, data: {:02X?}",
                                 id, data
                             );
                         }
