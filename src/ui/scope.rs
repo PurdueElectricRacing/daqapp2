@@ -9,6 +9,7 @@ use std::collections::VecDeque;
 pub struct Scope {
     pub title: String,
     msg_id: u32,
+    msg_name: String,
     signal_name: String,
     window: VecDeque<f64>,
     window_size: usize,
@@ -17,11 +18,12 @@ pub struct Scope {
 }
 
 impl Scope {
-    pub fn new(instance_num: usize, msg_id: u32, signal_name: String) -> Self {
-        let title = format!("Scope #{}: {}", instance_num, &signal_name);
+    pub fn new(instance_num: usize, msg_id: u32, msg_name: String, signal_name: String) -> Self {
+        let title = format!("Scope #{}", instance_num);
         Self {
             title,
             msg_id,
+            msg_name,
             signal_name,
             window: VecDeque::new(),
             window_size: 1000,
@@ -65,7 +67,10 @@ impl Scope {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
-        ui.heading(format!("📊 {}: {}", self.title, self.signal_name));
+        ui.heading(format!(
+            "📊 {}: {} - {}",
+            self.title, self.msg_name, self.signal_name
+        ));
 
         // Horizontal container
         ui.horizontal(|ui| {
@@ -83,7 +88,7 @@ impl Scope {
 
             // Window size slider
             ui.label("Window Size:");
-            ui.add(egui::Slider::new(&mut self.window_size, 10..=1000).suffix(" samples"));
+            ui.add(egui::Slider::new(&mut self.window_size, 10..=5000).suffix(" samples"));
 
             ui.separator();
 
@@ -141,15 +146,15 @@ impl Scope {
 
     pub fn handle_can_message(&mut self, msg: &crate::can::can_messages::CanMessage) {
         let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg;
-        
+
         if parsed.decoded.msg_id != self.msg_id {
             return;
         }
-        
+
         let Some(signal) = parsed.decoded.signals.get(&self.signal_name) else {
             return;
         };
-        
+
         self.add_point(signal.value);
     }
 }
