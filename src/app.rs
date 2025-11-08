@@ -185,5 +185,7 @@ impl eframe::App for DAQApp {
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
+
+        ctx.request_repaint();
     }
 }
