@@ -1,6 +1,13 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui;
 
+#[derive(Copy, Clone)]
+pub enum ThemeSelection {
+    Default,
+    Nord,
+    Catppuccin,
+}
+
 pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
@@ -10,15 +17,28 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pub theme: Option<config::ThemeColors>,
+    pub pending_scope_spawns: Vec<(u32, String)>,
+    pub theme: egui::Style,
+    pub theme_selection: ThemeSelection,
+    pub pixels_per_point: f32,
 }
+
+const MIN_UI_SCALE: f32 = 0.4;
+const MAX_UI_SCALE: f32 = 5.0;
 
 impl DAQApp {
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        cc: &eframe::CreationContext,
     ) -> Self {
-        let theme = config::ThemeColors::load_from_file("colors.toml");
+        // Boot with the egui default theme
+        let theme = egui::Style::default();
+        
+        // Calculate a default ui scale based off the native_pixels_per_point
+        let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
+        let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
+        
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -28,7 +48,10 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_receiver,
             ui_sender,
+            pending_scope_spawns: Vec::new(),
             theme,
+            theme_selection: ThemeSelection::Default,
+            pixels_per_point: default_scale,
         }
     }
 
@@ -81,8 +104,12 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
 
-    pub fn spawn_scope(&mut self) {
-        let widget = widgets::Widget::Scope(ui::scope::Scope::new(self.next_scope_num));
+    pub fn spawn_scope(&mut self, msg_id: u32, signal_name: String) {
+        let widget = widgets::Widget::Scope(ui::scope::Scope::new(
+            self.next_scope_num,
+            msg_id,
+            signal_name,
+        ));
         self.next_scope_num += 1;
         self.add_widget_to_tree(widget);
     }
@@ -92,6 +119,30 @@ impl DAQApp {
             widgets::Widget::LogParser(ui::log_parser::LogParser::new(self.next_log_parser_num));
         self.next_log_parser_num += 1;
         self.add_widget_to_tree(widget);
+    }
+
+    pub fn toggle_theme(&mut self) {
+        // Update theme selection to the next option
+        self.theme_selection = match self.theme_selection {
+            ThemeSelection::Default => ThemeSelection::Nord,
+            ThemeSelection::Nord => ThemeSelection::Catppuccin,
+            ThemeSelection::Catppuccin => ThemeSelection::Default,
+        };
+        
+        // Load the selected theme into the actual field
+        self.theme = match self.theme_selection {
+            ThemeSelection::Default => egui::Style::default(),
+            ThemeSelection::Nord => {
+                config::ThemeColors::load_from_file("nord.toml")
+                    .map(|t| t.to_egui_style())
+                    .unwrap_or_else(egui::Style::default)
+            },
+            ThemeSelection::Catppuccin => {
+                config::ThemeColors::load_from_file("catppuccin.toml")
+                    .map(|t| t.to_egui_style())
+                    .unwrap_or_else(egui::Style::default)
+            },
+        };
     }
 
     // Close the currently active widget in the tile tree
@@ -109,13 +160,10 @@ impl DAQApp {
 
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        // ctx.set_pixels_per_point(2.5);
+        // ctx.set_pixels_per_point(self.pixels_per_point);
+        ctx.set_style(self.theme.clone());
         
         // Handle keyboard shortcuts
-        if let Some(theme) = &self.theme {
-            ctx.set_style(theme.to_egui_style());
-        }
-        
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
         for action in shortcuts {
             match action {
@@ -125,14 +173,17 @@ impl eframe::App for DAQApp {
                 shortcuts::ShortcutAction::CloseActiveWidget => {
                     self.close_active_widget();
                 }
+                shortcuts::ShortcutAction::IncreaseScale => {
+                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
+                }
+                shortcuts::ShortcutAction::DecreaseScale => {
+                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
+                }
             }
         }
 
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
-
-        // Probally could to a return chain to not always request repaint
-        ctx.request_repaint();
     }
 }
