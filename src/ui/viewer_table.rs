@@ -231,7 +231,11 @@ fn message_card(
                             ui.add_space(8.0);
                             ui.label(egui::RichText::new(value).monospace());
                             if ui.small_button("add scope").clicked() {
-                                pending_scope_spawns.push((msg_id, sig_name.to_string()));
+                                pending_scope_spawns.push((
+                                    msg_id,
+                                    msg_name.to_string(),
+                                    sig_name.to_string(),
+                                ));
                             }
                         });
                     });
