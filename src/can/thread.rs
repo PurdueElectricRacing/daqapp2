@@ -65,7 +65,6 @@ pub fn start_can_thread(
             match can.read() {
                 Ok(frame) => match frame {
                     CanFrame::Can2(frame2) => {
-                        // println!("[can-thread] Received frame: {:?}", frame2);
                         let id = match frame2.id() {
                             slcan::Id::Standard(sid) => sid.as_raw() as u32,
                             slcan::Id::Extended(eid) => eid.as_raw(),
@@ -75,17 +74,34 @@ pub fn start_can_thread(
 
                         if let Some(parser) = state.parser.as_ref() {
                             if let Some(decoded) = parser.decode_msg(id, data) {
+                                let all_msg_defs = parser.msg_defs();
+                                let tx_node = all_msg_defs
+                                    .iter()
+                                    .find(|m| {
+                                        let m_id = match m.message_id() {
+                                            can_dbc::MessageId::Standard(sid) => *sid as u32,
+                                            can_dbc::MessageId::Extended(eid) => *eid,
+                                        };
+                                        m_id == id
+                                    })
+                                    .map(|m| match m.transmitter() {
+                                        can_dbc::Transmitter::NodeName(name) => name.clone(),
+                                        can_dbc::Transmitter::VectorXXX => "Unknown".to_string(),
+                                    })
+                                    .unwrap_or_else(|| "Unknown".to_string());
+
                                 let parsed_msg = can::message::ParsedMessage {
                                     timestamp: Local::now(),
                                     raw_bytes: data.to_vec(),
                                     decoded,
+                                    tx_node,
                                 };
                                 let _ = state
                                     .can_sender
                                     .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
                             } else {
                                 println!(
-                                    "[can-thread] No DBC message for frame ID 0x{:X}, data: {:02X?}",
+                                    "[can-thread] Failed to parse: frame ID 0x{:X}, data: {:02X?}",
                                     id, data
                                 );
                             }
@@ -96,38 +112,6 @@ pub fn start_can_thread(
                             );
                             continue;
                         };
-
-                        let Some(decoded) = parser.decode_msg(id, data) else {
-                            println!(
-                                "[can-thread] Unrecognized CAN message ID 0x{:X}, data: {:02X?}",
-                                id, data
-                            );
-                            continue;
-                        };
-
-                        let tx_node = parser.msg_defs().iter()
-                            .find(|m| {
-                                let m_id = match m.message_id() {
-                                    can_dbc::MessageId::Standard(sid) => *sid as u32,
-                                    can_dbc::MessageId::Extended(eid) => *eid,
-                                };
-                                m_id == id
-                            })
-                            .map(|m| match m.transmitter() {
-                                can_dbc::Transmitter::NodeName(name) => name.clone(),
-                                can_dbc::Transmitter::VectorXXX => "Unknown".to_string(),
-                            }).unwrap_or_else(|| "Unknown".to_string());
-
-                        let parsed_msg = can::message::ParsedMessage {
-                            timestamp: Local::now(),
-                            raw_bytes: data.to_vec(),
-                            decoded,
-                            tx_node,
-                        };
-
-                        let _ = state
-                            .can_sender
-                            .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
                     }
                     CanFrame::CanFd(frame_fd) => {
                         // Optional: Handle FD frames differently or log

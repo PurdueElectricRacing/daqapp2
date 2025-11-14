@@ -178,17 +178,13 @@ fn message_card(
                     },
                 ),
         );
-        ui.label(
-            egui::RichText::new(format!("from {}", tx_node))
-                .color(
-                    if search.is_empty() || tx_node.to_lowercase().contains(&search.to_lowercase())
-                    {
-                        ui.visuals().text_color()
-                    } else {
-                        ui.visuals().weak_text_color()
-                    },
-                )
-        );
+        ui.label(egui::RichText::new(format!("from {}", tx_node)).color(
+            if search.is_empty() || tx_node.to_lowercase().contains(&search.to_lowercase()) {
+                ui.visuals().text_color()
+            } else {
+                ui.visuals().weak_text_color()
+            },
+        ));
         ui.label(
             egui::RichText::new(timestamp)
                 .italics()
@@ -235,7 +231,11 @@ fn message_card(
                             ui.add_space(8.0);
                             ui.label(egui::RichText::new(value).monospace());
                             if ui.small_button("add scope").clicked() {
-                                pending_scope_spawns.push((msg_id, sig_name.to_string()));
+                                pending_scope_spawns.push((
+                                    msg_id,
+                                    msg_name.to_string(),
+                                    sig_name.to_string(),
+                                ));
                             }
                         });
                     });
