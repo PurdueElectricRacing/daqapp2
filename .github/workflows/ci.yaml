@@ -12,6 +12,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system dependencies (libudev)
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -24,7 +27,7 @@ jobs:
       - name: Cargo Build (fails on errors, but not on warnings)
         run: cargo build --all-targets
 
-      - name: Show Warnings in PR (non-blocking)
+      - name: Show Warnings in PR (does not stop PR merge)
         run: |
           echo "Compiler warnings:"
           cargo check --all-targets --message-format short
