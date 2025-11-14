@@ -17,7 +17,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pub pending_scope_spawns: Vec<(u32, String)>,
+    pub pending_scope_spawns: Vec<(u32, String, String)>,
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
@@ -34,7 +34,7 @@ impl DAQApp {
     ) -> Self {
         // Boot with the egui default theme
         let theme = egui::Style::default();
-        
+
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
@@ -104,10 +104,11 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
 
-    pub fn spawn_scope(&mut self, msg_id: u32, signal_name: String) {
+    pub fn spawn_scope(&mut self, msg_id: u32, msg_name: String, signal_name: String) {
         let widget = widgets::Widget::Scope(ui::scope::Scope::new(
             self.next_scope_num,
             msg_id,
+            msg_name,
             signal_name,
         ));
         self.next_scope_num += 1;
@@ -128,20 +129,16 @@ impl DAQApp {
             ThemeSelection::Nord => ThemeSelection::Catppuccin,
             ThemeSelection::Catppuccin => ThemeSelection::Default,
         };
-        
+
         // Load the selected theme into the actual field
         self.theme = match self.theme_selection {
             ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => {
-                config::ThemeColors::load_from_file("nord.toml")
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_else(egui::Style::default)
-            },
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file("catppuccin.toml")
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_else(egui::Style::default)
-            },
+            ThemeSelection::Nord => config::ThemeColors::load_from_file("nord.toml")
+                .map(|t| t.to_egui_style())
+                .unwrap_or_else(egui::Style::default),
+            ThemeSelection::Catppuccin => config::ThemeColors::load_from_file("catppuccin.toml")
+                .map(|t| t.to_egui_style())
+                .unwrap_or_else(egui::Style::default),
         };
     }
 
@@ -185,5 +182,7 @@ impl eframe::App for DAQApp {
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
+
+        ctx.request_repaint();
     }
 }

@@ -13,7 +13,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 crate::app::ThemeSelection::Nord => "🎨 Theme: Nord",
                 crate::app::ThemeSelection::Catppuccin => "🎨 Theme: Catppuccin",
             };
-            
+
             if ui.button(theme_label).clicked() {
                 app.toggle_theme();
             }

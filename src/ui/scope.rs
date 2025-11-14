@@ -9,24 +9,24 @@ use std::collections::VecDeque;
 pub struct Scope {
     pub title: String,
     msg_id: u32,
+    msg_name: String,
     signal_name: String,
     window: VecDeque<f64>,
     window_size: usize,
     is_paused: bool,
-    show_line: bool,
 }
 
 impl Scope {
-    pub fn new(instance_num: usize, msg_id: u32, signal_name: String) -> Self {
-        let title = format!("Scope #{}: {}", instance_num, &signal_name);
+    pub fn new(instance_num: usize, msg_id: u32, msg_name: String, signal_name: String) -> Self {
+        let title = format!("Scope #{}", instance_num);
         Self {
             title,
             msg_id,
+            msg_name,
             signal_name,
             window: VecDeque::new(),
             window_size: 1000,
             is_paused: false,
-            show_line: false,
         }
     }
 
@@ -65,7 +65,10 @@ impl Scope {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
-        ui.heading(format!("📊 {}: {}", self.title, self.signal_name));
+        ui.heading(format!(
+            "📊 {}: {} - {}",
+            self.title, self.msg_name, self.signal_name
+        ));
 
         // Horizontal container
         ui.horizontal(|ui| {
@@ -83,7 +86,7 @@ impl Scope {
 
             // Window size slider
             ui.label("Window Size:");
-            ui.add(egui::Slider::new(&mut self.window_size, 10..=1000).suffix(" samples"));
+            ui.add(egui::Slider::new(&mut self.window_size, 10..=5000).suffix(" samples"));
 
             ui.separator();
 
@@ -100,9 +103,6 @@ impl Scope {
             }
 
             ui.separator();
-
-            // Show line checkbox
-            ui.checkbox(&mut self.show_line, "Show Line");
         });
 
         ui.separator();
@@ -122,10 +122,6 @@ impl Scope {
                     .map(|(i, &value)| [i as f64, value])
                     .collect();
 
-                if !self.show_line {
-                    return;
-                }
-
                 let line = Line::new(&self.signal_name, points)
                     .color(egui::Color32::from_rgb(100, 200, 100))
                     .stroke(egui::Stroke::new(
@@ -141,15 +137,15 @@ impl Scope {
 
     pub fn handle_can_message(&mut self, msg: &crate::can::can_messages::CanMessage) {
         let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg;
-        
+
         if parsed.decoded.msg_id != self.msg_id {
             return;
         }
-        
+
         let Some(signal) = parsed.decoded.signals.get(&self.signal_name) else {
             return;
         };
-        
+
         self.add_point(signal.value);
     }
 }
