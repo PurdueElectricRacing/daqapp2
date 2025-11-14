@@ -234,6 +234,9 @@ fn message_card(
                             }
                             ui.add_space(8.0);
                             ui.label(egui::RichText::new(value).monospace());
+                            if ui.small_button("add scope").clicked() {
+                                pending_scope_spawns.push((msg_id, sig_name.to_string()));
+                            }
                         });
                     });
                     if i < signals.len() - 1 {

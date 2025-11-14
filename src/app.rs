@@ -38,7 +38,7 @@ impl DAQApp {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-
+        
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -157,9 +157,9 @@ impl DAQApp {
 
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        ctx.set_pixels_per_point(self.pixels_per_point);
+        // ctx.set_pixels_per_point(self.pixels_per_point);
         ctx.set_style(self.theme.clone());
-
+        
         // Handle keyboard shortcuts
         let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
         for action in shortcuts {

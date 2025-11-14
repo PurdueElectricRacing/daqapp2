@@ -73,10 +73,26 @@ pub fn start_can_thread(
 
                         let data = frame2.data().unwrap_or(&[]);
 
-                        let Some(parser) = state.parser.as_ref() else {
+                        if let Some(parser) = state.parser.as_ref() {
+                            if let Some(decoded) = parser.decode_msg(id, data) {
+                                let parsed_msg = can::message::ParsedMessage {
+                                    timestamp: Local::now(),
+                                    raw_bytes: data.to_vec(),
+                                    decoded,
+                                };
+                                let _ = state
+                                    .can_sender
+                                    .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                            } else {
+                                println!(
+                                    "[can-thread] No DBC message for frame ID 0x{:X}, data: {:02X?}",
+                                    id, data
+                                );
+                            }
+                        } else {
                             println!(
-                                "[can-thread] Failed to parse frame with ID 0x{:X}, data: {:02X?}",
-                                id, data
+                                "[can-thread] No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
+                                id, id, data
                             );
                             continue;
                         };
