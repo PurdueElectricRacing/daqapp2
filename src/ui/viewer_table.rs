@@ -178,17 +178,13 @@ fn message_card(
                     },
                 ),
         );
-        ui.label(
-            egui::RichText::new(format!("from {}", tx_node))
-                .color(
-                    if search.is_empty() || tx_node.to_lowercase().contains(&search.to_lowercase())
-                    {
-                        ui.visuals().text_color()
-                    } else {
-                        ui.visuals().weak_text_color()
-                    },
-                )
-        );
+        ui.label(egui::RichText::new(format!("from {}", tx_node)).color(
+            if search.is_empty() || tx_node.to_lowercase().contains(&search.to_lowercase()) {
+                ui.visuals().text_color()
+            } else {
+                ui.visuals().weak_text_color()
+            },
+        ));
         ui.label(
             egui::RichText::new(timestamp)
                 .italics()
