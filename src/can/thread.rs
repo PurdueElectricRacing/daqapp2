@@ -102,13 +102,17 @@ pub fn start_can_thread(
                             } else {
                                 log::error!(
                                     "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
-                                    id, id, data
+                                    id,
+                                    id,
+                                    data
                                 );
                             }
                         } else {
                             log::warn!(
                                 "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
-                                id, id, data
+                                id,
+                                id,
+                                data
                             );
                             continue;
                         };
