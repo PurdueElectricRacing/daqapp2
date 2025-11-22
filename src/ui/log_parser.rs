@@ -48,7 +48,7 @@ impl LogParser {
         let dbc_path = match &self.dbc_path {
             Some(p) => p,
             None => {
-                eprintln!("Error: DBC file not selected");
+                log::error!("Error: DBC file not selected");
                 return;
             }
         };
@@ -56,7 +56,7 @@ impl LogParser {
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
-                eprintln!("Error: Logs directory not selected");
+                log::error!("Error: Logs directory not selected");
                 return;
             }
         };
@@ -64,14 +64,14 @@ impl LogParser {
         let output_dir = match &self.output_dir {
             Some(p) => p,
             None => {
-                eprintln!("Error: Output directory not selected");
+                log::error!("Error: Output directory not selected");
                 return;
             }
         };
 
         // TODO: Implement log parsing
-        println!("Parsing logs from: {}", logs_dir.display());
-        println!("Output to: {}", output_dir.display());
+        log::info!("Parsing logs from: {}", logs_dir.display());
+        log::info!("Output to: {}", output_dir.display());
     }
 
     pub fn show(

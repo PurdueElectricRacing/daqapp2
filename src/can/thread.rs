@@ -21,7 +21,7 @@ pub fn start_can_thread(
         {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("[can-thread] Failed to open serialport {e}");
+                log::error!("Failed to open serialport {e}");
                 return;
             }
         };
@@ -33,12 +33,12 @@ pub fn start_can_thread(
 
         // Reset, set mode, open, etc.
         if let Err(e) = can.set_operating_mode(OperatingMode::Normal) {
-            eprintln!("[can-thread] Failed to set operating mode: {e}");
+            log::error!("Failed to set operating mode: {e}");
             return;
         }
 
         if let Err(e) = can.open(NominalBitRate::Rate500Kbit) {
-            eprintln!("[can-thread] Failed to open CAN: {e}");
+            log::error!("Failed to open CAN: {e}");
             return;
         }
 
@@ -53,9 +53,9 @@ pub fn start_can_thread(
                         match can_decode::Parser::from_dbc_file(&path) {
                             Ok(parser) => {
                                 state.parser = Some(parser);
-                                println!("[can-thread] Loaded DBC from {:?}", path);
+                                log::info!("Loaded DBC from {:?}", path);
                             }
-                            Err(e) => eprintln!("[can-thread] Failed to load DBC {:?}: {e}", path),
+                            Err(e) => log::error!("Failed to load DBC {:?}: {e}", path),
                         }
                     }
                 }
@@ -100,14 +100,14 @@ pub fn start_can_thread(
                                     .can_sender
                                     .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
                             } else {
-                                println!(
-                                    "[can-thread] Failed to parse: frame ID 0x{:X}, data: {:02X?}",
-                                    id, data
+                                log::error!(
+                                    "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
+                                    id, id, data
                                 );
                             }
                         } else {
-                            println!(
-                                "[can-thread] No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
+                            log::warn!(
+                                "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
                                 id, id, data
                             );
                             continue;
@@ -115,13 +115,13 @@ pub fn start_can_thread(
                     }
                     CanFrame::CanFd(frame_fd) => {
                         // Optional: Handle FD frames differently or log
-                        println!("[can-thread] Received frame: {:?}", frame_fd);
+                        log::info!("Received frame: {:?}", frame_fd);
                         let id = match frame_fd.id() {
                             slcan::Id::Standard(sid) => sid.as_raw() as u32,
                             slcan::Id::Extended(eid) => eid.as_raw(),
                         };
-                        eprintln!(
-                            "[can-thread] Received CAN FD frame id=0x{:X} len={}",
+                        log::warn!(
+                            "Received CAN FD frame id=0x{:X} len={}",
                             id,
                             frame_fd.data().len()
                         );
@@ -134,12 +134,12 @@ pub fn start_can_thread(
                     thread::sleep(Duration::from_millis(2));
                 }
                 Err(e) => {
-                    eprintln!("[can-thread] read error: {e}");
+                    log::error!("Read error: {e}");
                     break;
                 }
             }
         }
         let _ = can.close();
-        println!("[can-thread] Exiting CAN thread");
+        log::info!("Exiting CAN thread");
     })
 }

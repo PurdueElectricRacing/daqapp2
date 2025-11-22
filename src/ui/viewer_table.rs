@@ -107,11 +107,11 @@ impl ViewerTable {
                             .map(|sig_name| {
                                 let signal = &msg.decoded.signals[sig_name];
                                 if signal.unit.is_empty() {
-                                    (signal.name.as_str(), format!("{}", signal.value))
+                                    (signal.name.as_str(), format!("{:.2}", signal.value))
                                 } else {
                                     (
                                         signal.name.as_str(),
-                                        format!("{} {}", signal.value, signal.unit),
+                                        format!("{:.2} {}", signal.value, signal.unit),
                                     )
                                 }
                             })

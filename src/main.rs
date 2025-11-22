@@ -8,7 +8,7 @@ mod workspace;
 
 fn main() -> eframe::Result<()> {
     env_logger::Builder::from_default_env()
-        .filter_level(log::LevelFilter::Warn)
+        .filter_level(log::LevelFilter::Info)
         .init();
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();

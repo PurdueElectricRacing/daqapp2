@@ -82,9 +82,9 @@ impl ViewerList {
                             });
                             row.col(|ui| {
                                 if signal.unit.is_empty() {
-                                    ui.label(format!("{}", signal.value));
+                                    ui.label(format!("{:.2}", signal.value));
                                 } else {
-                                    ui.label(format!("{} {}", signal.value, signal.unit));
+                                    ui.label(format!("{:.2} {}", signal.value, signal.unit));
                                 }
                             });
                         });
