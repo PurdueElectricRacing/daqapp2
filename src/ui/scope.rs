@@ -73,9 +73,9 @@ impl Scope {
             .save_file()
         {
             if let Err(e) = std::fs::write(&path, csv_content) {
-                eprintln!("Failed to save CSV file: {}", e);
+                log::error!("Failed to save CSV file: {}", e);
             } else {
-                println!("CSV exported to: {}", path.display());
+                log::info!("CSV exported to: {}", path.display());
             }
         }
     }
