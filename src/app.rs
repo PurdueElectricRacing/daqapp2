@@ -136,9 +136,11 @@ impl DAQApp {
             ThemeSelection::Nord => config::ThemeColors::load_from_file("themes/nord.toml")
                 .map(|t| t.to_egui_style())
                 .unwrap_or_default(),
-            ThemeSelection::Catppuccin => config::ThemeColors::load_from_file("themes/catppuccin.toml")
-                .map(|t| t.to_egui_style())
-                .unwrap_or_default(),
+            ThemeSelection::Catppuccin => {
+                config::ThemeColors::load_from_file("themes/catppuccin.toml")
+                    .map(|t| t.to_egui_style())
+                    .unwrap_or_default()
+            }
         };
     }
 
