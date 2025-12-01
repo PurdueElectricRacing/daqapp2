@@ -83,7 +83,7 @@ impl ViewerTable {
                                     .to_string()
                                     .to_lowercase()
                                     .contains(&low_search)
-                                || msg.tx_node.to_lowercase().contains(&low_search)
+                                || msg.decoded.tx_node.to_lowercase().contains(&low_search)
                                 || msg
                                     .decoded
                                     .signals
@@ -126,7 +126,7 @@ impl ViewerTable {
                             ui,
                             &msg.decoded.name,
                             msg.decoded.msg_id,
-                            msg.tx_node.as_str(),
+                            msg.decoded.tx_node.as_str(),
                             raw_bytes_str.as_str(),
                             &msg.timestamp.format("%-I:%M:%S%.3f").to_string(),
                             &signals,
