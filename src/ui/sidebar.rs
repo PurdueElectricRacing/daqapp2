@@ -16,7 +16,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             egui::Frame::new()
                 .fill(ctx.style().visuals.window_fill())
                 .corner_radius(rounding)
-                .inner_margin(8.0),
+                .inner_margin(10.0),
         )
         .resizable(true)
         .show_animated(ctx, app.is_sidebar_open, |ui| {
