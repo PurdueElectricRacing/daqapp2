@@ -2,27 +2,46 @@ use crate::{can, ui, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        if app.tile_tree.is_empty() {
-            ui.vertical_centered(|ui| {
-                ui.label("No widgets in workspace yet.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to spawn widgets.");
-            });
-        } else {
-            let mut behavior = WorkspaceTileBehavior {
-                can_receiver: &app.can_receiver,
-                ui_sender: &app.ui_sender,
-                pending_scope_spawns: &mut app.pending_scope_spawns,
-            };
-            app.tile_tree.ui(&mut behavior, ui);
-
-            // Spawn all pending scopes in the queue
-            for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns) {
-                app.spawn_scope(msg_id, msg_name, signal_name);
-            }
+    let rounding = if cfg!(target_os = "macos") {
+        egui::CornerRadius {
+            nw: 0,
+            ne: 12,
+            sw: 0,
+            se: 12,
         }
-    });
+    } else {
+        egui::CornerRadius::ZERO
+    };
+
+    egui::CentralPanel::default()
+        .frame(
+            egui::Frame::new()
+                .fill(ctx.style().visuals.window_fill())
+                .corner_radius(rounding)
+                .inner_margin(0.0),
+        )
+        .show(ctx, |ui| {
+            if app.tile_tree.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.label("No widgets in workspace yet.");
+                    ui.label("CMD+S to toggle the sidebar.");
+                    ui.label("Use the sidebar to spawn widgets.");
+                });
+            } else {
+                let mut behavior = WorkspaceTileBehavior {
+                    can_receiver: &app.can_receiver,
+                    ui_sender: &app.ui_sender,
+                    pending_scope_spawns: &mut app.pending_scope_spawns,
+                };
+                app.tile_tree.ui(&mut behavior, ui);
+
+                // Spawn all pending scopes in the queue
+                for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns)
+                {
+                    app.spawn_scope(msg_id, msg_name, signal_name);
+                }
+            }
+        });
 }
 
 struct WorkspaceTileBehavior<'a> {

@@ -15,14 +15,13 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-
     let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver);
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder {
-            decorations: Some(false),
-            ..Default::default()
-        },
+        viewport: egui::ViewportBuilder::default()
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_window_level(egui::viewport::WindowLevel::Normal),
         ..Default::default()
     };
 
