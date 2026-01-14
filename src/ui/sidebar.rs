@@ -35,5 +35,9 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             if ui.button("Add Log Parser").clicked() {
                 app.spawn_log_parser();
             }
+
+            if ui.button("Add Message Sender").clicked() {
+                app.spawn_message_sender();
+            }
         });
 }

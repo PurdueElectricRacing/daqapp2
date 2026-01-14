@@ -7,6 +7,7 @@ pub enum Widget {
     Bootloader(ui::bootloader::Bootloader),
     Scope(ui::scope::Scope),
     LogParser(ui::log_parser::LogParser),
+    Send(ui::send::Send),
 }
 
 impl Widget {
@@ -17,6 +18,7 @@ impl Widget {
             Widget::Bootloader(w) => &w.title,
             Widget::Scope(w) => &w.title,
             Widget::LogParser(w) => &w.title,
+            Widget::Send(w) => &w.title,
         }
     }
 
@@ -45,6 +47,7 @@ impl Widget {
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, ui_sender),
+            Widget::Send(w) => w.show(ui, ui_sender),
         }
     }
 

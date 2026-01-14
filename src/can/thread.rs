@@ -58,6 +58,30 @@ pub fn start_can_thread(
                             Err(e) => log::error!("Failed to load DBC {:?}: {e}", path),
                         }
                     }
+                    ui::ui_messages::UiMessage::SendCanMessage {
+                        msg_id,
+                        msg_id_extended,
+                        msg_bytes,
+                    } => {
+                        let frame_id = if msg_id_extended {
+                            slcan::Id::Extended(
+                                slcan::ExtendedId::new(msg_id).expect("Invalid extended ID"),
+                            )
+                        } else {
+                            slcan::Id::Standard(
+                                slcan::StandardId::new(msg_id as u16).expect("Invalid standard ID"),
+                            )
+                        };
+                        match slcan::Can2Frame::new_data(frame_id, &msg_bytes) {
+                            Some(frame) => match can.send(frame) {
+                                Ok(_) => log::info!("Sent CAN message ID 0x{:X}", msg_id),
+                                Err(e) => log::error!("Failed to send CAN message: {}", e),
+                            },
+                            None => {
+                                log::error!("Failed to create CAN frame for ID 0x{:X}", msg_id);
+                            }
+                        }
+                    }
                 }
             }
 

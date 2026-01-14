@@ -122,6 +122,13 @@ impl DAQApp {
         self.add_widget_to_tree(widget);
     }
 
+    pub fn spawn_message_sender(&mut self) {
+        let widget =
+            widgets::Widget::Send(ui::send::Send::new(self.next_log_parser_num));
+        self.next_log_parser_num += 1;
+        self.add_widget_to_tree(widget);
+    }
+
     pub fn toggle_theme(&mut self) {
         // Update theme selection to the next option
         self.theme_selection = match self.theme_selection {
