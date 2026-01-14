@@ -123,8 +123,7 @@ impl DAQApp {
     }
 
     pub fn spawn_message_sender(&mut self) {
-        let widget =
-            widgets::Widget::Send(ui::send::Send::new(self.next_log_parser_num));
+        let widget = widgets::Widget::Send(ui::send::Send::new(self.next_log_parser_num));
         self.next_log_parser_num += 1;
         self.add_widget_to_tree(widget);
     }
