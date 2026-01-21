@@ -1,5 +1,11 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui;
+//use image::GenericImageView; //<-- added
+//use resize::Type::Lanczos3;
+use image::imageops::FilterType;
+use image::{GenericImageView, ImageResult};
+use std::path::Path;
+
 
 #[derive(Copy, Clone)]
 pub enum ThemeSelection {
@@ -21,6 +27,8 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
+    pub logo_texture: Option<egui::TextureHandle>, // <-- new
+
 }
 
 const MIN_UI_SCALE: f32 = 0.4;
@@ -36,8 +44,42 @@ impl DAQApp {
         let theme = egui::Style::default();
 
         // Calculate a default ui scale based off the native_pixels_per_point
+        // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
+
+        // Load the logo texture
+        let logo_texture = {
+            let image_bytes = include_bytes!("../images/PER-Logo.png");
+            let image = image::load_from_memory(image_bytes)
+                .unwrap()
+                .to_rgba8();
+
+            let scale_factor = 0.32;
+            // Scale image dimensions using default_scale
+            let new_width  = (image.width()  as f32 * scale_factor) as u32;
+            let new_height = (image.height() as f32 * scale_factor) as u32;
+
+            let resized = image::imageops::resize(
+                &image,
+                new_width.max(1),   // avoid zero size
+                new_height.max(1),
+                FilterType::Lanczos3,
+            );
+
+            let size = [
+                resized.width() as usize,
+                resized.height() as usize,
+            ];
+            let pixels = resized.into_vec();
+
+            Some(cc.egui_ctx.load_texture(
+                "logo",
+                egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
+                egui::TextureOptions::default(),
+            ))
+        };
+
 
         Self {
             is_sidebar_open: true,
@@ -52,6 +94,7 @@ impl DAQApp {
             theme,
             theme_selection: ThemeSelection::Default,
             pixels_per_point: default_scale,
+            logo_texture // added new
         }
     }
 
