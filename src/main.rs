@@ -23,12 +23,7 @@ fn main() -> eframe::Result<()> {
     
     let icon = from_png_bytes(include_bytes!("../images/PER Window Icon.png"))
         .expect("Failed to load app icon");
-    /*eframe::run_native(
-        "DaqApp2",
-        eframe::NativeOptions::default(),
-        Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
-    )
-    */
+    
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_icon(icon),
         ..Default::default()
