@@ -24,8 +24,10 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
+
     pub logo_texture: egui::TextureHandle,
-}
+
+    pub logo_texture: Option<egui::TextureHandle>, 
 
 const MIN_UI_SCALE: f32 = 0.4;
 const MAX_UI_SCALE: f32 = 5.0;
