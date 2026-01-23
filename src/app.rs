@@ -1,7 +1,5 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui;
-//use image::GenericImageView; //<-- added
-//use resize::Type::Lanczos3;
 use image::imageops::FilterType;
 use image::{GenericImageView, ImageResult};
 use std::path::Path;
@@ -27,7 +25,7 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub logo_texture: Option<egui::TextureHandle>, // <-- new
+    pub logo_texture: Option<egui::TextureHandle>, 
 
 }
 
@@ -43,7 +41,6 @@ impl DAQApp {
         // Boot with the egui default theme
         let theme = egui::Style::default();
 
-        // Calculate a default ui scale based off the native_pixels_per_point
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
