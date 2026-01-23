@@ -19,8 +19,10 @@ fn main() -> eframe::Result<()> {
 
     let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver);
 
+
     let icon =
         from_png_bytes(include_bytes!("../images/PER_Logo.png")).expect("Failed to load app icon");
+
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_icon(icon),
