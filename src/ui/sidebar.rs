@@ -8,25 +8,15 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.separator();
 
             // logo
-            if let Some(texture) = &app.logo_texture {
-                let available_width = ui.available_width();
+            let available_width = ui.available_width();
+            let original_size = app.logo_texture.size_vec2();
 
-                let original_size = texture.size_vec2();
+            let scale = (available_width / original_size.x).min(1.0);
+            let display_size = original_size * scale;
 
-                // Uniform scale, never stretch
-                let scale = (available_width / original_size.x).min(1.0);
+            ui.add(egui::Image::new(&app.logo_texture).fit_to_exact_size(display_size));
 
-                let display_size = original_size * scale;
-
-                ui.add(
-                    egui::Image::new(texture)
-                        .fit_to_exact_size(display_size)
-                );
-
-                ui.separator();
-            }
-
-
+            ui.separator();
 
             // Theme toggle button
             let theme_label = match app.theme_selection {

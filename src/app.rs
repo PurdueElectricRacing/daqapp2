@@ -4,7 +4,6 @@ use image::imageops::FilterType;
 use image::{GenericImageView, ImageResult};
 use std::path::Path;
 
-
 #[derive(Copy, Clone)]
 pub enum ThemeSelection {
     Default,
@@ -25,8 +24,7 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub logo_texture: Option<egui::TextureHandle>, 
-
+    pub logo_texture: egui::TextureHandle,
 }
 
 const MIN_UI_SCALE: f32 = 0.4;
@@ -48,35 +46,29 @@ impl DAQApp {
         // Load the logo texture
         let logo_texture = {
             let image_bytes = include_bytes!("../images/PER_Logo.png");
-            let image = image::load_from_memory(image_bytes)
-                .unwrap()
-                .to_rgba8();
+            let image = image::load_from_memory(image_bytes).unwrap().to_rgba8();
 
             let scale_factor = 0.32;
             // Scale image dimensions using default_scale
-            let new_width  = (image.width()  as f32 * scale_factor) as u32;
+            let new_width = (image.width() as f32 * scale_factor) as u32;
             let new_height = (image.height() as f32 * scale_factor) as u32;
 
             let resized = image::imageops::resize(
                 &image,
-                new_width.max(1),   // avoid zero size
+                new_width.max(1), // avoid zero size
                 new_height.max(1),
                 FilterType::Lanczos3,
             );
 
-            let size = [
-                resized.width() as usize,
-                resized.height() as usize,
-            ];
+            let size = [resized.width() as usize, resized.height() as usize];
             let pixels = resized.into_vec();
 
-            Some(cc.egui_ctx.load_texture(
+            cc.egui_ctx.load_texture(
                 "logo",
                 egui::ColorImage::from_rgba_unmultiplied(size, &pixels),
                 egui::TextureOptions::default(),
-            ))
+            )
         };
-
 
         Self {
             is_sidebar_open: true,
@@ -91,7 +83,7 @@ impl DAQApp {
             theme,
             theme_selection: ThemeSelection::Default,
             pixels_per_point: default_scale,
-            logo_texture // added new
+            logo_texture, // added new
         }
     }
 
