@@ -47,7 +47,7 @@ impl DAQApp {
 
         // Load the logo texture
         let logo_texture = {
-            let image_bytes = include_bytes!("../images/PER-Logo.png");
+            let image_bytes = include_bytes!("../images/PER_Logo.png");
             let image = image::load_from_memory(image_bytes)
                 .unwrap()
                 .to_rgba8();
