@@ -25,6 +25,7 @@ pub struct DAQApp {
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
 
+
     pub logo_texture: egui::TextureHandle,
  
 
