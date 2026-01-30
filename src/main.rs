@@ -6,6 +6,9 @@ mod ui;
 mod widgets;
 mod workspace;
 
+use eframe::egui;
+use eframe::icon_data::from_png_bytes;
+
 fn main() -> eframe::Result<()> {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
@@ -16,9 +19,17 @@ fn main() -> eframe::Result<()> {
 
     let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver);
 
+    let icon =
+        from_png_bytes(include_bytes!("../images/PER_Logo.png")).expect("Failed to load app icon");
+
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default().with_icon(icon),
+        ..Default::default()
+    };
+
     eframe::run_native(
         "DaqApp2",
-        eframe::NativeOptions::default(),
+        options,
         Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
     )
 }
