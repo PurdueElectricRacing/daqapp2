@@ -1,7 +1,23 @@
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+    let rounding = if cfg!(target_os = "macos") {
+        egui::CornerRadius {
+            nw: 12,
+            ne: 0,
+            sw: 12,
+            se: 0,
+        }
+    } else {
+        egui::CornerRadius::ZERO
+    };
     egui::SidePanel::left("left_sidebar")
+        .frame(
+            egui::Frame::new()
+                .fill(ctx.style().visuals.window_fill())
+                .corner_radius(rounding)
+                .inner_margin(10.0),
+        )
         .resizable(true)
         .show_animated(ctx, app.is_sidebar_open, |ui| {
             ui.heading("Side bar");
