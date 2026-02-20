@@ -19,7 +19,12 @@ fn main() -> eframe::Result<()> {
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
     let settings = Settings::load("settings.json");
 
-    let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver, settings.selected_serial.clone(), settings.dbc_path.clone(),);
+    let _can_thread = can::thread::start_can_thread(
+        can_sender,
+        ui_receiver,
+        settings.selected_serial.clone(),
+        settings.dbc_path.clone(),
+    );
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

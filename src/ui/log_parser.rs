@@ -15,8 +15,6 @@ impl LogParser {
         }
     }
 
-
-
     fn select_logs_dir(&mut self) {
         if let Some(path) = rfd::FileDialog::new().pick_folder() {
             self.logs_dir = Some(path);
@@ -30,8 +28,6 @@ impl LogParser {
     }
 
     fn parse_logs(&mut self) {
-    
-
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
@@ -53,13 +49,10 @@ impl LogParser {
         log::info!("Output to: {}", output_dir.display());
     }
 
-    pub fn show(
-        &mut self,
-        ui: &mut egui::Ui,
-    ) -> egui_tiles::UiResponse {
+    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
-        
+
         // Log directory selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select Logs Dir").clicked() {

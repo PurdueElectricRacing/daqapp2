@@ -1,7 +1,7 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui::{self};
+use serde::{Deserialize, Serialize};
 use std::fs;
-use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum ThemeSelection {
@@ -24,17 +24,16 @@ pub struct DAQApp {
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
     pub selected_serial: Option<String>,
-    pub serial_ports:Vec<serialport::SerialPortInfo>,
+    pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub dbc_path: Option<std::path::PathBuf>,
     pub connection_error: Option<String>,
-
 }
 
-#[derive( Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub dbc_path: Option<std::path::PathBuf>,
     pub selected_serial: Option<String>,
-    pub theme: ThemeSelection
+    pub theme: ThemeSelection,
 }
 
 impl Default for Settings {
@@ -64,8 +63,6 @@ impl Settings {
     }
 }
 
-
-
 const MIN_UI_SCALE: f32 = 0.4;
 const MAX_UI_SCALE: f32 = 5.0;
 
@@ -78,13 +75,12 @@ impl DAQApp {
         };
         settings.save("settings.json");
     }
-    
+
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         cc: &eframe::CreationContext,
     ) -> Self {
-
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
@@ -92,20 +88,18 @@ impl DAQApp {
         let settings = Settings::load(&settings_path);
         let theme1 = settings.theme.clone();
         let theme_selection = settings.theme;
-        let theme = match theme1{
+        let theme = match theme1 {
             ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord=>config::ThemeColors::load_from_file("themes/nord.toml")
-            .map(|t| t.to_egui_style())
-            .unwrap_or_default(),
-            ThemeSelection::Catppuccin=>{
+            ThemeSelection::Nord => config::ThemeColors::load_from_file("themes/nord.toml")
+                .map(|t| t.to_egui_style())
+                .unwrap_or_default(),
+            ThemeSelection::Catppuccin => {
                 config::ThemeColors::load_from_file("themes/catppuccin.toml")
                     .map(|t| t.to_egui_style())
                     .unwrap_or_default()
             }
+        };
 
-        } ;
-        
-        
         let selected_serial = settings.selected_serial.clone();
         let dbc_path = settings.dbc_path.clone();
         Self {
@@ -121,11 +115,10 @@ impl DAQApp {
             theme,
             theme_selection,
             pixels_per_point: default_scale,
-            serial_ports:Vec::new(),
+            serial_ports: Vec::new(),
             selected_serial,
             dbc_path,
             connection_error: None,
-    
         }
     }
 

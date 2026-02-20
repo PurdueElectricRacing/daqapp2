@@ -17,7 +17,6 @@ pub fn start_can_thread(
         let mut can = None;
         let mut pending_connection_error: Option<String> = None;
 
-
         if let Some(path) = dbc_path {
             match can_decode::Parser::from_dbc_file(&path) {
                 Ok(parser) => {

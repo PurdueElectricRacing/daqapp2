@@ -21,15 +21,14 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 .inner_margin(10.0),
         )
         .show(ctx, |ui| {
-                    while let Ok(msg) = app.can_receiver.try_recv() {
-            match &msg {
-                can::can_messages::CanMessage::ConnectionFailed(port) => {
-                    app.connection_error = Some(format!("Failed to connect to {port}"));
-                }
-                _ => {
+            while let Ok(msg) = app.can_receiver.try_recv() {
+                match &msg {
+                    can::can_messages::CanMessage::ConnectionFailed(port) => {
+                        app.connection_error = Some(format!("Failed to connect to {port}"));
+                    }
+                    _ => {}
                 }
             }
-        }
             if app.tile_tree.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.label("No widgets in workspace yet.");
