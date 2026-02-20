@@ -1,2 +1,5 @@
+.envrc
+.direnv
+
 /target
 colors.toml
