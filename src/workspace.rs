@@ -2,8 +2,26 @@ use crate::{can, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
-    egui::CentralPanel::default().show(ctx, |ui| {
-        while let Ok(msg) = app.can_receiver.try_recv() {
+    let rounding = if cfg!(target_os = "macos") {
+        egui::CornerRadius {
+            nw: 0,
+            ne: 12,
+            sw: 0,
+            se: 12,
+        }
+    } else {
+        egui::CornerRadius::ZERO
+    };
+
+    egui::CentralPanel::default()
+        .frame(
+            egui::Frame::new()
+                .fill(ctx.style().visuals.window_fill())
+                .corner_radius(rounding)
+                .inner_margin(10.0),
+        )
+        .show(ctx, |ui| {
+                    while let Ok(msg) = app.can_receiver.try_recv() {
             match &msg {
                 can::can_messages::CanMessage::ConnectionFailed(port) => {
                     app.connection_error = Some(format!("Failed to connect to {port}"));
@@ -12,25 +30,26 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 }
             }
         }
-        if app.tile_tree.is_empty() {
-            ui.vertical_centered(|ui| {
-                ui.label("No widgets in workspace yet.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to spawn widgets.");
-            });
-        } else {
-            let mut behavior = WorkspaceTileBehavior {
-                can_receiver: &app.can_receiver,
-                pending_scope_spawns: &mut app.pending_scope_spawns,
-            };
-            app.tile_tree.ui(&mut behavior, ui);
+            if app.tile_tree.is_empty() {
+                ui.vertical_centered(|ui| {
+                    ui.label("No widgets in workspace yet.");
+                    ui.label("CMD+S to toggle the sidebar.");
+                    ui.label("Use the sidebar to spawn widgets.");
+                });
+            } else {
+                let mut behavior = WorkspaceTileBehavior {
+                    can_receiver: &app.can_receiver,
+                    pending_scope_spawns: &mut app.pending_scope_spawns,
+                };
+                app.tile_tree.ui(&mut behavior, ui);
 
-            // Spawn all pending scopes in the queue
-            for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns) {
-                app.spawn_scope(msg_id, msg_name, signal_name);
+                // Spawn all pending scopes in the queue
+                for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns)
+                {
+                    app.spawn_scope(msg_id, msg_name, signal_name);
+                }
             }
-        }
-    });
+        });
 }
 
 struct WorkspaceTileBehavior<'a> {

@@ -8,6 +8,8 @@ mod ui;
 mod widgets;
 mod workspace;
 
+use eframe::egui;
+
 fn main() -> eframe::Result<()> {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
@@ -19,9 +21,17 @@ fn main() -> eframe::Result<()> {
 
     let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver, settings.selected_serial.clone(), settings.dbc_path.clone(),);
 
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_window_level(egui::viewport::WindowLevel::Normal),
+        ..Default::default()
+    };
+
     eframe::run_native(
         "DaqApp2",
-        eframe::NativeOptions::default(),
+        options,
         Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
     )
 }
