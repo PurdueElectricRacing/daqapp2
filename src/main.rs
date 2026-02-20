@@ -1,3 +1,5 @@
+use crate::app::Settings;
+
 mod app;
 mod can;
 mod config;
@@ -13,8 +15,9 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
+    let settings = Settings::load("settings.json");
 
-    let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver);
+    let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver, settings.selected_serial.clone(), settings.dbc_path.clone(),);
 
     eframe::run_native(
         "DaqApp2",

@@ -24,7 +24,6 @@ impl Widget {
         &mut self,
         ui: &mut egui::Ui,
         can_receiver: &std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         pending_scope_spawns: &mut Vec<(u32, String, String)>,
     ) -> egui_tiles::UiResponse {
         let mut received_new_data = false;
@@ -44,7 +43,7 @@ impl Widget {
             Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
-            Widget::LogParser(w) => w.show(ui, ui_sender),
+            Widget::LogParser(w) => w.show(ui),
         }
     }
 

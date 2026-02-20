@@ -1,9 +1,7 @@
-use crate::ui;
 use eframe::egui;
 
 pub struct LogParser {
     pub title: String,
-    dbc_path: Option<std::path::PathBuf>,
     logs_dir: Option<std::path::PathBuf>,
     output_dir: Option<std::path::PathBuf>,
 }
@@ -12,25 +10,12 @@ impl LogParser {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("Log Parser #{}", instance_num),
-            dbc_path: None,
             logs_dir: None,
             output_dir: None,
         }
     }
 
-    fn select_dbc(&mut self, ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>) {
-        if let Some(path) = rfd::FileDialog::new()
-            .add_filter("DBC Files", &["dbc"])
-            .pick_file()
-        {
-            self.dbc_path = Some(path);
-            ui_sender
-                .send(ui::ui_messages::UiMessage::DbcSelected(
-                    self.dbc_path.clone().unwrap(),
-                ))
-                .expect("Failed to send DBC selected message");
-        }
-    }
+
 
     fn select_logs_dir(&mut self) {
         if let Some(path) = rfd::FileDialog::new().pick_folder() {
@@ -45,13 +30,7 @@ impl LogParser {
     }
 
     fn parse_logs(&mut self) {
-        let dbc_path = match &self.dbc_path {
-            Some(p) => p,
-            None => {
-                log::error!("Error: DBC file not selected");
-                return;
-            }
-        };
+    
 
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
@@ -77,25 +56,10 @@ impl LogParser {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
-
-        // DBC file selection
-        ui.horizontal(|ui| {
-            if ui.button("📁 Select DBC").clicked() {
-                self.select_dbc(ui_sender);
-            }
-            if let Some(path) = &self.dbc_path {
-                ui.label(format!("DBC: {}", path.display()));
-            } else {
-                ui.label("DBC: None selected");
-            }
-        });
-
-        ui.separator();
-
+        
         // Log directory selection
         ui.horizontal(|ui| {
             if ui.button("📁 Select Logs Dir").clicked() {

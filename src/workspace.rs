@@ -1,8 +1,17 @@
-use crate::{can, ui, widgets};
+use crate::{can, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
     egui::CentralPanel::default().show(ctx, |ui| {
+        while let Ok(msg) = app.can_receiver.try_recv() {
+            match &msg {
+                can::can_messages::CanMessage::ConnectionFailed(port) => {
+                    app.connection_error = Some(format!("Failed to connect to {port}"));
+                }
+                _ => {
+                }
+            }
+        }
         if app.tile_tree.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.label("No widgets in workspace yet.");
@@ -12,7 +21,6 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
         } else {
             let mut behavior = WorkspaceTileBehavior {
                 can_receiver: &app.can_receiver,
-                ui_sender: &app.ui_sender,
                 pending_scope_spawns: &mut app.pending_scope_spawns,
             };
             app.tile_tree.ui(&mut behavior, ui);
@@ -27,7 +35,6 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
 struct WorkspaceTileBehavior<'a> {
     can_receiver: &'a std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    ui_sender: &'a std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
 }
 
@@ -38,12 +45,7 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(
-            ui,
-            self.can_receiver,
-            self.ui_sender,
-            self.pending_scope_spawns,
-        )
+        widget.show(ui, self.can_receiver, self.pending_scope_spawns)
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
