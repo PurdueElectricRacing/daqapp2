@@ -64,9 +64,13 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         ui: &mut egui::Ui,
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
-        
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.can_receiver, self.pending_scope_spawns, self.dbc_path)
+        widget.show(
+            ui,
+            self.can_receiver,
+            self.pending_scope_spawns,
+            self.dbc_path,
+        )
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {

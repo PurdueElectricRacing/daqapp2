@@ -49,7 +49,11 @@ impl LogParser {
         log::info!("Output to: {}", output_dir.display());
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui,  dbc_path: Option<&std::path::PathBuf>) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        dbc_path: Option<&std::path::PathBuf>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
 
