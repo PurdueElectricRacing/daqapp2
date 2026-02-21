@@ -37,7 +37,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 });
             } else {
                 let mut behavior = WorkspaceTileBehavior {
-                    can_messages: &app.can_messages, 
+                    can_messages: &app.can_messages,
                     pending_scope_spawns: &mut app.pending_scope_spawns,
                     dbc_path: app.dbc_path.as_ref(),
                 };

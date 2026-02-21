@@ -1,4 +1,7 @@
-use crate::{can, ui::{self}};
+use crate::{
+    can,
+    ui::{self},
+};
 use eframe::egui;
 use serialport::available_ports;
 
@@ -149,4 +152,3 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             });
         });
 }
-

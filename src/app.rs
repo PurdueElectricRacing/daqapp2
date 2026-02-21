@@ -30,7 +30,6 @@ pub struct DAQApp {
     pub dbc_path: Option<std::path::PathBuf>,
     pub connection_error: Option<String>,
     pub can_messages: Vec<can::can_messages::CanMessage>,
-
 }
 
 #[derive(Serialize, Deserialize)]

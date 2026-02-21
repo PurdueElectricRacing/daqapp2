@@ -1,4 +1,7 @@
-use crate::{can::{self, can_messages}, ui};
+use crate::{
+    can::{self, can_messages},
+    ui,
+};
 use eframe::egui;
 
 pub enum Widget {
