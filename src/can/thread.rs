@@ -164,14 +164,13 @@ pub fn start_can_thread(
                 Err(e) => {
                     log::error!("Read error: {e}");
                     state.is_connected = false;
+                    pending_connection_error = serial_path.clone();
                     can = None;
                     continue;
                 }
             }
         }
-        if let Some(mut c) = can {
-            let _ = c.close();
-        }
+       unreachable!("CAN thread should never exit on its own");
         log::info!("Exiting CAN thread");
     })
 }

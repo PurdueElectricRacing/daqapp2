@@ -17,7 +17,7 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-    let settings = Settings::load("settings.json");
+    let settings = Settings::load(app::SETTINGS_PATH);
 
     let _can_thread = can::thread::start_can_thread(
         can_sender,

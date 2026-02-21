@@ -2,7 +2,7 @@ use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui::{self};
 use serde::{Deserialize, Serialize};
 use std::fs;
-const SETTINGS_PATH: &str = "settings.json";
+pub(crate) const SETTINGS_PATH: &str = "settings.json";
 const NORD_THEME_PATH: &str = "themes/nord.toml";
 const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
@@ -61,7 +61,7 @@ impl Settings {
 
     pub fn save(&self, path: &str) {
         let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
-        fs::write(path, json).expect("Failed to write settings.json");
+        fs::write(path, json).expect(&format!("Failed to write {}", path));
     }
 }
 
