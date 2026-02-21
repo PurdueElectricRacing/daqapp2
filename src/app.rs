@@ -2,7 +2,9 @@ use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui::{self};
 use serde::{Deserialize, Serialize};
 use std::fs;
-
+const SETTINGS_PATH: &str = "settings.json";
+const NORD_THEME_PATH: &str = "themes/nord.toml";
+const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum ThemeSelection {
     Default,
@@ -73,7 +75,7 @@ impl DAQApp {
             selected_serial: self.selected_serial.clone(),
             theme: self.theme_selection,
         };
-        settings.save("settings.json");
+        settings.save(SETTINGS_PATH);
     }
 
     pub fn new(
@@ -84,17 +86,17 @@ impl DAQApp {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        let settings_path = "settings.json".to_string();
+        let settings_path = SETTINGS_PATH.to_string();
         let settings = Settings::load(&settings_path);
         let theme1 = settings.theme.clone();
         let theme_selection = settings.theme;
         let theme = match theme1 {
             ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file("themes/nord.toml")
+            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
                 .map(|t| t.to_egui_style())
                 .unwrap_or_default(),
             ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file("themes/catppuccin.toml")
+                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
                     .map(|t| t.to_egui_style())
                     .unwrap_or_default()
             }
@@ -200,11 +202,11 @@ impl DAQApp {
         // Load the selected theme into the actual field
         self.theme = match self.theme_selection {
             ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file("themes/nord.toml")
+            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
                 .map(|t| t.to_egui_style())
                 .unwrap_or_default(),
             ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file("themes/catppuccin.toml")
+                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
                     .map(|t| t.to_egui_style())
                     .unwrap_or_default()
             }

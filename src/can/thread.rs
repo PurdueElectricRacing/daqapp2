@@ -5,6 +5,10 @@ use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode, ReadError};
 use std::{io, thread, time::Duration};
 
+const BAUD_RATE: u32 = 115_200;
+const NO_PORT_SLEEP_MS: u64 = 200;
+const READ_RETRY_SLEEP_MS: u64 = 2;
+
 pub fn start_can_thread(
     can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
     ui_receiver: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
@@ -13,7 +17,6 @@ pub fn start_can_thread(
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
-        let baud_rate = 115_200u32;
         let mut can = None;
         let mut pending_connection_error: Option<String> = None;
 
@@ -28,7 +31,7 @@ pub fn start_can_thread(
         }
 
         if let Some(path) = selected_serial {
-            if let Ok(port) = serialport::new(&path, baud_rate)
+            if let Ok(port) = serialport::new(&path, BAUD_RATE)
                 .timeout(Duration::from_millis(10))
                 .open()
             {
@@ -41,6 +44,8 @@ pub fn start_can_thread(
                     can = Some(socket);
                 } else {
                     log::error!("Failed to configure CAN on {path}");
+                    state.is_connected = false;
+                    pending_connection_error = Some(path)
                 }
             } else {
                 log::error!("Failed to open serialport {path}");
@@ -73,7 +78,7 @@ pub fn start_can_thread(
                         if let Some(mut old) = can.take() {
                             let _ = old.close();
                         }
-                        let port = match serialport::new(&path, baud_rate)
+                        let port = match serialport::new(&path, BAUD_RATE)
                             .timeout(Duration::from_millis(10))
                             .open()
                         {
@@ -92,10 +97,14 @@ pub fn start_can_thread(
                             CanSocket::new(port.try_clone().expect("clone serialport failed"));
                         if let Err(e) = socket.set_operating_mode(OperatingMode::Normal) {
                             log::error!("Failed to set operating mode: {e}");
+                            state.is_connected = false;
+                            pending_connection_error = Some(path);
                             continue;
                         }
                         if let Err(e) = socket.open(NominalBitRate::Rate500Kbit) {
                             log::error!("Failed to open CAN: {e}");
+                            state.is_connected = false;
+                            pending_connection_error = Some(path);
                             continue;
                         }
                         state.is_connected = true;
@@ -106,7 +115,7 @@ pub fn start_can_thread(
 
             // Try to read a frame
             let Some(ref mut can_socket) = can else {
-                thread::sleep(Duration::from_millis(200));
+                thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
                 continue;
             };
             match can_socket.read() {
@@ -165,11 +174,13 @@ pub fn start_can_thread(
                     if e.kind() == io::ErrorKind::WouldBlock
                         || e.kind() == io::ErrorKind::TimedOut =>
                 {
-                    thread::sleep(Duration::from_millis(2));
+                    thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                 }
                 Err(e) => {
                     log::error!("Read error: {e}");
-                    break;
+                    state.is_connected = false;
+                    can = None;
+                    continue;
                 }
             }
         }

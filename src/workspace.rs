@@ -39,6 +39,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 let mut behavior = WorkspaceTileBehavior {
                     can_receiver: &app.can_receiver,
                     pending_scope_spawns: &mut app.pending_scope_spawns,
+                    dbc_path: app.dbc_path.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
 
@@ -54,6 +55,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 struct WorkspaceTileBehavior<'a> {
     can_receiver: &'a std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
+    dbc_path: Option<&'a std::path::PathBuf>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -62,8 +64,9 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         ui: &mut egui::Ui,
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
+        
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.can_receiver, self.pending_scope_spawns)
+        widget.show(ui, self.can_receiver, self.pending_scope_spawns, self.dbc_path)
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
