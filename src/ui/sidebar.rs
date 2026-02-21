@@ -10,11 +10,9 @@ pub fn select_dbc(
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
     {
-        app.dbc_path = Some(path);
+        app.dbc_path = Some(path.clone());
         ui_sender
-            .send(ui::ui_messages::UiMessage::DbcSelected(
-                app.dbc_path.clone().unwrap(),
-            ))
+            .send(ui::ui_messages::UiMessage::DbcSelected(path))
             .expect("Failed to send DBC selected message");
         app.save_settings();
     }
@@ -81,8 +79,14 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                             .into_iter()
                             .filter(|p| {
                                 let name = p.port_name.to_lowercase();
-                                name.starts_with("/dev/tty.usbmodem")
-                                    || name.starts_with("/dev/ttyACM")
+                                if cfg!(target_os = "windows") {
+                                    // On Windows, serial ports are typically named "COMx"
+                                    name.starts_with("com")
+                                } else {
+                                    // On Unix-like systems, keep common USB serial devices
+                                    name.starts_with("/dev/tty.usbmodem")
+                                        || name.starts_with("/dev/ttyacm")
+                                }
                             })
                             .collect(),
                         Err(err) => {
@@ -92,17 +96,19 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                     };
 
                     for port in &app.serial_ports {
-                        ui.selectable_value(
+                        let response = ui.selectable_value(
                             &mut app.selected_serial,
                             Some(port.port_name.clone()),
                             &port.port_name,
                         );
-                        app.ui_sender
-                            .send(ui::ui_messages::UiMessage::SerialSelected(
-                                port.port_name.clone(),
-                            ))
-                            .expect("Failed to send serial selected");
-                        app.save_settings();
+                        if response.changed() {
+                            app.ui_sender
+                                .send(ui::ui_messages::UiMessage::SerialSelected(
+                                    port.port_name.clone(),
+                                ))
+                                .expect("Failed to send serial selected");
+                            app.save_settings();
+                        }
                     }
                 });
             if let Some(ref err) = app.connection_error {

@@ -61,7 +61,7 @@ impl Settings {
 
     pub fn save(&self, path: &str) {
         let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
-        fs::write(path, json).expect(&format!("Failed to write {}", path));
+        fs::write(path, json).unwrap_or_else(|e| panic!("Failed to write {}: {}", path, e));
     }
 }
 
@@ -86,9 +86,9 @@ impl DAQApp {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        let settings_path = SETTINGS_PATH.to_string();
-        let settings = Settings::load(&settings_path);
+        let settings = Settings::load(SETTINGS_PATH);
         let theme1 = settings.theme.clone();
+        let theme_selection = settings.theme;
         let theme_selection = settings.theme;
         let theme = match theme1 {
             ThemeSelection::Default => egui::Style::default(),
