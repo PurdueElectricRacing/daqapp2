@@ -170,7 +170,7 @@ pub fn start_can_thread(
                 }
             }
         }
-       unreachable!("CAN thread should never exit on its own");
+        unreachable!("CAN thread should never exit on its own");
         log::info!("Exiting CAN thread");
     })
 }
