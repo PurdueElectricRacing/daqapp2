@@ -1,4 +1,4 @@
-use crate::ui::{self};
+use crate::{can, ui::{self}};
 use eframe::egui;
 use serialport::available_ports;
 
@@ -19,6 +19,17 @@ pub fn select_dbc(
 }
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+    app.can_messages.clear();
+    while let Ok(msg) = app.can_receiver.try_recv() {
+        match &msg {
+            can::can_messages::CanMessage::ConnectionFailed(port) => {
+                app.connection_error = Some(format!("Failed to connect to {port}"));
+            }
+            _ => {
+                app.can_messages.push(msg);
+            }
+        }
+    }
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 12,
@@ -138,3 +149,4 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             });
         });
 }
+

@@ -29,6 +29,8 @@ pub struct DAQApp {
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub dbc_path: Option<std::path::PathBuf>,
     pub connection_error: Option<String>,
+    pub can_messages: Vec<can::can_messages::CanMessage>,
+
 }
 
 #[derive(Serialize, Deserialize)]
@@ -121,6 +123,7 @@ impl DAQApp {
             selected_serial,
             dbc_path,
             connection_error: None,
+            can_messages: Vec::new(),
         }
     }
 
