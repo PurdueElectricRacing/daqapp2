@@ -1,6 +1,7 @@
 use crate::{can, config, shortcuts, ui, widgets, workspace};
 use eframe::egui::{self};
 use serde::{Deserialize, Serialize};
+use serialport::available_ports;
 use std::fs;
 pub(crate) const SETTINGS_PATH: &str = "settings.json";
 const NORD_THEME_PATH: &str = "themes/nord.toml";
@@ -116,7 +117,18 @@ impl DAQApp {
             theme,
             theme_selection,
             pixels_per_point: default_scale,
-            serial_ports: Vec::new(),
+            serial_ports: available_ports()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|p| {
+                    let name = p.port_name.to_lowercase();
+                    if cfg!(target_os = "windows") {
+                        name.starts_with("com")
+                    } else {
+                        name.starts_with("/dev/tty.usbmodem") || name.starts_with("/dev/ttyacm")
+                    }
+                })
+                .collect(),
             selected_serial,
             dbc_path,
             connection_error: None,
