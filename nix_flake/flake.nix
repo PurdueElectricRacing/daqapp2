@@ -1,5 +1,5 @@
 {
-  description = "Dev shell for daqapp2";
+  description = "Dev shell for PurdueElectricRacing/daqapp2";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
