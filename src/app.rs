@@ -233,6 +233,17 @@ impl eframe::App for DAQApp {
         egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
     }
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        self.can_messages.clear();
+        while let Ok(msg) = self.can_receiver.try_recv() {
+            match &msg {
+                can::can_messages::CanMessage::ConnectionFailed(port) => {
+                    self.connection_error = Some(format!("Failed to connect to {port}"));
+                }
+                _ => {
+                    self.can_messages.push(msg);
+                }
+            }
+        }
         // ctx.set_pixels_per_point(self.pixels_per_point);
         ctx.set_style(self.theme.clone());
 
