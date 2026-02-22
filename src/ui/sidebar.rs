@@ -70,20 +70,35 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             if ui.button("Add Log Parser").clicked() {
                 app.spawn_log_parser();
             }
-
-            egui::ComboBox::from_label("Serial Port")
-                .selected_text(app.selected_serial.as_deref().unwrap_or("Serial Port"))
-                .show_ui(ui, |ui| {
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_label("Serial Port")
+                    .selected_text(app.selected_serial.as_deref().unwrap_or("Serial Port"))
+                    .show_ui(ui, |ui| {
+                        for port in &app.serial_ports {
+                            let response = ui.selectable_value(
+                                &mut app.selected_serial,
+                                Some(port.port_name.clone()),
+                                &port.port_name,
+                            );
+                            if response.changed() {
+                                app.ui_sender
+                                    .send(ui::ui_messages::UiMessage::SerialSelected(
+                                        port.port_name.clone(),
+                                    ))
+                                    .expect("Failed to send serial selected");
+                                app.save_settings();
+                            }
+                        }
+                    });
+                if ui.button("🔄").clicked() {
                     app.serial_ports = match available_ports() {
                         Ok(ports) => ports
                             .into_iter()
                             .filter(|p| {
                                 let name = p.port_name.to_lowercase();
                                 if cfg!(target_os = "windows") {
-                                    // On Windows, serial ports are typically named "COMx"
                                     name.starts_with("com")
                                 } else {
-                                    // On Unix-like systems, keep common USB serial devices
                                     name.starts_with("/dev/tty.usbmodem")
                                         || name.starts_with("/dev/ttyacm")
                                 }
@@ -94,23 +109,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                             vec![]
                         }
                     };
-
-                    for port in &app.serial_ports {
-                        let response = ui.selectable_value(
-                            &mut app.selected_serial,
-                            Some(port.port_name.clone()),
-                            &port.port_name,
-                        );
-                        if response.changed() {
-                            app.ui_sender
-                                .send(ui::ui_messages::UiMessage::SerialSelected(
-                                    port.port_name.clone(),
-                                ))
-                                .expect("Failed to send serial selected");
-                            app.save_settings();
-                        }
-                    }
-                });
+                }
+            });
             if let Some(ref err) = app.connection_error {
                 ui.colored_label(egui::Color32::RED, format!(" {err}"));
             }
