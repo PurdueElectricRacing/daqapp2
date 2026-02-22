@@ -22,10 +22,6 @@ fn main() -> eframe::Result<()> {
     let icon =
         from_png_bytes(include_bytes!("../images/PER_Logo.png")).expect("Failed to load app icon");
 
-
-
-
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_icon(icon),
         ..Default::default()

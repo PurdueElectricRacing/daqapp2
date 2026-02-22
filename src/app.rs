@@ -4,15 +4,15 @@ use image::imageops::FilterType;
 use image::{GenericImageView, ImageResult};
 use std::path::Path;
 
-const MIN_UI_SCALE: f32 = 0.4;
-const MAX_UI_SCALE: f32 = 5.0;
-
 #[derive(Copy, Clone)]
 pub enum ThemeSelection {
     Default,
     Nord,
     Catppuccin,
 }
+
+const MIN_UI_SCALE: f32 = 0.4;
+const MAX_UI_SCALE: f32 = 5.0;
 
 pub struct DAQApp {
     pub is_sidebar_open: bool,
@@ -27,8 +27,8 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub logo_texture: egui::TextureHandle,
 
+    pub logo_texture: egui::TextureHandle,
 }
 impl DAQApp {
     pub fn new(
