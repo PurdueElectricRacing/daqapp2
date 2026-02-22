@@ -21,11 +21,6 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 .inner_margin(10.0),
         )
         .show(ctx, |ui| {
-            for msg in &app.can_messages {
-                if let can::can_messages::CanMessage::ConnectionFailed(port) = msg {
-                    app.connection_error = Some(format!("Failed to connect to {port}"));
-                }
-            }
             if app.tile_tree.is_empty() {
                 ui.vertical_centered(|ui| {
                     ui.label("No widgets in workspace yet.");

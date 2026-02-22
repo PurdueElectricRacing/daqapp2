@@ -62,7 +62,7 @@ impl Settings {
 
     pub fn save(&self, path: &str) {
         let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
-        fs::write(path, json).unwrap_or_else(|e| panic!("Failed to write {}: {}", path, e));
+        fs::write(path, json).unwrap_or_else(|e| log::error!("Failed to write {}: {}", path, e));
     }
 }
 
@@ -88,10 +88,8 @@ impl DAQApp {
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
         let settings = Settings::load(SETTINGS_PATH);
-        let theme1 = settings.theme.clone();
         let theme_selection = settings.theme;
-        let theme_selection = settings.theme;
-        let theme = match theme1 {
+        let theme = match theme_selection {
             ThemeSelection::Default => egui::Style::default(),
             ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
                 .map(|t| t.to_egui_style())
@@ -238,6 +236,9 @@ impl eframe::App for DAQApp {
             match &msg {
                 can::can_messages::CanMessage::ConnectionFailed(port) => {
                     self.connection_error = Some(format!("Failed to connect to {port}"));
+                }
+                can::can_messages::CanMessage::ConnectionSuccessful => {
+                    self.connection_error = None;
                 }
                 _ => {
                     self.can_messages.push(msg);

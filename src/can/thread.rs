@@ -70,7 +70,7 @@ pub fn start_can_thread(
                     {
                         Ok(p) => p,
                         Err(e) => {
-                            log::error!("Failed to open serialport {e}");
+                            log::error!("Failed to open serialport {}: {e}", path);
                             pending_connection_error = Some(path.clone());
                             thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
                             continue;
@@ -94,6 +94,9 @@ pub fn start_can_thread(
                         continue;
                     }
                     state.is_connected = true;
+                    let _ = state
+                        .can_sender
+                        .send(can::can_messages::CanMessage::ConnectionSuccessful);
                     can = Some(socket);
                 }
             }

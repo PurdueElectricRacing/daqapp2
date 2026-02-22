@@ -1,7 +1,4 @@
-use crate::{
-    can,
-    ui::{self},
-};
+use crate::ui::{self};
 use eframe::egui;
 use serialport::available_ports;
 
@@ -93,7 +90,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                             })
                             .collect(),
                         Err(err) => {
-                            eprintln!("Failed to get ports: {err}");
+                            log::error!("Failed to get ports: {err}");
                             vec![]
                         }
                     };
