@@ -1,3 +1,5 @@
+use crate::app::Settings;
+
 mod app;
 mod can;
 mod config;
@@ -15,7 +17,14 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-    let _can_thread = can::thread::start_can_thread(can_sender, ui_receiver);
+    let settings = Settings::load(app::SETTINGS_PATH);
+
+    let _can_thread = can::thread::start_can_thread(
+        can_sender,
+        ui_receiver,
+        settings.selected_serial.clone(),
+        settings.dbc_path.clone(),
+    );
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

@@ -1,4 +1,7 @@
-use crate::{can, ui};
+use crate::{
+    can::{self, can_messages},
+    ui,
+};
 use eframe::egui;
 
 pub enum Widget {
@@ -23,13 +26,13 @@ impl Widget {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        can_receiver: &std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        can_messages: &[can::can_messages::CanMessage],
         pending_scope_spawns: &mut Vec<(u32, String, String)>,
+        dbc_path: Option<&std::path::PathBuf>,
     ) -> egui_tiles::UiResponse {
         let mut received_new_data = false;
 
-        for msg in can_receiver.try_iter() {
+        for msg in can_messages {
             self.handle_can_message(&msg);
             received_new_data = true;
         }
@@ -44,7 +47,7 @@ impl Widget {
             Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
-            Widget::LogParser(w) => w.show(ui, ui_sender),
+            Widget::LogParser(w) => w.show(ui, dbc_path),
         }
     }
 

@@ -157,7 +157,9 @@ impl Scope {
     }
 
     pub fn handle_can_message(&mut self, msg: &crate::can::can_messages::CanMessage) {
-        let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg;
+        let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg else {
+            return;
+        };
 
         if parsed.decoded.msg_id != self.msg_id {
             return;
