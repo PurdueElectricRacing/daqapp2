@@ -1,4 +1,4 @@
-use crate::{can, ui, widgets};
+use crate::{can, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
@@ -29,9 +29,9 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 });
             } else {
                 let mut behavior = WorkspaceTileBehavior {
-                    can_receiver: &app.can_receiver,
-                    ui_sender: &app.ui_sender,
+                    can_messages: &app.can_messages,
                     pending_scope_spawns: &mut app.pending_scope_spawns,
+                    dbc_path: app.dbc_path.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
 
@@ -45,9 +45,9 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_receiver: &'a std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    ui_sender: &'a std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    can_messages: &'a [can::can_messages::CanMessage],
     pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
+    dbc_path: Option<&'a std::path::PathBuf>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -59,9 +59,9 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
     ) -> egui_tiles::UiResponse {
         widget.show(
             ui,
-            self.can_receiver,
-            self.ui_sender,
+            self.can_messages,
             self.pending_scope_spawns,
+            self.dbc_path,
         )
     }
 
