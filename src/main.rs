@@ -16,15 +16,7 @@ fn main() -> eframe::Result<()> {
         .init();
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
-    let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-    let settings = Settings::load(app::SETTINGS_PATH);
-
-    let _can_thread = can::thread::start_can_thread(
-        can_sender,
-        ui_receiver,
-        settings.selected_serial.clone(),
-        settings.dbc_path.clone(),
-    );
+    let _settings = Settings::load(app::SETTINGS_PATH);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -37,6 +29,12 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "DaqApp2",
         options,
-        Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DAQApp::new(
+                can_receiver,
+                can_sender,
+                cc,
+            )))
+        }),
     )
 }

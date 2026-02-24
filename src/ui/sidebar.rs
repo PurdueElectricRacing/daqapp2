@@ -2,18 +2,13 @@ use crate::ui::{self};
 use eframe::egui;
 use serialport::available_ports;
 
-pub fn select_dbc(
-    app: &mut crate::app::DAQApp,
-    ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-) {
+pub fn select_dbc(app: &mut crate::app::DAQApp) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
     {
         app.dbc_path = Some(path.clone());
-        ui_sender
-            .send(ui::ui_messages::UiMessage::DbcSelected(path))
-            .expect("Failed to send DBC selected message");
+        app.spawn_can_thread();
         app.save_settings();
     }
 }
@@ -70,26 +65,44 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             if ui.button("Add Log Parser").clicked() {
                 app.spawn_log_parser();
             }
+            ui.separator();
+            ui.heading("Connection Settings");
+
             ui.horizontal(|ui| {
-                egui::ComboBox::from_label("Serial Port")
-                    .selected_text(app.selected_serial.as_deref().unwrap_or("Serial Port"))
+                ui.label("UDP Port:");
+                if ui.add(egui::DragValue::new(&mut app.udp_port).range(1..=65535)).changed() {
+                    app.save_settings();
+                }
+            });
+
+            ui.horizontal(|ui| {
+                let selected_text = match &app.selected_source {
+                    Some(crate::ui::ui_messages::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
+                    Some(crate::ui::ui_messages::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    None => "Select Source".to_string(),
+                };
+
+                egui::ComboBox::from_label("Source")
+                    .selected_text(selected_text)
                     .show_ui(ui, |ui| {
-                        for port in &app.serial_ports {
-                            let response = ui.selectable_value(
-                                &mut app.selected_serial,
-                                Some(port.port_name.clone()),
-                                &port.port_name,
-                            );
-                            if response.changed() {
-                                app.ui_sender
-                                    .send(ui::ui_messages::UiMessage::Connect(
-                                        ui::ui_messages::ConnectionSource::Serial(port.port_name.clone()),
-                                    ))
-                                    .expect("Failed to send serial selected");
+                        ui.label("Serial Ports");
+                        let ports: Vec<_> = app.serial_ports.iter().map(|p| p.port_name.clone()).collect();
+                        for port_name in ports {
+                            let source = crate::ui::ui_messages::ConnectionSource::Serial(port_name.clone());
+                            if ui.selectable_value(&mut app.selected_source, Some(source.clone()), &port_name).changed() {
+                                app.spawn_can_thread();
                                 app.save_settings();
                             }
                         }
+                        ui.separator();
+                        ui.label("Network");
+                        let udp_source = crate::ui::ui_messages::ConnectionSource::Udp(app.udp_port);
+                        if ui.selectable_value(&mut app.selected_source, Some(udp_source.clone()), format!("UDP ({})", app.udp_port)).changed() {
+                            app.spawn_can_thread();
+                            app.save_settings();
+                        }
                     });
+
                 if ui.button("🔄").clicked() {
                     app.serial_ports = match available_ports() {
                         Ok(ports) => ports
@@ -114,17 +127,9 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 if ui.button("🔌 Disconnect").clicked() {
-                    app.ui_sender
-                        .send(ui::ui_messages::UiMessage::Disconnect)
-                        .expect("Failed to send disconnect");
-                }
-
-                if ui.button("📡 UDP (5000)").clicked() {
-                    app.ui_sender
-                        .send(ui::ui_messages::UiMessage::Connect(
-                            ui::ui_messages::ConnectionSource::Udp(5000),
-                        ))
-                        .expect("Failed to send UDP connect");
+                    app.selected_source = None;
+                    app.stop_can_thread();
+                    app.save_settings();
                 }
             });
 
@@ -133,11 +138,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             }
 
             ui.horizontal(|ui| {
-                // Clone the sender so we don’t borrow app immutably yet
-                let ui_sender = app.ui_sender.clone();
-
                 if ui.button("📁 Select DBC").clicked() {
-                    select_dbc(app, &ui_sender); // mutable borrow is fine
+                    select_dbc(app);
                 }
 
                 // Clone the path for reading only
