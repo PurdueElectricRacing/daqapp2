@@ -28,10 +28,15 @@ impl SerialDriver {
         let mut socket = CanSocket::new(port);
         socket
             .set_operating_mode(OperatingMode::Normal)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to set mode: {:?}", e)))?;
-        socket
-            .open(NominalBitRate::Rate500Kbit)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to open SLCAN: {:?}", e)))?;
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::Other, format!("Failed to set mode: {:?}", e))
+            })?;
+        socket.open(NominalBitRate::Rate500Kbit).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to open SLCAN: {:?}", e),
+            )
+        })?;
 
         self.socket = Some(socket);
         Ok(())
@@ -48,7 +53,8 @@ impl CanDriver for SerialDriver {
             match socket.read() {
                 Ok(frame) => Ok(frame),
                 Err(ReadError::Io(e)) => {
-                    if e.kind() != io::ErrorKind::WouldBlock && e.kind() != io::ErrorKind::TimedOut {
+                    if e.kind() != io::ErrorKind::WouldBlock && e.kind() != io::ErrorKind::TimedOut
+                    {
                         self.socket = None;
                     }
                     Err(e)
@@ -64,7 +70,10 @@ impl CanDriver for SerialDriver {
     }
 
     fn write_frame(&mut self, _frame: &CanFrame) -> io::Result<()> {
-        Err(io::Error::new(io::ErrorKind::Other, "Write not supported yet"))
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "Write not supported yet",
+        ))
     }
 
     fn is_connected(&self) -> bool {

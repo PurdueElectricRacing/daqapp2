@@ -76,7 +76,10 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 ui.label("UDP Port:");
-                if ui.add(egui::DragValue::new(&mut app.udp_port).range(1..=65535)).changed() {
+                if ui
+                    .add(egui::DragValue::new(&mut app.udp_port).range(1..=65535))
+                    .changed()
+                {
                     app.save_settings();
                 }
             });
@@ -92,10 +95,21 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                     .selected_text(selected_text)
                     .show_ui(ui, |ui| {
                         ui.label("Serial Ports");
-                        let ports: Vec<_> = app.serial_ports.iter().map(|p| p.port_name.clone()).collect();
+                        let ports: Vec<_> = app
+                            .serial_ports
+                            .iter()
+                            .map(|p| p.port_name.clone())
+                            .collect();
                         for port_name in ports {
                             let source = ConnectionSource::Serial(port_name.clone());
-                            if ui.selectable_value(&mut app.selected_source, Some(source.clone()), &port_name).changed() {
+                            if ui
+                                .selectable_value(
+                                    &mut app.selected_source,
+                                    Some(source.clone()),
+                                    &port_name,
+                                )
+                                .changed()
+                            {
                                 app.spawn_can_thread();
                                 app.save_settings();
                             }
@@ -103,7 +117,14 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                         ui.separator();
                         ui.label("Network");
                         let udp_source = ConnectionSource::Udp(app.udp_port);
-                        if ui.selectable_value(&mut app.selected_source, Some(udp_source.clone()), format!("UDP ({})", app.udp_port)).changed() {
+                        if ui
+                            .selectable_value(
+                                &mut app.selected_source,
+                                Some(udp_source.clone()),
+                                format!("UDP ({})", app.udp_port),
+                            )
+                            .changed()
+                        {
                             app.spawn_can_thread();
                             app.save_settings();
                         }

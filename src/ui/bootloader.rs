@@ -1,6 +1,6 @@
+use crate::widgets::AppAction;
 use eframe::egui;
 use std::collections::VecDeque;
-use crate::widgets::AppAction;
 
 pub struct Bootloader {
     pub title: String,

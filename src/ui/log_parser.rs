@@ -1,6 +1,6 @@
+use crate::widgets::AppAction;
 use eframe::egui;
 use std::{collections::VecDeque, path::PathBuf};
-use crate::widgets::AppAction;
 
 pub struct LogParser {
     pub title: String,
