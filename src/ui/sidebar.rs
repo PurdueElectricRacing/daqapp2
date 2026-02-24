@@ -1,4 +1,3 @@
-use crate::ui::{self};
 use eframe::egui;
 use serialport::available_ports;
 
@@ -77,8 +76,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 let selected_text = match &app.selected_source {
-                    Some(crate::ui::ui_messages::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
-                    Some(crate::ui::ui_messages::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    Some(crate::can::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
+                    Some(crate::can::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
                     None => "Select Source".to_string(),
                 };
 
@@ -88,7 +87,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                         ui.label("Serial Ports");
                         let ports: Vec<_> = app.serial_ports.iter().map(|p| p.port_name.clone()).collect();
                         for port_name in ports {
-                            let source = crate::ui::ui_messages::ConnectionSource::Serial(port_name.clone());
+                            let source = crate::can::ConnectionSource::Serial(port_name.clone());
                             if ui.selectable_value(&mut app.selected_source, Some(source.clone()), &port_name).changed() {
                                 app.spawn_can_thread();
                                 app.save_settings();
@@ -96,7 +95,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                         }
                         ui.separator();
                         ui.label("Network");
-                        let udp_source = crate::ui::ui_messages::ConnectionSource::Udp(app.udp_port);
+                        let udp_source = crate::can::ConnectionSource::Udp(app.udp_port);
                         if ui.selectable_value(&mut app.selected_source, Some(udp_source.clone()), format!("UDP ({})", app.udp_port)).changed() {
                             app.spawn_can_thread();
                             app.save_settings();

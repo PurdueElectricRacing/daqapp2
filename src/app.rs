@@ -25,7 +25,7 @@ pub struct DAQApp {
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub selected_source: Option<ui::ui_messages::ConnectionSource>,
+    pub selected_source: Option<can::ConnectionSource>,
     pub udp_port: u16,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub dbc_path: Option<std::path::PathBuf>,
@@ -39,7 +39,7 @@ pub struct DAQApp {
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_source: Option<ui::ui_messages::ConnectionSource>,
+    pub selected_source: Option<can::ConnectionSource>,
     pub udp_port: u16,
     pub theme: ThemeSelection,
 }
@@ -170,17 +170,12 @@ impl DAQApp {
             return;
         };
 
-        let driver: Box<dyn can::CanDriver> = match source {
-            ui::ui_messages::ConnectionSource::Serial(path) => {
-                Box::new(can::serial::SerialDriver::new(path.clone(), 115_200))
+        let driver = match source.create_driver() {
+            Ok(d) => d,
+            Err(e) => {
+                self.connection_error = Some(format!("Error: {e}"));
+                return;
             }
-            ui::ui_messages::ConnectionSource::Udp(port) => match can::udp::UdpDriver::new(*port) {
-                Ok(d) => Box::new(d),
-                Err(e) => {
-                    self.connection_error = Some(format!("UDP Error: {e}"));
-                    return;
-                }
-            },
         };
 
         self.can_thread = Some(can::thread::spawn_worker(
