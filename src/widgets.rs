@@ -1,5 +1,5 @@
 use crate::{
-    can::{self, can_messages},
+    can,
     ui,
 };
 use eframe::egui;
