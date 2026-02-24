@@ -1,8 +1,21 @@
-use crate::{can, config, shortcuts, ui, widgets, workspace};
-use eframe::egui::{self};
+use crate::can::{self, can_messages::CanMessage, ConnectionSource};
+use crate::widgets::{AppAction, Widget, WidgetType};
+use crate::{config, shortcuts, ui, workspace};
+use eframe::egui;
 use serde::{Deserialize, Serialize};
 use serialport::available_ports;
-use std::fs;
+use std::{
+    collections::VecDeque,
+    fs,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{Receiver, Sender},
+        Arc,
+    },
+    thread::JoinHandle,
+};
+
 pub(crate) const SETTINGS_PATH: &str = "settings.json";
 const NORD_THEME_PATH: &str = "themes/nord.toml";
 const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
@@ -15,31 +28,28 @@ pub enum ThemeSelection {
 
 pub struct DAQApp {
     pub is_sidebar_open: bool,
-    pub tile_tree: egui_tiles::Tree<widgets::Widget>,
-    pub next_can_viewer_num: usize,
-    pub next_bootloader_num: usize,
-    pub next_scope_num: usize,
-    pub next_log_parser_num: usize,
-    pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    pub pending_scope_spawns: Vec<(u32, String, String)>,
+    pub tile_tree: egui_tiles::Tree<Widget>,
+    pub next_instance_num: usize,
+    pub can_receiver: Receiver<CanMessage>,
+    pub action_queue: VecDeque<AppAction>,
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub selected_source: Option<can::ConnectionSource>,
+    pub selected_source: Option<ConnectionSource>,
     pub udp_port: u16,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
-    pub dbc_path: Option<std::path::PathBuf>,
+    pub dbc_path: Option<PathBuf>,
     pub connection_error: Option<String>,
-    pub can_messages: Vec<can::can_messages::CanMessage>,
-    pub can_thread: Option<std::thread::JoinHandle<()>>,
-    pub stop_signal: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    pub can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
+    pub can_messages: Vec<CanMessage>,
+    pub can_thread: Option<JoinHandle<()>>,
+    pub stop_signal: Arc<AtomicBool>,
+    pub can_sender: Sender<CanMessage>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
-    pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_source: Option<can::ConnectionSource>,
+    pub dbc_path: Option<PathBuf>,
+    pub selected_source: Option<ConnectionSource>,
     pub udp_port: u16,
     pub theme: ThemeSelection,
 }
@@ -87,8 +97,8 @@ impl DAQApp {
     }
 
     pub fn new(
-        can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
+        can_receiver: Receiver<CanMessage>,
+        can_sender: Sender<CanMessage>,
         cc: &eframe::CreationContext,
     ) -> Self {
         // Calculate a default ui scale based off the native_pixels_per_point
@@ -114,12 +124,9 @@ impl DAQApp {
         let mut app = Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
-            next_can_viewer_num: 1,
-            next_bootloader_num: 1,
-            next_scope_num: 1,
-            next_log_parser_num: 1,
+            next_instance_num: 1,
             can_receiver,
-            pending_scope_spawns: Vec::new(),
+            action_queue: VecDeque::new(),
             theme,
             theme_selection,
             pixels_per_point: default_scale,
@@ -141,7 +148,7 @@ impl DAQApp {
             connection_error: None,
             can_messages: Vec::new(),
             can_thread: None,
-            stop_signal: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            stop_signal: Arc::new(AtomicBool::new(false)),
             can_sender,
         };
 
@@ -155,12 +162,12 @@ impl DAQApp {
 
     pub fn stop_can_thread(&mut self) {
         self.stop_signal
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+            .store(true, Ordering::Relaxed);
         if let Some(handle) = self.can_thread.take() {
             let _ = handle.join();
         }
         self.stop_signal
-            .store(false, std::sync::atomic::Ordering::Relaxed);
+            .store(false, Ordering::Relaxed);
     }
 
     pub fn spawn_can_thread(&mut self) {
@@ -186,7 +193,7 @@ impl DAQApp {
         ));
     }
 
-    fn add_widget_to_tree(&mut self, widget: widgets::Widget) {
+    fn add_widget_to_tree(&mut self, widget: Widget) {
         let new_tile_id = self.tile_tree.tiles.insert_pane(widget);
 
         // No root yet, this becomes the root
@@ -213,43 +220,61 @@ impl DAQApp {
         tabs.set_active(new_tile_id);
     }
 
-    pub fn spawn_viewer_table(&mut self) {
-        let widget = widgets::Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
-            self.next_can_viewer_num,
-        ));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
+    pub fn handle_action(&mut self, action: AppAction) {
+        match action {
+            AppAction::SpawnWidget(ty) => self.spawn_widget(ty),
+            AppAction::CloseTile(tile_id) => {
+                self.tile_tree.tiles.remove(tile_id);
+            }
+        }
     }
 
-    pub fn spawn_viewer_list(&mut self) {
-        let widget =
-            widgets::Widget::ViewerList(ui::viewer_list::ViewerList::new(self.next_can_viewer_num));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_bootloader(&mut self) {
-        let widget =
-            widgets::Widget::Bootloader(ui::bootloader::Bootloader::new(self.next_bootloader_num));
-        self.next_bootloader_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_scope(&mut self, msg_id: u32, msg_name: String, signal_name: String) {
-        let widget = widgets::Widget::Scope(ui::scope::Scope::new(
-            self.next_scope_num,
-            msg_id,
-            msg_name,
-            signal_name,
-        ));
-        self.next_scope_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_log_parser(&mut self) {
-        let widget =
-            widgets::Widget::LogParser(ui::log_parser::LogParser::new(self.next_log_parser_num));
-        self.next_log_parser_num += 1;
+    pub fn spawn_widget(&mut self, ty: WidgetType) {
+        let widget = match ty {
+            WidgetType::ViewerTable => {
+                let w = Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
+                    self.next_instance_num,
+                ));
+                self.next_instance_num += 1;
+                w
+            }
+            WidgetType::ViewerList => {
+                // Fix: ViewerList should use its own type name in labels, but for now we follow the existing pattern
+                let w = Widget::ViewerList(ui::viewer_list::ViewerList::new(
+                    self.next_instance_num,
+                ));
+                self.next_instance_num += 1;
+                w
+            }
+            WidgetType::Bootloader => {
+                let w = Widget::Bootloader(ui::bootloader::Bootloader::new(
+                    self.next_instance_num,
+                ));
+                self.next_instance_num += 1;
+                w
+            }
+            WidgetType::Scope {
+                msg_id,
+                msg_name,
+                signal_name,
+            } => {
+                let w = Widget::Scope(ui::scope::Scope::new(
+                    self.next_instance_num,
+                    msg_id,
+                    msg_name,
+                    signal_name,
+                ));
+                self.next_instance_num += 1;
+                w
+            }
+            WidgetType::LogParser => {
+                let w = Widget::LogParser(ui::log_parser::LogParser::new(
+                    self.next_instance_num,
+                ));
+                self.next_instance_num += 1;
+                w
+            }
+        };
         self.add_widget_to_tree(widget);
     }
 
@@ -296,10 +321,10 @@ impl eframe::App for DAQApp {
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
-                can::can_messages::CanMessage::ConnectionFailed(port) => {
+                CanMessage::ConnectionFailed(port) => {
                     self.connection_error = Some(format!("Failed to connect to {port}"));
                 }
-                can::can_messages::CanMessage::ConnectionSuccessful => {
+                CanMessage::ConnectionSuccessful => {
                     self.connection_error = None;
                 }
                 _ => {
@@ -307,6 +332,19 @@ impl eframe::App for DAQApp {
                 }
             }
         }
+
+        // 1. Deliver data to all widgets (even non-visible ones)
+        if !self.can_messages.is_empty() {
+            for tile in self.tile_tree.tiles.tiles_mut() {
+                if let egui_tiles::Tile::Pane(widget) = tile {
+                    for msg in &self.can_messages {
+                        widget.handle_can_message(msg);
+                    }
+                }
+            }
+            ctx.request_repaint(); // Ensure we redraw if we got data
+        }
+
         // ctx.set_pixels_per_point(self.pixels_per_point);
         ctx.set_style(self.theme.clone());
 

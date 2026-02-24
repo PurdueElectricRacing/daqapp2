@@ -1,4 +1,6 @@
 use crate::app::Settings;
+use crate::can::can_messages::CanMessage;
+use std::sync::mpsc::channel;
 
 mod app;
 mod can;
@@ -15,7 +17,7 @@ fn main() -> eframe::Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
+    let (can_sender, can_receiver) = channel::<CanMessage>();
     let _settings = Settings::load(app::SETTINGS_PATH);
 
     let options = eframe::NativeOptions {

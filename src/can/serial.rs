@@ -2,8 +2,7 @@ use crate::can::CanDriver;
 use serialport::SerialPort;
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode, ReadError};
-use std::io;
-use std::time::Duration;
+use std::{io, time::Duration};
 
 pub struct SerialDriver {
     socket: Option<CanSocket<Box<dyn SerialPort>>>,

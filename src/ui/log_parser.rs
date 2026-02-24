@@ -1,9 +1,11 @@
 use eframe::egui;
+use std::{collections::VecDeque, path::PathBuf};
+use crate::widgets::AppAction;
 
 pub struct LogParser {
     pub title: String,
-    logs_dir: Option<std::path::PathBuf>,
-    output_dir: Option<std::path::PathBuf>,
+    logs_dir: Option<PathBuf>,
+    output_dir: Option<PathBuf>,
 }
 
 impl LogParser {
@@ -52,7 +54,8 @@ impl LogParser {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        _dbc_path: Option<&std::path::PathBuf>,
+        _action_queue: &mut VecDeque<AppAction>,
+        _dbc_path: Option<&PathBuf>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();

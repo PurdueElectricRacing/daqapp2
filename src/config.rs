@@ -1,5 +1,6 @@
 use eframe::egui::{self, Color32};
 use serde::Deserialize;
+use std::fs;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ThemeColors {
@@ -80,7 +81,7 @@ impl ThemeColors {
     }
 
     pub fn load_from_file(path: &str) -> Option<Self> {
-        std::fs::read_to_string(path)
+        fs::read_to_string(path)
             .ok()
             .and_then(|data| toml::from_str::<Self>(&data).ok())
     }

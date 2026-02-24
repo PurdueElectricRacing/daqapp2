@@ -1,6 +1,8 @@
+use crate::can::can_messages::CanMessage;
+use crate::widgets::AppAction;
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, fs};
 
 // TODO add trigger
 // TODO fft view
@@ -72,7 +74,7 @@ impl Scope {
             .add_filter("CSV Files", &["csv"])
             .save_file()
         {
-            if let Err(e) = std::fs::write(&path, csv_content) {
+            if let Err(e) = fs::write(&path, csv_content) {
                 log::error!("Failed to save CSV file: {}", e);
             } else {
                 log::info!("CSV exported to: {}", path.display());
@@ -80,7 +82,11 @@ impl Scope {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        _action_queue: &mut VecDeque<AppAction>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!(
             "📊 {}: {} - {}",
             self.title, self.msg_name, self.signal_name
@@ -156,8 +162,8 @@ impl Scope {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &crate::can::can_messages::CanMessage) {
-        let crate::can::can_messages::CanMessage::ParsedMessage(parsed) = msg else {
+    pub fn handle_can_message(&mut self, msg: &CanMessage) {
+        let CanMessage::ParsedMessage(parsed) = msg else {
             return;
         };
 

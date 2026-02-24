@@ -1,4 +1,6 @@
 use eframe::egui;
+use std::collections::VecDeque;
+use crate::widgets::AppAction;
 
 pub struct Bootloader {
     pub title: String,
@@ -11,7 +13,11 @@ impl Bootloader {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        _action_queue: &mut VecDeque<AppAction>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
         ui.label("Bootloader interface will be implemented here");

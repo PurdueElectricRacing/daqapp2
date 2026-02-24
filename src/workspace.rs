@@ -1,7 +1,9 @@
-use crate::{can, widgets};
+use crate::app::DAQApp;
+use crate::widgets::{AppAction, Widget};
 use eframe::egui;
+use std::{collections::VecDeque, path::PathBuf};
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 0,
@@ -29,43 +31,35 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                 });
             } else {
                 let mut behavior = WorkspaceTileBehavior {
-                    can_messages: &app.can_messages,
-                    pending_scope_spawns: &mut app.pending_scope_spawns,
+                    action_queue: &mut app.action_queue,
                     dbc_path: app.dbc_path.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
 
-                // Spawn all pending scopes in the queue
-                for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns)
-                {
-                    app.spawn_scope(msg_id, msg_name, signal_name);
+                // Drain and process all pending actions
+                while let Some(action) = app.action_queue.pop_front() {
+                    app.handle_action(action);
                 }
             }
         });
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_messages: &'a [can::can_messages::CanMessage],
-    pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
-    dbc_path: Option<&'a std::path::PathBuf>,
+    action_queue: &'a mut VecDeque<AppAction>,
+    dbc_path: Option<&'a PathBuf>,
 }
 
-impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
+impl egui_tiles::Behavior<Widget> for WorkspaceTileBehavior<'_> {
     fn pane_ui(
         &mut self,
         ui: &mut egui::Ui,
         _tile_id: egui_tiles::TileId,
-        widget: &mut widgets::Widget,
+        widget: &mut Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(
-            ui,
-            self.can_messages,
-            self.pending_scope_spawns,
-            self.dbc_path,
-        )
+        widget.show(ui, self.action_queue, self.dbc_path)
     }
 
-    fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
+    fn tab_title_for_pane(&mut self, widget: &Widget) -> egui::WidgetText {
         widget.title().into()
     }
 
@@ -82,7 +76,7 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
 
     fn is_tab_closable(
         &self,
-        _tiles: &egui_tiles::Tiles<widgets::Widget>,
+        _tiles: &egui_tiles::Tiles<Widget>,
         _tile_id: egui_tiles::TileId,
     ) -> bool {
         true

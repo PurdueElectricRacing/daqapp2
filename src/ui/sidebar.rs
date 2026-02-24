@@ -1,7 +1,10 @@
+use crate::app::{DAQApp, ThemeSelection};
+use crate::can::ConnectionSource;
+use crate::widgets::{AppAction, WidgetType};
 use eframe::egui;
 use serialport::available_ports;
 
-pub fn select_dbc(app: &mut crate::app::DAQApp) {
+pub fn select_dbc(app: &mut DAQApp) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
@@ -12,7 +15,7 @@ pub fn select_dbc(app: &mut crate::app::DAQApp) {
     }
 }
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 12,
@@ -37,9 +40,9 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
             // Theme toggle button
             let theme_label = match app.theme_selection {
-                crate::app::ThemeSelection::Default => "🎨 Theme: Default",
-                crate::app::ThemeSelection::Nord => "🎨 Theme: Nord",
-                crate::app::ThemeSelection::Catppuccin => "🎨 Theme: Catppuccin",
+                ThemeSelection::Default => "🎨 Theme: Default",
+                ThemeSelection::Nord => "🎨 Theme: Nord",
+                ThemeSelection::Catppuccin => "🎨 Theme: Catppuccin",
             };
 
             if ui.button(theme_label).clicked() {
@@ -50,19 +53,23 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.separator();
 
             if ui.button("Add CAN Viewer Table").clicked() {
-                app.spawn_viewer_table();
+                app.action_queue
+                    .push_back(AppAction::SpawnWidget(WidgetType::ViewerTable));
             }
 
             if ui.button("Add CAN Viewer List").clicked() {
-                app.spawn_viewer_list();
+                app.action_queue
+                    .push_back(AppAction::SpawnWidget(WidgetType::ViewerList));
             }
 
             if ui.button("Add Bootloader").clicked() {
-                app.spawn_bootloader();
+                app.action_queue
+                    .push_back(AppAction::SpawnWidget(WidgetType::Bootloader));
             }
 
             if ui.button("Add Log Parser").clicked() {
-                app.spawn_log_parser();
+                app.action_queue
+                    .push_back(AppAction::SpawnWidget(WidgetType::LogParser));
             }
             ui.separator();
             ui.heading("Connection Settings");
@@ -76,8 +83,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 let selected_text = match &app.selected_source {
-                    Some(crate::can::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
-                    Some(crate::can::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    Some(ConnectionSource::Serial(p)) => format!("Serial: {}", p),
+                    Some(ConnectionSource::Udp(p)) => format!("UDP: {}", p),
                     None => "Select Source".to_string(),
                 };
 
@@ -87,7 +94,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                         ui.label("Serial Ports");
                         let ports: Vec<_> = app.serial_ports.iter().map(|p| p.port_name.clone()).collect();
                         for port_name in ports {
-                            let source = crate::can::ConnectionSource::Serial(port_name.clone());
+                            let source = ConnectionSource::Serial(port_name.clone());
                             if ui.selectable_value(&mut app.selected_source, Some(source.clone()), &port_name).changed() {
                                 app.spawn_can_thread();
                                 app.save_settings();
@@ -95,7 +102,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                         }
                         ui.separator();
                         ui.label("Network");
-                        let udp_source = crate::can::ConnectionSource::Udp(app.udp_port);
+                        let udp_source = ConnectionSource::Udp(app.udp_port);
                         if ui.selectable_value(&mut app.selected_source, Some(udp_source.clone()), format!("UDP ({})", app.udp_port)).changed() {
                             app.spawn_can_thread();
                             app.save_settings();
