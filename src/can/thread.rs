@@ -26,7 +26,13 @@ pub fn spawn_worker(
             // 1. Handle commands
             let cmd = if driver.is_none() && source_info.is_none() {
                 // Fully idle: block until we get a command
-                command_receiver.recv().ok()
+                match command_receiver.recv() {
+                    Ok(c) => Some(c),
+                    Err(_) => {
+                        log::info!("CAN worker command channel disconnected, shutting down");
+                        return;
+                    }
+                }
             } else {
                 // Active or retrying: non-blocking check
                 command_receiver.try_recv().ok()
