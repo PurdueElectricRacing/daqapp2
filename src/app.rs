@@ -21,22 +21,26 @@ pub struct DAQApp {
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pub pending_scope_spawns: Vec<(u32, String, String)>,
     pub theme: egui::Style,
     pub theme_selection: ThemeSelection,
     pub pixels_per_point: f32,
-    pub selected_serial: Option<String>,
+    pub selected_source: Option<ui::ui_messages::ConnectionSource>,
+    pub udp_port: u16,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub dbc_path: Option<std::path::PathBuf>,
     pub connection_error: Option<String>,
     pub can_messages: Vec<can::can_messages::CanMessage>,
+    pub can_thread: Option<std::thread::JoinHandle<()>>,
+    pub stop_signal: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    pub can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
     pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_serial: Option<String>,
+    pub selected_source: Option<ui::ui_messages::ConnectionSource>,
+    pub udp_port: u16,
     pub theme: ThemeSelection,
 }
 
@@ -45,7 +49,8 @@ impl Default for Settings {
         Self {
             theme: ThemeSelection::Default,
             dbc_path: None,
-            selected_serial: None,
+            selected_source: None,
+            udp_port: 5000,
         }
     }
 }
@@ -74,7 +79,8 @@ impl DAQApp {
     pub fn save_settings(&self) {
         let settings = Settings {
             dbc_path: self.dbc_path.clone(),
-            selected_serial: self.selected_serial.clone(),
+            selected_source: self.selected_source.clone(),
+            udp_port: self.udp_port,
             theme: self.theme_selection,
         };
         settings.save(SETTINGS_PATH);
@@ -82,7 +88,7 @@ impl DAQApp {
 
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
         cc: &eframe::CreationContext,
     ) -> Self {
         // Calculate a default ui scale based off the native_pixels_per_point
@@ -102,9 +108,10 @@ impl DAQApp {
             }
         };
 
-        let selected_serial = settings.selected_serial.clone();
+        let selected_source = settings.selected_source.clone();
+        let udp_port = settings.udp_port;
         let dbc_path = settings.dbc_path.clone();
-        Self {
+        let mut app = Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
@@ -112,7 +119,6 @@ impl DAQApp {
             next_scope_num: 1,
             next_log_parser_num: 1,
             can_receiver,
-            ui_sender,
             pending_scope_spawns: Vec::new(),
             theme,
             theme_selection,
@@ -129,11 +135,60 @@ impl DAQApp {
                     }
                 })
                 .collect(),
-            selected_serial,
+            selected_source,
+            udp_port,
             dbc_path,
             connection_error: None,
             can_messages: Vec::new(),
+            can_thread: None,
+            stop_signal: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            can_sender,
+        };
+
+        // If we had a saved source, try to connect immediately
+        if app.selected_source.is_some() {
+            app.spawn_can_thread();
         }
+
+        app
+    }
+
+    pub fn stop_can_thread(&mut self) {
+        self.stop_signal
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(handle) = self.can_thread.take() {
+            let _ = handle.join();
+        }
+        self.stop_signal
+            .store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn spawn_can_thread(&mut self) {
+        self.stop_can_thread();
+
+        let Some(source) = &self.selected_source else {
+            return;
+        };
+
+        let driver: Box<dyn can::CanDriver> = match source {
+            ui::ui_messages::ConnectionSource::Serial(path) => {
+                Box::new(can::serial::SerialDriver::new(path.clone(), 115_200))
+            }
+            ui::ui_messages::ConnectionSource::Udp(port) => match can::udp::UdpDriver::new(*port) {
+                Ok(d) => Box::new(d),
+                Err(e) => {
+                    self.connection_error = Some(format!("UDP Error: {e}"));
+                    return;
+                }
+            },
+        };
+
+        self.can_thread = Some(can::thread::spawn_worker(
+            self.can_sender.clone(),
+            driver,
+            self.dbc_path.clone(),
+            self.stop_signal.clone(),
+        ));
     }
 
     fn add_widget_to_tree(&mut self, widget: widgets::Widget) {
