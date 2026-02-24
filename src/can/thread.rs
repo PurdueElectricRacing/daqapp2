@@ -10,115 +10,161 @@ use std::{io, path::PathBuf, sync::mpsc, thread, time::Duration};
 const READ_RETRY_SLEEP_MS: u64 = 2;
 const RECONNECT_DELAY_MS: u64 = 1000;
 
+enum State {
+    Idle,
+    Connecting {
+        source: ConnectionSource,
+        name: String,
+    },
+    Connected {
+        driver: Box<dyn crate::can::CanDriver>,
+        source: ConnectionSource,
+        name: String,
+        is_first_success: bool,
+    },
+}
+
+struct Worker {
+    can_sender: mpsc::Sender<CanMessage>,
+    command_receiver: mpsc::Receiver<WorkerCommand>,
+    parser: Option<can_decode::Parser>,
+    state: State,
+}
+
 pub fn spawn_worker(
     can_sender: mpsc::Sender<CanMessage>,
     command_receiver: mpsc::Receiver<WorkerCommand>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let mut driver: Option<Box<dyn crate::can::CanDriver>> = None;
-        let mut source_info: Option<(ConnectionSource, String)> = None;
-        let mut parser: Option<can_decode::Parser> = None;
-        let mut first_success = false;
+        let mut worker = Worker {
+            can_sender,
+            command_receiver,
+            parser: None,
+            state: State::Idle,
+        };
+        worker.run();
+    })
+}
 
+impl Worker {
+    fn run(&mut self) {
         log::info!("CAN persistent worker started");
 
         loop {
             // 1. Handle commands
-            let cmd = if driver.is_none() && source_info.is_none() {
-                // Fully idle: block until we get a command
-                match command_receiver.recv() {
+            let cmd = match &self.state {
+                State::Idle => match self.command_receiver.recv() {
                     Ok(c) => Some(c),
                     Err(_) => {
                         log::info!("CAN worker command channel disconnected, shutting down");
-                        return;
+                        break;
                     }
-                }
-            } else {
-                // Active or retrying: non-blocking check
-                command_receiver.try_recv().ok()
+                },
+                _ => self.command_receiver.try_recv().ok(),
             };
 
             if let Some(c) = cmd {
-                match c {
-                    WorkerCommand::Shutdown => {
-                        log::info!("CAN worker received Shutdown");
-                        return;
-                    }
-                    WorkerCommand::Disconnect => {
-                        log::info!("CAN worker Disconnect");
-                        driver = None;
-                        source_info = None;
-                    }
-                    WorkerCommand::UpdateDbc(path) => {
-                        parser = load_parser(path);
-                    }
-                    WorkerCommand::Connect { source, dbc_path } => {
-                        let name = match &source {
-                            ConnectionSource::Serial(p) => p.clone(),
-                            ConnectionSource::Udp(p) => format!("UDP:{}", p),
-                        };
-                        log::info!("CAN worker connecting to {}", name);
-                        source_info = Some((source, name));
-                        parser = load_parser(dbc_path);
-                        first_success = true;
-                        driver = None; // Force new connection attempt
-                    }
+                if !self.handle_command(c) {
+                    break;
                 }
             }
 
-            // 2. If we have a source but no active driver, try to connect/reconnect
-            if driver.is_none() {
-                if let Some((source, name)) = &source_info {
-                    match source.create_driver() {
-                        Ok(d) => {
-                            driver = Some(d);
-                        }
-                        Err(e) => {
-                            let _ = can_sender.send(CanMessage::ConnectionFailed {
-                                source: name.clone(),
-                                error: e.to_string(),
-                            });
-                            thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
-                            continue; // Check for commands again
-                        }
-                    }
-                }
+            // 2. Run state logic
+            self.step();
+        }
+    }
+
+    fn handle_command(&mut self, cmd: WorkerCommand) -> bool {
+        match cmd {
+            WorkerCommand::Shutdown => {
+                log::info!("CAN worker received Shutdown");
+                false
             }
-
-            // 3. If we have a driver, try to read from it
-            if let Some(ref mut d) = driver {
-                match d.read_frame() {
-                    Ok(frame) => {
-                        if first_success {
-                            let _ = can_sender.send(CanMessage::ConnectionSuccessful);
-                            first_success = false;
-                        }
-                        process_frame(&can_sender, &mut parser, frame);
-                    }
-                    Err(e)
-                        if e.kind() == io::ErrorKind::WouldBlock
-                            || e.kind() == io::ErrorKind::TimedOut =>
-                    {
-                        thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
-                    }
-                    Err(e) => {
-                        let source_name = source_info
-                            .as_ref()
-                            .map(|(_, n)| n.clone())
-                            .unwrap_or_else(|| "unknown".to_string());
-
-                        log::error!("Driver read error on {}: {}", source_name, e);
-                        let _ = can_sender.send(CanMessage::ConnectionFailed {
-                            source: source_name,
-                            error: e.to_string(),
-                        });
-                        driver = None; // Drop driver, will retry on next loop iteration
-                        thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
-                    }
-                }
+            WorkerCommand::Disconnect => {
+                log::info!("CAN worker Disconnect");
+                self.state = State::Idle;
+                true
+            }
+            WorkerCommand::UpdateDbc(path) => {
+                self.parser = load_parser(path);
+                true
+            }
+            WorkerCommand::Connect { source, dbc_path } => {
+                let name = match &source {
+                    ConnectionSource::Serial(p) => p.clone(),
+                    ConnectionSource::Udp(p) => format!("UDP:{}", p),
+                };
+                log::info!("CAN worker connecting to {}", name);
+                self.parser = load_parser(dbc_path);
+                self.state = State::Connecting { source, name };
+                true
             }
         }
-    })
+    }
+
+    fn step(&mut self) {
+        let current_state = std::mem::replace(&mut self.state, State::Idle);
+        self.state = match current_state {
+            State::Idle => State::Idle,
+            State::Connecting { source, name } => match source.create_driver() {
+                Ok(driver) => State::Connected {
+                    driver,
+                    source,
+                    name,
+                    is_first_success: true,
+                },
+                Err(e) => {
+                    let _ = self.can_sender.send(CanMessage::ConnectionFailed {
+                        source: name.clone(),
+                        error: e.to_string(),
+                    });
+                    thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
+                    State::Connecting { source, name }
+                }
+            },
+            State::Connected {
+                mut driver,
+                source,
+                name,
+                mut is_first_success,
+            } => match driver.read_frame() {
+                Ok(frame) => {
+                    if is_first_success {
+                        let _ = self.can_sender.send(CanMessage::ConnectionSuccessful);
+                        is_first_success = false;
+                    }
+                    process_frame(&self.can_sender, &mut self.parser, frame);
+                    State::Connected {
+                        driver,
+                        source,
+                        name,
+                        is_first_success,
+                    }
+                }
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::TimedOut =>
+                {
+                    thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
+                    State::Connected {
+                        driver,
+                        source,
+                        name,
+                        is_first_success,
+                    }
+                }
+                Err(e) => {
+                    log::error!("Driver read error on {}: {}", name, e);
+                    let _ = self.can_sender.send(CanMessage::ConnectionFailed {
+                        source: name.clone(),
+                        error: e.to_string(),
+                    });
+                    thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
+                    State::Connecting { source, name }
+                }
+            },
+        };
+    }
 }
 
 fn load_parser(path: Option<PathBuf>) -> Option<can_decode::Parser> {
