@@ -225,13 +225,11 @@ fn message_card(
                         ));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.small_button("📊").clicked() {
-                                action_queue.push_back(AppAction::SpawnWidget(
-                                    WidgetType::Scope {
-                                        msg_id,
-                                        msg_name: msg_name.to_string(),
-                                        signal_name: sig_name.to_string(),
-                                    },
-                                ));
+                                action_queue.push_back(AppAction::SpawnWidget(WidgetType::Scope {
+                                    msg_id,
+                                    msg_name: msg_name.to_string(),
+                                    signal_name: sig_name.to_string(),
+                                }));
                             }
                             ui.add_space(8.0);
                             ui.label(egui::RichText::new(value).monospace());

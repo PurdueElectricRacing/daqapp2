@@ -1,10 +1,14 @@
-use crate::can::{can_messages::CanMessage, message::ParsedMessage, CanDriver};
+use crate::can::{CanDriver, can_messages::CanMessage, message::ParsedMessage};
 use chrono::Local;
 use slcan::CanFrame;
 use std::{
     io,
     path::PathBuf,
-    sync::{atomic::{AtomicBool, Ordering}, mpsc, Arc},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::Duration,
 };
@@ -43,7 +47,10 @@ pub fn spawn_worker(
                     }
                     process_frame(&can_sender, &mut parser, frame);
                 }
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::TimedOut =>
+                {
                     thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                 }
                 Err(e) => {

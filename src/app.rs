@@ -1,4 +1,4 @@
-use crate::can::{self, can_messages::CanMessage, ConnectionSource};
+use crate::can::{self, ConnectionSource, can_messages::CanMessage};
 use crate::widgets::{AppAction, Widget, WidgetType};
 use crate::{config, shortcuts, ui, workspace};
 use eframe::egui;
@@ -9,9 +9,9 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
+        Arc,
         atomic::{AtomicBool, Ordering},
         mpsc::{Receiver, Sender},
-        Arc,
     },
     thread::JoinHandle,
 };
@@ -241,24 +241,20 @@ impl DAQApp {
     pub fn spawn_widget(&mut self, ty: WidgetType) {
         let widget = match ty {
             WidgetType::ViewerTable => {
-                let w = Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
-                    self.next_instance_num,
-                ));
+                let w =
+                    Widget::ViewerTable(ui::viewer_table::ViewerTable::new(self.next_instance_num));
                 self.next_instance_num += 1;
                 w
             }
             WidgetType::ViewerList => {
                 // Fix: ViewerList should use its own type name in labels, but for now we follow the existing pattern
-                let w = Widget::ViewerList(ui::viewer_list::ViewerList::new(
-                    self.next_instance_num,
-                ));
+                let w =
+                    Widget::ViewerList(ui::viewer_list::ViewerList::new(self.next_instance_num));
                 self.next_instance_num += 1;
                 w
             }
             WidgetType::Bootloader => {
-                let w = Widget::Bootloader(ui::bootloader::Bootloader::new(
-                    self.next_instance_num,
-                ));
+                let w = Widget::Bootloader(ui::bootloader::Bootloader::new(self.next_instance_num));
                 self.next_instance_num += 1;
                 w
             }
@@ -277,9 +273,7 @@ impl DAQApp {
                 w
             }
             WidgetType::LogParser => {
-                let w = Widget::LogParser(ui::log_parser::LogParser::new(
-                    self.next_instance_num,
-                ));
+                let w = Widget::LogParser(ui::log_parser::LogParser::new(self.next_instance_num));
                 self.next_instance_num += 1;
                 w
             }
