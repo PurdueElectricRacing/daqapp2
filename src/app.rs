@@ -8,12 +8,7 @@ use std::{
     collections::VecDeque,
     fs,
     path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, Sender},
-    },
-    thread::JoinHandle,
+    sync::mpsc::{Receiver, Sender},
 };
 
 pub(crate) const SETTINGS_PATH: &str = "settings.json";
@@ -49,9 +44,7 @@ pub struct DAQApp {
     pub dbc_path: Option<PathBuf>,
     pub connection_status: ConnectionStatus,
     pub can_messages: Vec<CanMessage>,
-    pub can_thread: Option<JoinHandle<()>>,
-    pub stop_signal: Arc<AtomicBool>,
-    pub can_sender: Sender<CanMessage>,
+    pub worker_command_sender: Sender<can::can_messages::WorkerCommand>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,7 +99,7 @@ impl DAQApp {
 
     pub fn new(
         can_receiver: Receiver<CanMessage>,
-        can_sender: Sender<CanMessage>,
+        worker_command_sender: Sender<can::can_messages::WorkerCommand>,
         cc: &eframe::CreationContext,
     ) -> Self {
         // Calculate a default ui scale based off the native_pixels_per_point
@@ -155,43 +148,37 @@ impl DAQApp {
             dbc_path,
             connection_status: ConnectionStatus::Disconnected,
             can_messages: Vec::new(),
-            can_thread: None,
-            stop_signal: Arc::new(AtomicBool::new(false)),
-            can_sender,
+            worker_command_sender,
         };
 
         // If we had a saved source, try to connect immediately
         if app.selected_source.is_some() {
-            app.spawn_can_thread();
+            app.connect_can();
         }
 
         app
     }
 
-    pub fn stop_can_thread(&mut self) {
-        self.stop_signal.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.can_thread.take() {
-            let _ = handle.join();
-        }
-        self.stop_signal.store(false, Ordering::Relaxed);
+    pub fn disconnect_can(&mut self) {
+        let _ = self
+            .worker_command_sender
+            .send(can::can_messages::WorkerCommand::Disconnect);
         self.connection_status = ConnectionStatus::Disconnected;
     }
 
-    pub fn spawn_can_thread(&mut self) {
-        self.stop_can_thread();
-
+    pub fn connect_can(&mut self) {
         let Some(source) = &self.selected_source else {
             return;
         };
 
         self.connection_status = ConnectionStatus::Connecting;
 
-        self.can_thread = Some(can::thread::spawn_worker(
-            self.can_sender.clone(),
-            source.clone(),
-            self.dbc_path.clone(),
-            self.stop_signal.clone(),
-        ));
+        let _ = self
+            .worker_command_sender
+            .send(can::can_messages::WorkerCommand::Connect {
+                source: source.clone(),
+                dbc_path: self.dbc_path.clone(),
+            });
     }
 
     fn add_widget_to_tree(&mut self, widget: Widget) {
@@ -313,20 +300,6 @@ impl eframe::App for DAQApp {
         egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
     }
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
-        // Watchdog: Check if the thread died unexpectedly
-        if let Some(handle) = &self.can_thread {
-            if handle.is_finished() {
-                // If the thread is finished but we didn't set Error/Disconnected, it crashed
-                if let ConnectionStatus::Connected | ConnectionStatus::Connecting =
-                    self.connection_status
-                {
-                    self.connection_status =
-                        ConnectionStatus::Error("Worker thread died unexpectedly".into());
-                    self.can_thread = None;
-                }
-            }
-        }
-
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
@@ -384,5 +357,11 @@ impl eframe::App for DAQApp {
         workspace::show(self, ctx);
 
         ctx.request_repaint();
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        let _ = self
+            .worker_command_sender
+            .send(can::can_messages::WorkerCommand::Shutdown);
     }
 }

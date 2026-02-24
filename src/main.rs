@@ -1,5 +1,4 @@
-use crate::app::Settings;
-use crate::can::can_messages::CanMessage;
+use crate::can::can_messages::{CanMessage, WorkerCommand};
 use std::sync::mpsc::channel;
 
 mod app;
@@ -18,7 +17,10 @@ fn main() -> eframe::Result<()> {
         .init();
 
     let (can_sender, can_receiver) = channel::<CanMessage>();
-    let _settings = Settings::load(app::SETTINGS_PATH);
+    let (worker_command_sender, worker_command_receiver) = channel::<WorkerCommand>();
+
+    // Spawn the persistent worker thread
+    crate::can::thread::spawn_worker(can_sender, worker_command_receiver);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -31,6 +33,12 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "DaqApp2",
         options,
-        Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, can_sender, cc)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DAQApp::new(
+                can_receiver,
+                worker_command_sender,
+                cc,
+            )))
+        }),
     )
 }

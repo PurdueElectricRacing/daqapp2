@@ -10,7 +10,11 @@ pub fn select_dbc(app: &mut DAQApp) {
         .pick_file()
     {
         app.dbc_path = Some(path.clone());
-        app.spawn_can_thread();
+        let _ = app
+            .worker_command_sender
+            .send(crate::can::can_messages::WorkerCommand::UpdateDbc(Some(
+                path,
+            )));
         app.save_settings();
     }
 }
@@ -110,7 +114,7 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                                 )
                                 .changed()
                             {
-                                app.spawn_can_thread();
+                                app.connect_can();
                                 app.save_settings();
                             }
                         }
@@ -125,7 +129,7 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                             )
                             .changed()
                         {
-                            app.spawn_can_thread();
+                            app.connect_can();
                             app.save_settings();
                         }
                     });
@@ -155,7 +159,7 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 if ui.button("🔌 Disconnect").clicked() {
                     app.selected_source = None;
-                    app.stop_can_thread();
+                    app.disconnect_can();
                     app.save_settings();
                 }
 
