@@ -35,11 +35,11 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                     dbc_path: app.dbc_path.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
+            }
 
-                // Drain and process all pending actions
-                while let Some(action) = app.action_queue.pop_front() {
-                    app.handle_action(action);
-                }
+            // Drain and process all pending actions regardless of tree state
+            while let Some(action) = app.action_queue.pop_front() {
+                app.handle_action(action);
             }
         });
 }
