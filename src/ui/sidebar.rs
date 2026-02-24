@@ -82,8 +82,8 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                             );
                             if response.changed() {
                                 app.ui_sender
-                                    .send(ui::ui_messages::UiMessage::SerialSelected(
-                                        port.port_name.clone(),
+                                    .send(ui::ui_messages::UiMessage::Connect(
+                                        ui::ui_messages::ConnectionSource::Serial(port.port_name.clone()),
                                     ))
                                     .expect("Failed to send serial selected");
                                 app.save_settings();
@@ -111,6 +111,23 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                     };
                 }
             });
+
+            ui.horizontal(|ui| {
+                if ui.button("🔌 Disconnect").clicked() {
+                    app.ui_sender
+                        .send(ui::ui_messages::UiMessage::Disconnect)
+                        .expect("Failed to send disconnect");
+                }
+
+                if ui.button("📡 UDP (5000)").clicked() {
+                    app.ui_sender
+                        .send(ui::ui_messages::UiMessage::Connect(
+                            ui::ui_messages::ConnectionSource::Udp(5000),
+                        ))
+                        .expect("Failed to send UDP connect");
+                }
+            });
+
             if let Some(ref err) = app.connection_error {
                 ui.colored_label(egui::Color32::RED, format!(" {err}"));
             }
