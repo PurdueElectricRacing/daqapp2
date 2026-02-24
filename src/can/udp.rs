@@ -1,6 +1,6 @@
 use crate::can::CanDriver;
 use slcan::CanFrame;
-use std::{io, net::UdpSocket, thread, time::Duration};
+use std::{io, net::UdpSocket, time::Duration};
 
 pub struct UdpDriver {
     _socket: UdpSocket,
@@ -16,16 +16,14 @@ impl UdpDriver {
 
 impl CanDriver for UdpDriver {
     fn read_frame(&mut self) -> io::Result<CanFrame> {
-        // Mocking for now: simulate a delay and no data
-        thread::sleep(Duration::from_millis(10));
-        Err(io::Error::new(io::ErrorKind::WouldBlock, "Not data yet"))
+        todo!("UDP Driver is not yet implemented")
     }
 
     fn write_frame(&mut self, _frame: &CanFrame) -> io::Result<()> {
-        Ok(())
+        todo!("UDP Driver is not yet implemented")
     }
 
     fn is_connected(&self) -> bool {
-        true
+        false
     }
 }

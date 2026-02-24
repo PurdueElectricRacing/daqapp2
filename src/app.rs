@@ -186,17 +186,9 @@ impl DAQApp {
 
         self.connection_status = ConnectionStatus::Connecting;
 
-        let driver = match source.create_driver() {
-            Ok(d) => d,
-            Err(e) => {
-                self.connection_status = ConnectionStatus::Error(format!("Error: {e}"));
-                return;
-            }
-        };
-
         self.can_thread = Some(can::thread::spawn_worker(
             self.can_sender.clone(),
-            driver,
+            source.clone(),
             self.dbc_path.clone(),
             self.stop_signal.clone(),
         ));
@@ -338,8 +330,9 @@ impl eframe::App for DAQApp {
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
-                CanMessage::ConnectionFailed(err_msg) => {
-                    self.connection_status = ConnectionStatus::Error(err_msg.clone());
+                CanMessage::ConnectionFailed { source, error } => {
+                    self.connection_status =
+                        ConnectionStatus::Error(format!("Failed to connect to {}: {}", source, error));
                 }
                 CanMessage::ConnectionSuccessful => {
                     if self.connection_status != ConnectionStatus::Connected {
