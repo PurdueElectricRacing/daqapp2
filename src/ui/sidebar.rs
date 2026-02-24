@@ -35,8 +35,7 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
         )
         .resizable(true)
         .show_animated(ctx, app.is_sidebar_open, |ui| {
-            ui.heading("Side bar");
-            ui.separator();
+            ui.heading("Customization");
 
             // Theme toggle button
             let theme_label = match app.theme_selection {
@@ -51,23 +50,24 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
             }
 
             ui.separator();
+            ui.heading("Widgets");
 
-            if ui.button("Add CAN Viewer Table").clicked() {
+            if ui.button("Spawn CAN Viewer Table").clicked() {
                 app.action_queue
                     .push_back(AppAction::SpawnWidget(WidgetType::ViewerTable));
             }
 
-            if ui.button("Add CAN Viewer List").clicked() {
+            if ui.button("Spawn CAN Viewer List").clicked() {
                 app.action_queue
                     .push_back(AppAction::SpawnWidget(WidgetType::ViewerList));
             }
 
-            if ui.button("Add Bootloader").clicked() {
+            if ui.button("Spawn Bootloader").clicked() {
                 app.action_queue
                     .push_back(AppAction::SpawnWidget(WidgetType::Bootloader));
             }
 
-            if ui.button("Add Log Parser").clicked() {
+            if ui.button("Spawn Log Parser").clicked() {
                 app.action_queue
                     .push_back(AppAction::SpawnWidget(WidgetType::LogParser));
             }
