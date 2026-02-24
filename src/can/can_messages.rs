@@ -2,6 +2,6 @@ use crate::can::message::ParsedMessage;
 
 pub enum CanMessage {
     ParsedMessage(ParsedMessage),
-    ConnectionFailed(String),
+    ConnectionFailed { source: String, error: String },
     ConnectionSuccessful,
 }
