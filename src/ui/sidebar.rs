@@ -1,4 +1,4 @@
-use crate::app::{DAQApp, ThemeSelection};
+use crate::app::{ConnectionStatus, DAQApp, ThemeSelection};
 use crate::can::ConnectionSource;
 use crate::widgets::{AppAction, WidgetType};
 use eframe::egui;
@@ -137,9 +137,18 @@ pub fn show(app: &mut DAQApp, ctx: &egui::Context) {
                     app.stop_can_thread();
                     app.save_settings();
                 }
+
+                // Connection status indicator
+                let (status_icon, status_color) = match &app.connection_status {
+                    ConnectionStatus::Disconnected => ("⚪", egui::Color32::GRAY),
+                    ConnectionStatus::Connecting => ("🟡", egui::Color32::YELLOW),
+                    ConnectionStatus::Connected => ("🟢", egui::Color32::GREEN),
+                    ConnectionStatus::Error(_) => ("🔴", egui::Color32::RED),
+                };
+                ui.label(egui::RichText::new(status_icon).color(status_color));
             });
 
-            if let Some(ref err) = app.connection_error {
+            if let ConnectionStatus::Error(ref err) = app.connection_status {
                 ui.colored_label(egui::Color32::RED, format!(" {err}"));
             }
 

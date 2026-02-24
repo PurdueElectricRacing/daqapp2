@@ -26,6 +26,14 @@ pub enum ThemeSelection {
     Catppuccin,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error(String),
+}
+
 pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<Widget>,
@@ -39,7 +47,7 @@ pub struct DAQApp {
     pub udp_port: u16,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub dbc_path: Option<PathBuf>,
-    pub connection_error: Option<String>,
+    pub connection_status: ConnectionStatus,
     pub can_messages: Vec<CanMessage>,
     pub can_thread: Option<JoinHandle<()>>,
     pub stop_signal: Arc<AtomicBool>,
@@ -145,7 +153,7 @@ impl DAQApp {
             selected_source,
             udp_port,
             dbc_path,
-            connection_error: None,
+            connection_status: ConnectionStatus::Disconnected,
             can_messages: Vec::new(),
             can_thread: None,
             stop_signal: Arc::new(AtomicBool::new(false)),
@@ -161,13 +169,12 @@ impl DAQApp {
     }
 
     pub fn stop_can_thread(&mut self) {
-        self.stop_signal
-            .store(true, Ordering::Relaxed);
+        self.stop_signal.store(true, Ordering::Relaxed);
         if let Some(handle) = self.can_thread.take() {
             let _ = handle.join();
         }
-        self.stop_signal
-            .store(false, Ordering::Relaxed);
+        self.stop_signal.store(false, Ordering::Relaxed);
+        self.connection_status = ConnectionStatus::Disconnected;
     }
 
     pub fn spawn_can_thread(&mut self) {
@@ -177,10 +184,12 @@ impl DAQApp {
             return;
         };
 
+        self.connection_status = ConnectionStatus::Connecting;
+
         let driver = match source.create_driver() {
             Ok(d) => d,
             Err(e) => {
-                self.connection_error = Some(format!("Error: {e}"));
+                self.connection_status = ConnectionStatus::Error(format!("Error: {e}"));
                 return;
             }
         };
@@ -318,14 +327,30 @@ impl eframe::App for DAQApp {
         egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
     }
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        // Watchdog: Check if the thread died unexpectedly
+        if let Some(handle) = &self.can_thread {
+            if handle.is_finished() {
+                // If the thread is finished but we didn't set Error/Disconnected, it crashed
+                if let ConnectionStatus::Connected | ConnectionStatus::Connecting =
+                    self.connection_status
+                {
+                    self.connection_status =
+                        ConnectionStatus::Error("Worker thread died unexpectedly".into());
+                    self.can_thread = None;
+                }
+            }
+        }
+
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
-                CanMessage::ConnectionFailed(port) => {
-                    self.connection_error = Some(format!("Failed to connect to {port}"));
+                CanMessage::ConnectionFailed(err_msg) => {
+                    self.connection_status = ConnectionStatus::Error(err_msg.clone());
                 }
                 CanMessage::ConnectionSuccessful => {
-                    self.connection_error = None;
+                    if self.connection_status != ConnectionStatus::Connected {
+                        self.connection_status = ConnectionStatus::Connected;
+                    }
                 }
                 _ => {
                     self.can_messages.push(msg);

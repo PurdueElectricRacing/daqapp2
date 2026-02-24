@@ -31,11 +31,16 @@ pub fn spawn_worker(
 
         log::info!("CAN worker started");
 
+        let mut first_success = true;
+
         while !stop_signal.load(Ordering::Relaxed) {
             // Read from driver
             match driver.read_frame() {
                 Ok(frame) => {
-                    let _ = can_sender.send(CanMessage::ConnectionSuccessful);
+                    if first_success {
+                        let _ = can_sender.send(CanMessage::ConnectionSuccessful);
+                        first_success = false;
+                    }
                     process_frame(&can_sender, &mut parser, frame);
                 }
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
