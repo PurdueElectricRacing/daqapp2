@@ -1,15 +1,34 @@
-use crate::{
-    can,
-    ui,
+use crate::can::can_messages::CanMessage;
+use crate::ui::{
+    bootloader::Bootloader, log_parser::LogParser, scope::Scope, viewer_list::ViewerList,
+    viewer_table::ViewerTable,
 };
 use eframe::egui;
+use std::{collections::VecDeque, path::PathBuf};
+
+pub enum AppAction {
+    SpawnWidget(WidgetType),
+    CloseTile(egui_tiles::TileId),
+}
+
+pub enum WidgetType {
+    ViewerTable,
+    ViewerList,
+    Bootloader,
+    Scope {
+        msg_id: u32,
+        msg_name: String,
+        signal_name: String,
+    },
+    LogParser,
+}
 
 pub enum Widget {
-    ViewerTable(ui::viewer_table::ViewerTable),
-    ViewerList(ui::viewer_list::ViewerList),
-    Bootloader(ui::bootloader::Bootloader),
-    Scope(ui::scope::Scope),
-    LogParser(ui::log_parser::LogParser),
+    ViewerTable(ViewerTable),
+    ViewerList(ViewerList),
+    Bootloader(Bootloader),
+    Scope(Scope),
+    LogParser(LogParser),
 }
 
 impl Widget {
@@ -26,32 +45,19 @@ impl Widget {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        can_messages: &[can::can_messages::CanMessage],
-        pending_scope_spawns: &mut Vec<(u32, String, String)>,
-        dbc_path: Option<&std::path::PathBuf>,
+        action_queue: &mut VecDeque<AppAction>,
+        dbc_path: Option<&PathBuf>,
     ) -> egui_tiles::UiResponse {
-        let mut received_new_data = false;
-
-        for msg in can_messages {
-            self.handle_can_message(&msg);
-            received_new_data = true;
-        }
-
-        // Request repaint only if we received new data
-        if received_new_data {
-            ui.ctx().request_repaint();
-        }
-
         match self {
-            Widget::ViewerTable(w) => w.show(ui, pending_scope_spawns),
-            Widget::ViewerList(w) => w.show(ui),
-            Widget::Bootloader(w) => w.show(ui),
-            Widget::Scope(w) => w.show(ui),
-            Widget::LogParser(w) => w.show(ui, dbc_path),
+            Widget::ViewerTable(w) => w.show(ui, action_queue),
+            Widget::ViewerList(w) => w.show(ui, action_queue),
+            Widget::Bootloader(w) => w.show(ui, action_queue),
+            Widget::Scope(w) => w.show(ui, action_queue),
+            Widget::LogParser(w) => w.show(ui, action_queue, dbc_path),
         }
     }
 
-    fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
+    pub fn handle_can_message(&mut self, msg: &CanMessage) {
         match self {
             Widget::ViewerTable(w) => w.handle_can_message(msg),
             Widget::ViewerList(w) => w.handle_can_message(msg),

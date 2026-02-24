@@ -1,8 +1,9 @@
-use crate::can;
+use crate::can::{can_messages::CanMessage, message::ParsedMessage, CanDriver};
 use chrono::Local;
 use slcan::CanFrame;
 use std::{
     io,
+    path::PathBuf,
     sync::{atomic::{AtomicBool, Ordering}, mpsc, Arc},
     thread,
     time::Duration,
@@ -11,9 +12,9 @@ use std::{
 const READ_RETRY_SLEEP_MS: u64 = 2;
 
 pub fn spawn_worker(
-    can_sender: mpsc::Sender<can::can_messages::CanMessage>,
-    mut driver: Box<dyn can::CanDriver>,
-    dbc_path: Option<std::path::PathBuf>,
+    can_sender: mpsc::Sender<CanMessage>,
+    mut driver: Box<dyn CanDriver>,
+    dbc_path: Option<PathBuf>,
     stop_signal: Arc<AtomicBool>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
@@ -34,7 +35,7 @@ pub fn spawn_worker(
             // Read from driver
             match driver.read_frame() {
                 Ok(frame) => {
-                    let _ = can_sender.send(can::can_messages::CanMessage::ConnectionSuccessful);
+                    let _ = can_sender.send(CanMessage::ConnectionSuccessful);
                     process_frame(&can_sender, &mut parser, frame);
                 }
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
@@ -42,7 +43,7 @@ pub fn spawn_worker(
                 }
                 Err(e) => {
                     log::error!("Driver read error: {e}");
-                    let _ = can_sender.send(can::can_messages::CanMessage::ConnectionFailed(e.to_string()));
+                    let _ = can_sender.send(CanMessage::ConnectionFailed(e.to_string()));
                     return;
                 }
             }
@@ -52,7 +53,7 @@ pub fn spawn_worker(
 }
 
 fn process_frame(
-    can_sender: &mpsc::Sender<can::can_messages::CanMessage>,
+    can_sender: &mpsc::Sender<CanMessage>,
     parser: &mut Option<can_decode::Parser>,
     frame: CanFrame,
 ) {
@@ -67,12 +68,12 @@ fn process_frame(
 
             if let Some(p) = parser.as_ref() {
                 if let Some(decoded) = p.decode_msg(id, data) {
-                    let parsed_msg = can::message::ParsedMessage {
+                    let parsed_msg = ParsedMessage {
                         timestamp: Local::now(),
                         raw_bytes: data.to_vec(),
                         decoded,
                     };
-                    let _ = can_sender.send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                    let _ = can_sender.send(CanMessage::ParsedMessage(parsed_msg));
                 }
             }
         }

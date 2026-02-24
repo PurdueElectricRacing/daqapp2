@@ -1,4 +1,6 @@
-use crate::can;
+use crate::can::can_messages::CanMessage;
+use crate::can::message::ParsedMessage;
+use crate::widgets::AppAction;
 use eframe::egui;
 use std::collections::VecDeque;
 
@@ -6,8 +8,8 @@ const MAX_MESSAGES: usize = 200;
 
 pub struct ViewerList {
     pub title: String,
-    pub decoded_msgs: VecDeque<can::message::ParsedMessage>,
-    pub frozen_msgs: Option<VecDeque<can::message::ParsedMessage>>,
+    pub decoded_msgs: VecDeque<ParsedMessage>,
+    pub frozen_msgs: Option<VecDeque<ParsedMessage>>,
     pub paused: bool,
 }
 
@@ -21,7 +23,11 @@ impl ViewerList {
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        _action_queue: &mut VecDeque<AppAction>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
             .button(if self.paused { "Resume" } else { "Pause" })
@@ -97,9 +103,9 @@ impl ViewerList {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
+    pub fn handle_can_message(&mut self, msg: &CanMessage) {
         match msg {
-            can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
+            CanMessage::ParsedMessage(parsed_msg) => {
                 if self.paused {
                     return;
                 }

@@ -1,11 +1,14 @@
-use crate::can;
+use crate::can::can_messages::CanMessage;
+use crate::can::message::ParsedMessage;
+use crate::widgets::{AppAction, WidgetType};
 use eframe::egui;
 use hashbrown::HashMap;
+use std::collections::VecDeque;
 
 pub struct ViewerTable {
     pub title: String,
-    pub decoded_msgs: HashMap<u32, can::message::ParsedMessage>,
-    pub frozen_msgs: Option<HashMap<u32, can::message::ParsedMessage>>,
+    pub decoded_msgs: HashMap<u32, ParsedMessage>,
+    pub frozen_msgs: Option<HashMap<u32, ParsedMessage>>,
     pub paused: bool,
     pub search: String,
 }
@@ -24,7 +27,7 @@ impl ViewerTable {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        pending_scope_spawns: &mut Vec<(u32, String, String)>,
+        action_queue: &mut VecDeque<AppAction>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
@@ -131,7 +134,7 @@ impl ViewerTable {
                             &msg.timestamp.format("%-I:%M:%S%.3f").to_string(),
                             &signals,
                             &self.search,
-                            pending_scope_spawns,
+                            action_queue,
                         );
                         ui.add_space(8.0);
                     }
@@ -141,9 +144,9 @@ impl ViewerTable {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
+    pub fn handle_can_message(&mut self, msg: &CanMessage) {
         match msg {
-            can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
+            CanMessage::ParsedMessage(parsed_msg) => {
                 self.decoded_msgs
                     .insert(parsed_msg.decoded.msg_id, parsed_msg.clone());
             }
@@ -161,7 +164,7 @@ fn message_card(
     timestamp: &str,
     signals: &[(&str, String)],
     search: &str,
-    pending_scope_spawns: &mut Vec<(u32, String, String)>,
+    action_queue: &mut VecDeque<AppAction>,
 ) {
     // Header (outside card)
     ui.horizontal(|ui| {
@@ -222,10 +225,12 @@ fn message_card(
                         ));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.small_button("📊").clicked() {
-                                pending_scope_spawns.push((
-                                    msg_id,
-                                    msg_name.to_string(),
-                                    sig_name.to_string(),
+                                action_queue.push_back(AppAction::SpawnWidget(
+                                    WidgetType::Scope {
+                                        msg_id,
+                                        msg_name: msg_name.to_string(),
+                                        signal_name: sig_name.to_string(),
+                                    },
                                 ));
                             }
                             ui.add_space(8.0);
