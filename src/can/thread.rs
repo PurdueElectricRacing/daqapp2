@@ -1,7 +1,7 @@
 use crate::can::{
+    ConnectionSource,
     can_messages::{CanMessage, WorkerCommand},
     message::ParsedMessage,
-    ConnectionSource,
 };
 use chrono::Local;
 use slcan::CanFrame;
@@ -89,7 +89,10 @@ pub fn spawn_worker(
                         }
                         process_frame(&can_sender, &mut parser, frame);
                     }
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+                    Err(e)
+                        if e.kind() == io::ErrorKind::WouldBlock
+                            || e.kind() == io::ErrorKind::TimedOut =>
+                    {
                         thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                     }
                     Err(e) => {

@@ -304,8 +304,10 @@ impl eframe::App for DAQApp {
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
                 CanMessage::ConnectionFailed { source, error } => {
-                    self.connection_status =
-                        ConnectionStatus::Error(format!("Failed to connect to {}: {}", source, error));
+                    self.connection_status = ConnectionStatus::Error(format!(
+                        "Failed to connect to {}: {}",
+                        source, error
+                    ));
                 }
                 CanMessage::ConnectionSuccessful => {
                     if self.connection_status != ConnectionStatus::Connected {
