@@ -8,9 +8,9 @@ pub struct ThemeColors {
     pub panel_bg: String,
     pub text: String,
     pub accent: String,
-    pub button: Option<String>,
-    pub button_hover: Option<String>,
-    pub button_text: Option<String>,
+    pub button: String,
+    pub button_hover: String,
+    pub button_text: String,
 }
 
 impl ThemeColors {
@@ -42,19 +42,10 @@ impl ThemeColors {
         let panel = Self::parse_hex(&self.panel_bg);
         let text = Self::parse_hex(&self.text);
         let accent = Self::parse_hex(&self.accent);
-        let button = Self::parse_hex(&self.button.clone().unwrap_or_else(|| self.accent.clone()));
-        let button_hover = Self::parse_hex(
-            &self
-                .button_hover
-                .clone()
-                .unwrap_or_else(|| self.accent.clone()),
-        );
-        let button_text = Self::parse_hex(
-            &self
-                .button_text
-                .clone()
-                .unwrap_or_else(|| self.text.clone()),
-        );
+
+        let button = Self::parse_hex(&self.button);
+        let button_hover = Self::parse_hex(&self.button_hover);
+        let button_text = Self::parse_hex(&self.button_text);
 
         // --- Base ---
         style.visuals.window_fill = bg;

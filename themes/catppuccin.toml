@@ -1,4 +1,5 @@
 background   = "#1e1e2e"
+button_text  = "#fab387"
 panel_bg     = "#313244"
 text         = "#fab387"
 accent       = "#fab387"
