@@ -1,4 +1,3 @@
-use crate::can::CanDriver;
 use slcan::CanFrame;
 use std::{io, net::UdpSocket, time::Duration};
 
@@ -12,18 +11,8 @@ impl UdpDriver {
         socket.set_read_timeout(Some(Duration::from_millis(10)))?;
         Ok(Self { _socket: socket })
     }
-}
 
-impl CanDriver for UdpDriver {
-    fn read_frame(&mut self) -> io::Result<CanFrame> {
+    pub fn read_frame(&mut self) -> io::Result<CanFrame> {
         todo!("UDP Driver is not yet implemented")
-    }
-
-    fn write_frame(&mut self, _frame: &CanFrame) -> io::Result<()> {
-        todo!("UDP Driver is not yet implemented")
-    }
-
-    fn is_connected(&self) -> bool {
-        false
     }
 }

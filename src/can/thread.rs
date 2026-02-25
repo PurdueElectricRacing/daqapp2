@@ -17,10 +17,9 @@ enum State {
         name: String,
     },
     Connected {
-        driver: Box<dyn crate::can::CanDriver>,
+        driver: crate::can::Driver,
         source: ConnectionSource,
         name: String,
-        is_first_success: bool,
     },
 }
 
@@ -103,55 +102,49 @@ impl Worker {
     }
 
     fn step(&mut self) {
-        let current_state = std::mem::replace(&mut self.state, State::Idle);
-        self.state = match current_state {
-            State::Idle => State::Idle,
+        match std::mem::replace(&mut self.state, State::Idle) {
+            State::Idle => {}
             State::Connecting { source, name } => match source.create_driver() {
-                Ok(driver) => State::Connected {
-                    driver,
-                    source,
-                    name,
-                    is_first_success: true,
-                },
+                Ok(driver) => {
+                    let _ = self.can_sender.send(CanMessage::ConnectionSuccessful);
+                    self.state = State::Connected {
+                        driver,
+                        source,
+                        name,
+                    };
+                }
                 Err(e) => {
                     let _ = self.can_sender.send(CanMessage::ConnectionFailed {
                         source: name.clone(),
                         error: e.to_string(),
                     });
                     thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
-                    State::Connecting { source, name }
+                    self.state = State::Connecting { source, name };
                 }
             },
             State::Connected {
                 mut driver,
                 source,
                 name,
-                mut is_first_success,
             } => match driver.read_frame() {
                 Ok(frame) => {
-                    if is_first_success {
-                        let _ = self.can_sender.send(CanMessage::ConnectionSuccessful);
-                        is_first_success = false;
-                    }
                     process_frame(&self.can_sender, &mut self.parser, frame);
-                    State::Connected {
+                    self.state = State::Connected {
                         driver,
                         source,
                         name,
-                        is_first_success,
-                    }
+                    };
                 }
                 Err(e)
                     if e.kind() == io::ErrorKind::WouldBlock
                         || e.kind() == io::ErrorKind::TimedOut =>
                 {
                     thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
-                    State::Connected {
+                    self.state = State::Connected {
                         driver,
                         source,
                         name,
-                        is_first_success,
-                    }
+                    };
                 }
                 Err(e) => {
                     log::error!("Driver read error on {}: {}", name, e);
@@ -160,10 +153,10 @@ impl Worker {
                         error: e.to_string(),
                     });
                     thread::sleep(Duration::from_millis(RECONNECT_DELAY_MS));
-                    State::Connecting { source, name }
+                    self.state = State::Connecting { source, name };
                 }
             },
-        };
+        }
     }
 }
 

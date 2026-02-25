@@ -15,16 +15,27 @@ pub enum ConnectionSource {
 }
 
 impl ConnectionSource {
-    pub fn create_driver(&self) -> io::Result<Box<dyn CanDriver>> {
+    pub fn create_driver(&self) -> io::Result<Driver> {
         match self {
-            Self::Serial(path) => Ok(Box::new(serial::SerialDriver::new(path.clone(), 115_200))),
-            Self::Udp(port) => Ok(Box::new(udp::UdpDriver::new(*port)?)),
+            Self::Serial(path) => Ok(Driver::Serial(serial::SerialDriver::new(
+                path.clone(),
+                115_200,
+            )?)),
+            Self::Udp(port) => Ok(Driver::Udp(udp::UdpDriver::new(*port)?)),
         }
     }
 }
 
-pub trait CanDriver: Send {
-    fn read_frame(&mut self) -> io::Result<CanFrame>;
-    fn write_frame(&mut self, frame: &CanFrame) -> io::Result<()>;
-    fn is_connected(&self) -> bool;
+pub enum Driver {
+    Serial(serial::SerialDriver),
+    Udp(udp::UdpDriver),
+}
+
+impl Driver {
+    pub fn read_frame(&mut self) -> io::Result<CanFrame> {
+        match self {
+            Self::Serial(s) => s.read_frame(),
+            Self::Udp(u) => u.read_frame(),
+        }
+    }
 }
