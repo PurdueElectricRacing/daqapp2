@@ -62,8 +62,8 @@ pub fn start_can_thread(
                 }
             }
 
-            if can.is_none() {
-                if let Some(ref path) = serial_path {
+            if can.is_none()
+                && let Some(ref path) = serial_path {
                     let port = match serialport::new(path, BAUD_RATE)
                         .timeout(Duration::from_millis(10))
                         .open()
@@ -99,7 +99,6 @@ pub fn start_can_thread(
                         .send(can::can_messages::CanMessage::ConnectionSuccessful);
                     can = Some(socket);
                 }
-            }
 
             // Try to read a frame
             let Some(ref mut can_socket) = can else {
