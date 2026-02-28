@@ -1,4 +1,4 @@
-use crate::{can, settings, shortcuts, theme, util, ui, widgets, workspace};
+use crate::{can, settings, shortcuts, theme, ui, util, widgets, workspace};
 use eframe::egui;
 
 const MIN_UI_SCALE: f32 = 0.4;

@@ -4,9 +4,9 @@ mod settings;
 mod shortcuts;
 mod theme;
 mod ui;
+mod util;
 mod widgets;
 mod workspace;
-mod util;
 
 use eframe::egui;
 
