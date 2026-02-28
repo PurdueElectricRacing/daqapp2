@@ -30,7 +30,7 @@ impl Widget {
         let mut received_new_data = false;
 
         for msg in can_messages {
-            self.handle_can_message(&msg);
+            self.handle_can_message(msg);
             received_new_data = true;
         }
 

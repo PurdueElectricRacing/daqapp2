@@ -11,7 +11,7 @@ pub enum ThemeSelection {
 }
 
 impl ThemeSelection {
-    pub fn to_name(&self) -> &'static str {
+    pub fn get_name(&self) -> &'static str {
         match self {
             ThemeSelection::Default => "Default",
             ThemeSelection::Nord => "Nord",

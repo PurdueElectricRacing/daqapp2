@@ -16,7 +16,7 @@ impl ParserInfo {
         Self { dbc_path, parser }
     }
     pub fn new_maybe(dbc_path: Option<std::path::PathBuf>) -> Option<Self> {
-        dbc_path.map(|path| Self::new(path))
+        dbc_path.map(Self::new)
     }
 }
 

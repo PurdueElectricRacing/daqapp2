@@ -98,17 +98,14 @@ impl ViewerList {
     }
 
     pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
-        match msg {
-            can::can_messages::CanMessage::ParsedMessage(parsed_msg) => {
-                if self.paused {
-                    return;
-                }
-                while self.decoded_msgs.len() >= MAX_MESSAGES - 1 {
-                    self.decoded_msgs.pop_front();
-                }
-                self.decoded_msgs.push_back(parsed_msg.clone());
+        if let can::can_messages::CanMessage::ParsedMessage(parsed_msg) = msg {
+            if self.paused {
+                return;
             }
-            _ => {}
+            while self.decoded_msgs.len() >= MAX_MESSAGES - 1 {
+                self.decoded_msgs.pop_front();
+            }
+            self.decoded_msgs.push_back(parsed_msg.clone());
         }
     }
 }

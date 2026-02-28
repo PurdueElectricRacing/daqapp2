@@ -40,7 +40,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.heading("Side bar");
             ui.separator();
 
-            let theme_label = format!("🎨 Theme: {}", app.theme_selection.to_name());
+            let theme_label = format!("🎨 Theme: {}", app.theme_selection.get_name());
 
             if ui.button(theme_label).clicked() {
                 app.toggle_theme();
