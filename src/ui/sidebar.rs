@@ -9,7 +9,7 @@ pub fn select_dbc(
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
     {
-        app.dbc_path = Some(path.clone());
+        app.parser = Some(app::ParserInfo::new(path.clone()));
         ui_sender
             .send(ui::ui_messages::UiMessage::DbcSelected(path))
             .expect("Failed to send DBC selected message");
@@ -100,10 +100,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     select_dbc(app, &ui_sender); // mutable borrow is fine
                 }
 
-                // Clone the path for reading only
-                let dbc_path = app.dbc_path.clone();
-
-                if let Some(path) = dbc_path {
+                if let Some(path) = app.parser.as_ref().map(|p| &p.dbc_path) {
                     let dbc_name = path
                         .file_name()
                         .map(|n| n.to_string_lossy())

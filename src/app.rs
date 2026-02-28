@@ -4,6 +4,22 @@ use eframe::egui;
 const MIN_UI_SCALE: f32 = 0.4;
 const MAX_UI_SCALE: f32 = 5.0;
 
+pub struct ParserInfo {
+    pub dbc_path: std::path::PathBuf,
+    pub parser: can_decode::Parser,
+}
+
+impl ParserInfo {
+    pub fn new(dbc_path: std::path::PathBuf) -> Self {
+        let parser =
+            can_decode::Parser::from_dbc_file(&dbc_path).expect("Failed to parse DBC file");
+        Self { dbc_path, parser }
+    }
+    pub fn new_maybe(dbc_path: Option<std::path::PathBuf>) -> Option<Self> {
+        dbc_path.map(|path| Self::new(path))
+    }
+}
+
 pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
@@ -19,7 +35,7 @@ pub struct DAQApp {
     pub pixels_per_point: f32,
     pub selected_serial: Option<String>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
-    pub dbc_path: Option<std::path::PathBuf>,
+    pub parser: Option<ParserInfo>,
     pub connection_error: Option<String>,
     pub can_messages: Vec<can::can_messages::CanMessage>,
 }
@@ -27,7 +43,7 @@ pub struct DAQApp {
 impl DAQApp {
     pub fn save_settings(&self) {
         let settings = settings::Settings {
-            dbc_path: self.dbc_path.clone(),
+            dbc_path: self.parser.as_ref().map(|p| p.dbc_path.clone()),
             selected_serial: self.selected_serial.clone(),
             theme: self.theme_selection,
         };
@@ -47,7 +63,6 @@ impl DAQApp {
         let theme_style = theme_selection.get_style();
 
         let selected_serial = settings.selected_serial.clone();
-        let dbc_path = settings.dbc_path.clone();
         Self {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -63,7 +78,7 @@ impl DAQApp {
             pixels_per_point: default_scale,
             serial_ports: util::get_avaible_serial_ports(),
             selected_serial,
-            dbc_path,
+            parser: ParserInfo::new_maybe(settings.dbc_path),
             connection_error: None,
             can_messages: Vec::new(),
         }

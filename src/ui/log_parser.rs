@@ -1,3 +1,4 @@
+use crate::app;
 use eframe::egui;
 
 pub struct LogParser {
@@ -52,7 +53,7 @@ impl LogParser {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        dbc_path: Option<&std::path::PathBuf>,
+        parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
