@@ -1,9 +1,9 @@
-use crate::ui::{self};
+use crate::{app, ui};
 use eframe::egui;
 use serialport::available_ports;
 
 pub fn select_dbc(
-    app: &mut crate::app::DAQApp,
+    app: &mut app::DAQApp,
     ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
 ) {
     if let Some(path) = rfd::FileDialog::new()
@@ -18,7 +18,7 @@ pub fn select_dbc(
     }
 }
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 12,

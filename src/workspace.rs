@@ -1,7 +1,7 @@
-use crate::{can, widgets};
+use crate::{app, can, widgets};
 use eframe::egui;
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 0,
