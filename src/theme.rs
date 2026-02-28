@@ -3,7 +3,6 @@ use eframe::egui;
 const NORD_THEME_PATH: &str = "themes/nord.toml";
 const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
 
-
 #[derive(Copy, Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub enum ThemeSelection {
     Default,
@@ -20,19 +19,17 @@ impl ThemeSelection {
         }
     }
 
-	pub fn get_style(&self) -> egui::Style {
-		match self {
-			ThemeSelection::Default => egui::Style::default(),
-			ThemeSelection::Nord => ThemeColors::load_from_file(NORD_THEME_PATH)
-				.map(|t| t.to_egui_style())
-				.unwrap_or_default(),
-			ThemeSelection::Catppuccin => {
-				ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
-					.map(|t| t.to_egui_style())
-					.unwrap_or_default()
-			}
-		}
-	}
+    pub fn get_style(&self) -> egui::Style {
+        match self {
+            ThemeSelection::Default => egui::Style::default(),
+            ThemeSelection::Nord => ThemeColors::load_from_file(NORD_THEME_PATH)
+                .map(|t| t.to_egui_style())
+                .unwrap_or_default(),
+            ThemeSelection::Catppuccin => ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
+                .map(|t| t.to_egui_style())
+                .unwrap_or_default(),
+        }
+    }
 
     pub fn next(&self) -> Self {
         match self {

@@ -1,4 +1,4 @@
-use crate::{can, shortcuts, ui, widgets, settings, workspace, theme};
+use crate::{can, settings, shortcuts, theme, ui, widgets, workspace};
 use eframe::egui;
 use serialport::available_ports;
 

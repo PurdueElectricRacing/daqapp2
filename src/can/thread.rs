@@ -63,42 +63,42 @@ pub fn start_can_thread(
             }
 
             if can.is_none()
-                && let Some(ref path) = serial_path {
-                    let port = match serialport::new(path, BAUD_RATE)
-                        .timeout(Duration::from_millis(10))
-                        .open()
-                    {
-                        Ok(p) => p,
-                        Err(e) => {
-                            log::error!("Failed to open serialport {}: {e}", path);
-                            pending_connection_error = Some(path.clone());
-                            thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
-                            continue;
-                        }
-                    };
-                    let _ = port.clear(ClearBuffer::All);
-                    let mut socket =
-                        CanSocket::new(port.try_clone().expect("clone serialport failed"));
-                    if let Err(e) = socket.set_operating_mode(OperatingMode::Normal) {
-                        log::error!("Failed to set operating mode: {e}");
-                        state.is_connected = false;
+                && let Some(ref path) = serial_path
+            {
+                let port = match serialport::new(path, BAUD_RATE)
+                    .timeout(Duration::from_millis(10))
+                    .open()
+                {
+                    Ok(p) => p,
+                    Err(e) => {
+                        log::error!("Failed to open serialport {}: {e}", path);
                         pending_connection_error = Some(path.clone());
                         thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
                         continue;
                     }
-                    if let Err(e) = socket.open(NominalBitRate::Rate500Kbit) {
-                        log::error!("Failed to open CAN: {e}");
-                        state.is_connected = false;
-                        pending_connection_error = Some(path.clone());
-                        thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
-                        continue;
-                    }
-                    state.is_connected = true;
-                    let _ = state
-                        .can_sender
-                        .send(can::can_messages::CanMessage::ConnectionSuccessful);
-                    can = Some(socket);
+                };
+                let _ = port.clear(ClearBuffer::All);
+                let mut socket = CanSocket::new(port.try_clone().expect("clone serialport failed"));
+                if let Err(e) = socket.set_operating_mode(OperatingMode::Normal) {
+                    log::error!("Failed to set operating mode: {e}");
+                    state.is_connected = false;
+                    pending_connection_error = Some(path.clone());
+                    thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
+                    continue;
                 }
+                if let Err(e) = socket.open(NominalBitRate::Rate500Kbit) {
+                    log::error!("Failed to open CAN: {e}");
+                    state.is_connected = false;
+                    pending_connection_error = Some(path.clone());
+                    thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
+                    continue;
+                }
+                state.is_connected = true;
+                let _ = state
+                    .can_sender
+                    .send(can::can_messages::CanMessage::ConnectionSuccessful);
+                can = Some(socket);
+            }
 
             // Try to read a frame
             let Some(ref mut can_socket) = can else {
