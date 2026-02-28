@@ -6,6 +6,7 @@ mod theme;
 mod ui;
 mod widgets;
 mod workspace;
+mod util;
 
 use eframe::egui;
 

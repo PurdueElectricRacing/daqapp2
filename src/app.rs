@@ -1,6 +1,5 @@
-use crate::{can, settings, shortcuts, theme, ui, widgets, workspace};
+use crate::{can, settings, shortcuts, theme, util, ui, widgets, workspace};
 use eframe::egui;
-use serialport::available_ports;
 
 const MIN_UI_SCALE: f32 = 0.4;
 const MAX_UI_SCALE: f32 = 5.0;
@@ -62,18 +61,7 @@ impl DAQApp {
             theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
-            serial_ports: available_ports()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|p| {
-                    let name = p.port_name.to_lowercase();
-                    if cfg!(target_os = "windows") {
-                        name.starts_with("com")
-                    } else {
-                        name.starts_with("/dev/tty.usbmodem") || name.starts_with("/dev/ttyacm")
-                    }
-                })
-                .collect(),
+            serial_ports: util::get_avaible_serial_ports(),
             selected_serial,
             dbc_path,
             connection_error: None,
