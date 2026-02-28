@@ -1,4 +1,4 @@
-use crate::{app, ui, util};
+use crate::{action, app, ui, util};
 use eframe::egui;
 
 pub fn select_dbc(
@@ -50,19 +50,27 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.separator();
 
             if ui.button("Add CAN Viewer Table").clicked() {
-                app.spawn_viewer_table();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::ViewerTable,
+                ));
             }
 
             if ui.button("Add CAN Viewer List").clicked() {
-                app.spawn_viewer_list();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::ViewerList,
+                ));
             }
 
             if ui.button("Add Bootloader").clicked() {
-                app.spawn_bootloader();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::Bootloader,
+                ));
             }
 
             if ui.button("Add Log Parser").clicked() {
-                app.spawn_log_parser();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::LogParser,
+                ));
             }
             ui.horizontal(|ui| {
                 egui::ComboBox::from_label("Serial Port")
