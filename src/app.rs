@@ -1,17 +1,9 @@
-use crate::{can, config, shortcuts, ui, widgets, workspace};
-use eframe::egui::{self};
-use serde::{Deserialize, Serialize};
+use crate::{can, shortcuts, ui, widgets, settings, workspace, theme};
+use eframe::egui;
 use serialport::available_ports;
-use std::fs;
-pub(crate) const SETTINGS_PATH: &str = "settings.json";
-const NORD_THEME_PATH: &str = "themes/nord.toml";
-const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub enum ThemeSelection {
-    Default,
-    Nord,
-    Catppuccin,
-}
+
+const MIN_UI_SCALE: f32 = 0.4;
+const MAX_UI_SCALE: f32 = 5.0;
 
 pub struct DAQApp {
     pub is_sidebar_open: bool,
@@ -24,7 +16,7 @@ pub struct DAQApp {
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pub pending_scope_spawns: Vec<(u32, String, String)>,
     pub theme: egui::Style,
-    pub theme_selection: ThemeSelection,
+    pub theme_selection: theme::ThemeSelection,
     pub pixels_per_point: f32,
     pub selected_serial: Option<String>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
@@ -33,74 +25,27 @@ pub struct DAQApp {
     pub can_messages: Vec<can::can_messages::CanMessage>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Settings {
-    pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_serial: Option<String>,
-    pub theme: ThemeSelection,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            theme: ThemeSelection::Default,
-            dbc_path: None,
-            selected_serial: None,
-        }
-    }
-}
-
-impl Settings {
-    pub fn load(path: &str) -> Self {
-        if let Ok(json) = fs::read_to_string(path) {
-            serde_json::from_str(&json).unwrap_or_default()
-        } else {
-            let default = Settings::default();
-            default.save(path);
-            default
-        }
-    }
-
-    pub fn save(&self, path: &str) {
-        let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
-        fs::write(path, json).unwrap_or_else(|e| log::error!("Failed to write {}: {}", path, e));
-    }
-}
-
-const MIN_UI_SCALE: f32 = 0.4;
-const MAX_UI_SCALE: f32 = 5.0;
-
 impl DAQApp {
     pub fn save_settings(&self) {
-        let settings = Settings {
+        let settings = settings::Settings {
             dbc_path: self.dbc_path.clone(),
             selected_serial: self.selected_serial.clone(),
             theme: self.theme_selection,
         };
-        settings.save(SETTINGS_PATH);
+        settings.save();
     }
 
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        settings: settings::Settings,
         cc: &eframe::CreationContext,
     ) -> Self {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        let settings = Settings::load(SETTINGS_PATH);
         let theme_selection = settings.theme;
-        let theme = match theme_selection {
-            ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
-                .map(|t| t.to_egui_style())
-                .unwrap_or_default(),
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_default()
-            }
-        };
+        let theme_style = theme_selection.get_style();
 
         let selected_serial = settings.selected_serial.clone();
         let dbc_path = settings.dbc_path.clone();
@@ -114,7 +59,7 @@ impl DAQApp {
             can_receiver,
             ui_sender,
             pending_scope_spawns: Vec::new(),
-            theme,
+            theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
             serial_ports: available_ports()
@@ -205,24 +150,8 @@ impl DAQApp {
 
     pub fn toggle_theme(&mut self) {
         // Update theme selection to the next option
-        self.theme_selection = match self.theme_selection {
-            ThemeSelection::Default => ThemeSelection::Nord,
-            ThemeSelection::Nord => ThemeSelection::Catppuccin,
-            ThemeSelection::Catppuccin => ThemeSelection::Default,
-        };
-
-        // Load the selected theme into the actual field
-        self.theme = match self.theme_selection {
-            ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
-                .map(|t| t.to_egui_style())
-                .unwrap_or_default(),
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_default()
-            }
-        };
+        self.theme_selection = self.theme_selection.next();
+        self.theme = self.theme_selection.get_style();
     }
 
     // Close the currently active widget in the tile tree

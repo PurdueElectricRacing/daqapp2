@@ -41,12 +41,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.heading("Side bar");
             ui.separator();
 
-            // Theme toggle button
-            let theme_label = match app.theme_selection {
-                crate::app::ThemeSelection::Default => "🎨 Theme: Default",
-                crate::app::ThemeSelection::Nord => "🎨 Theme: Nord",
-                crate::app::ThemeSelection::Catppuccin => "🎨 Theme: Catppuccin",
-            };
+            let theme_label = format!("🎨 Theme: {}", app.theme_selection.to_name());
 
             if ui.button(theme_label).clicked() {
                 app.toggle_theme();
