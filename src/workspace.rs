@@ -34,11 +34,6 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     parser: app.parser.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
-
-                // Spawn all pending scopes in the queue
-                for action in std::mem::take(&mut app.action_queue) {
-                    app.handle_action(action);
-                }
             }
         });
 }

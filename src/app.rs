@@ -130,7 +130,7 @@ impl DAQApp {
                         signal_name,
                     } => widgets::Widget::Scope(ui::scope::Scope::new(
                         self.next_scope_num,
-                        msg_id.clone(),
+                        *msg_id,
                         msg_name.clone(),
                         signal_name.clone(),
                     )),
@@ -224,6 +224,11 @@ impl eframe::App for DAQApp {
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
+
+        // Drain the action queue and handle all actions
+        for action in std::mem::take(&mut self.action_queue) {
+            self.handle_action(action);
+        }
 
         ctx.request_repaint();
     }
