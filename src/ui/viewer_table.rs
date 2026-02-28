@@ -1,4 +1,4 @@
-use crate::can;
+use crate::{action, can};
 use eframe::egui;
 use hashbrown::HashMap;
 
@@ -24,7 +24,7 @@ impl ViewerTable {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        pending_scope_spawns: &mut Vec<(u32, String, String)>,
+        action_queue: &mut Vec<action::AppAction>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
@@ -133,7 +133,7 @@ impl ViewerTable {
                         }
                         .ui(ui)
                         .into_iter()
-                        .for_each(|spawn| pending_scope_spawns.push(spawn));
+                        .for_each(|spawn| action_queue.push(spawn));
                         ui.add_space(8.0);
                     }
                 });
@@ -161,8 +161,8 @@ struct MessageCard<'a> {
 }
 
 impl MessageCard<'_> {
-    fn ui(&self, ui: &mut egui::Ui) -> Vec<(u32, String, String)> {
-        let mut pending_scope_spawns = Vec::new();
+    fn ui(&self, ui: &mut egui::Ui) -> Vec<action::AppAction> {
+        let mut action_queue = Vec::new();
         // Header (outside card)
         ui.horizontal(|ui| {
             ui.label(
@@ -239,10 +239,12 @@ impl MessageCard<'_> {
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     if ui.small_button("📊").clicked() {
-                                        pending_scope_spawns.push((
-                                            self.msg_id,
-                                            self.msg_name.to_string(),
-                                            sig_name.to_string(),
+                                        action_queue.push(action::AppAction::SpawnWidget(
+                                            action::WidgetType::Scope {
+                                                msg_id: self.msg_id,
+                                                msg_name: self.msg_name.to_string(),
+                                                signal_name: sig_name.to_string(),
+                                            },
                                         ));
                                     }
                                     ui.add_space(8.0);
@@ -257,6 +259,6 @@ impl MessageCard<'_> {
                 });
             });
 
-        pending_scope_spawns
+        action_queue
     }
 }

@@ -1,4 +1,4 @@
-use crate::{can, settings, shortcuts, theme, ui, util, widgets, workspace};
+use crate::{action, can, settings, shortcuts, theme, ui, util, widgets, workspace};
 use eframe::egui;
 
 const MIN_UI_SCALE: f32 = 0.4;
@@ -29,7 +29,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pub pending_scope_spawns: Vec<(u32, String, String)>,
+    pub action_queue: Vec<action::AppAction>,
     pub theme: egui::Style,
     pub theme_selection: theme::ThemeSelection,
     pub pixels_per_point: f32,
@@ -72,7 +72,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_receiver,
             ui_sender,
-            pending_scope_spawns: Vec::new(),
+            action_queue: Vec::new(),
             theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
@@ -111,48 +111,58 @@ impl DAQApp {
         tabs.set_active(new_tile_id);
     }
 
-    pub fn spawn_viewer_table(&mut self) {
-        let widget = widgets::Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
-            self.next_can_viewer_num,
-        ));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
-    }
+    pub fn handle_action(&mut self, action: action::AppAction) {
+        match action {
+            action::AppAction::SpawnWidget(widget_type) => {
+                let widget = match &widget_type {
+                    action::WidgetType::ViewerTable => widgets::Widget::ViewerTable(
+                        ui::viewer_table::ViewerTable::new(self.next_can_viewer_num),
+                    ),
+                    action::WidgetType::ViewerList => widgets::Widget::ViewerList(
+                        ui::viewer_list::ViewerList::new(self.next_can_viewer_num),
+                    ),
+                    action::WidgetType::Bootloader => widgets::Widget::Bootloader(
+                        ui::bootloader::Bootloader::new(self.next_bootloader_num),
+                    ),
+                    action::WidgetType::Scope {
+                        msg_id,
+                        msg_name,
+                        signal_name,
+                    } => widgets::Widget::Scope(ui::scope::Scope::new(
+                        self.next_scope_num,
+                        msg_id.clone(),
+                        msg_name.clone(),
+                        signal_name.clone(),
+                    )),
+                    action::WidgetType::LogParser => widgets::Widget::LogParser(
+                        ui::log_parser::LogParser::new(self.next_log_parser_num),
+                    ),
+                };
+                self.add_widget_to_tree(widget);
 
-    pub fn spawn_viewer_list(&mut self) {
-        let widget =
-            widgets::Widget::ViewerList(ui::viewer_list::ViewerList::new(self.next_can_viewer_num));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_bootloader(&mut self) {
-        let widget =
-            widgets::Widget::Bootloader(ui::bootloader::Bootloader::new(self.next_bootloader_num));
-        self.next_bootloader_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_scope(&mut self, msg_id: u32, msg_name: String, signal_name: String) {
-        let widget = widgets::Widget::Scope(ui::scope::Scope::new(
-            self.next_scope_num,
-            msg_id,
-            msg_name,
-            signal_name,
-        ));
-        self.next_scope_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_log_parser(&mut self) {
-        let widget =
-            widgets::Widget::LogParser(ui::log_parser::LogParser::new(self.next_log_parser_num));
-        self.next_log_parser_num += 1;
-        self.add_widget_to_tree(widget);
+                // Increment the appropriate counter
+                match widget_type {
+                    action::WidgetType::ViewerTable | action::WidgetType::ViewerList => {
+                        self.next_can_viewer_num += 1;
+                    }
+                    action::WidgetType::Bootloader => {
+                        self.next_bootloader_num += 1;
+                    }
+                    action::WidgetType::Scope { .. } => {
+                        self.next_scope_num += 1;
+                    }
+                    action::WidgetType::LogParser => {
+                        self.next_log_parser_num += 1;
+                    }
+                }
+            }
+            action::AppAction::CloseTile(tile_id) => {
+                self.tile_tree.tiles.remove(tile_id);
+            }
+        }
     }
 
     pub fn toggle_theme(&mut self) {
-        // Update theme selection to the next option
         self.theme_selection = self.theme_selection.next();
         self.theme = self.theme_selection.get_style();
     }

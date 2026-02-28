@@ -1,4 +1,4 @@
-use crate::{app, can, ui};
+use crate::{action, app, can, ui};
 use eframe::egui;
 
 pub enum Widget {
@@ -24,7 +24,7 @@ impl Widget {
         &mut self,
         ui: &mut egui::Ui,
         can_messages: &[can::can_messages::CanMessage],
-        pending_scope_spawns: &mut Vec<(u32, String, String)>,
+        action_queue: &mut Vec<action::AppAction>,
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         let mut received_new_data = false;
@@ -40,7 +40,7 @@ impl Widget {
         }
 
         match self {
-            Widget::ViewerTable(w) => w.show(ui, pending_scope_spawns),
+            Widget::ViewerTable(w) => w.show(ui, action_queue),
             Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
