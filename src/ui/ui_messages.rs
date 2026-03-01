@@ -1,4 +1,6 @@
+use crate::connection;
+
 pub enum UiMessage {
     DbcSelected(std::path::PathBuf),
-    SerialSelected(String),
+    Connect(connection::ConnectionSource),
 }

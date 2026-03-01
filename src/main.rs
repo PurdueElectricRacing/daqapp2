@@ -1,10 +1,12 @@
-use crate::app::Settings;
-
+mod action;
 mod app;
 mod can;
-mod config;
+mod connection;
+mod settings;
 mod shortcuts;
+mod theme;
 mod ui;
+mod util;
 mod widgets;
 mod workspace;
 
@@ -17,12 +19,12 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-    let settings = Settings::load(app::SETTINGS_PATH);
+    let settings = settings::Settings::load();
 
     let _can_thread = can::thread::start_can_thread(
         can_sender,
         ui_receiver,
-        settings.selected_serial.clone(),
+        settings.selected_source.clone(),
         settings.dbc_path.clone(),
     );
 
@@ -37,6 +39,13 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "DaqApp2",
         options,
-        Box::new(|cc| Ok(Box::new(app::DAQApp::new(can_receiver, ui_sender, cc)))),
+        Box::new(|cc| {
+            Ok(Box::new(app::DAQApp::new(
+                can_receiver,
+                ui_sender,
+                settings,
+                cc,
+            )))
+        }),
     )
 }

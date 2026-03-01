@@ -1,7 +1,7 @@
-use crate::{can, widgets};
+use crate::{action, app, can, widgets};
 use eframe::egui;
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 0,
@@ -30,24 +30,18 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             } else {
                 let mut behavior = WorkspaceTileBehavior {
                     can_messages: &app.can_messages,
-                    pending_scope_spawns: &mut app.pending_scope_spawns,
-                    dbc_path: app.dbc_path.as_ref(),
+                    action_queue: &mut app.action_queue,
+                    parser: app.parser.as_ref(),
                 };
                 app.tile_tree.ui(&mut behavior, ui);
-
-                // Spawn all pending scopes in the queue
-                for (msg_id, msg_name, signal_name) in std::mem::take(&mut app.pending_scope_spawns)
-                {
-                    app.spawn_scope(msg_id, msg_name, signal_name);
-                }
             }
         });
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_messages: &'a [can::can_messages::CanMessage],
-    pending_scope_spawns: &'a mut Vec<(u32, String, String)>,
-    dbc_path: Option<&'a std::path::PathBuf>,
+    can_messages: &'a [can::message::ParsedMessage],
+    action_queue: &'a mut Vec<action::AppAction>,
+    parser: Option<&'a app::ParserInfo>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -57,12 +51,7 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(
-            ui,
-            self.can_messages,
-            self.pending_scope_spawns,
-            self.dbc_path,
-        )
+        widget.show(ui, self.can_messages, self.action_queue, self.parser)
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {

@@ -1,16 +1,15 @@
-use crate::ui::{self};
+use crate::{action, app, connection, ui, util};
 use eframe::egui;
-use serialport::available_ports;
 
 pub fn select_dbc(
-    app: &mut crate::app::DAQApp,
+    app: &mut app::DAQApp,
     ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
 ) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
     {
-        app.dbc_path = Some(path.clone());
+        app.parser = Some(app::ParserInfo::new(path.clone()));
         ui_sender
             .send(ui::ui_messages::UiMessage::DbcSelected(path))
             .expect("Failed to send DBC selected message");
@@ -18,7 +17,7 @@ pub fn select_dbc(
     }
 }
 
-pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
+pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
     let rounding = if cfg!(target_os = "macos") {
         egui::CornerRadius {
             nw: 12,
@@ -41,12 +40,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.heading("Side bar");
             ui.separator();
 
-            // Theme toggle button
-            let theme_label = match app.theme_selection {
-                crate::app::ThemeSelection::Default => "🎨 Theme: Default",
-                crate::app::ThemeSelection::Nord => "🎨 Theme: Nord",
-                crate::app::ThemeSelection::Catppuccin => "🎨 Theme: Catppuccin",
-            };
+            let theme_label = format!("🎨 Theme: {}", app.theme_selection.get_name());
 
             if ui.button(theme_label).clicked() {
                 app.toggle_theme();
@@ -56,64 +50,108 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
             ui.separator();
 
             if ui.button("Add CAN Viewer Table").clicked() {
-                app.spawn_viewer_table();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::ViewerTable,
+                ));
             }
 
             if ui.button("Add CAN Viewer List").clicked() {
-                app.spawn_viewer_list();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::ViewerList,
+                ));
             }
 
             if ui.button("Add Bootloader").clicked() {
-                app.spawn_bootloader();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::Bootloader,
+                ));
             }
 
             if ui.button("Add Log Parser").clicked() {
-                app.spawn_log_parser();
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::LogParser,
+                ));
             }
+
+            ui.separator();
+            ui.heading("Connection Settings");
+
             ui.horizontal(|ui| {
-                egui::ComboBox::from_label("Serial Port")
-                    .selected_text(app.selected_serial.as_deref().unwrap_or("Serial Port"))
+                ui.label("UDP Port:");
+                if ui
+                    .add(egui::DragValue::new(&mut app.udp_port).range(1..=65535))
+                    .changed()
+                {
+                    app.save_settings();
+                }
+            });
+
+            ui.horizontal(|ui| {
+                let selected_text = match &app.selected_source {
+                    Some(connection::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
+                    Some(connection::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    None => "Select Source".to_string(),
+                };
+
+                egui::ComboBox::from_label("Source")
+                    .selected_text(selected_text)
                     .show_ui(ui, |ui| {
-                        for port in &app.serial_ports {
-                            let response = ui.selectable_value(
-                                &mut app.selected_serial,
-                                Some(port.port_name.clone()),
-                                &port.port_name,
-                            );
-                            if response.changed() {
-                                app.ui_sender
-                                    .send(ui::ui_messages::UiMessage::SerialSelected(
-                                        port.port_name.clone(),
-                                    ))
-                                    .expect("Failed to send serial selected");
+                        ui.label("Serial Ports");
+                        let ports: Vec<_> = app
+                            .serial_ports
+                            .iter()
+                            .map(|p| p.port_name.clone())
+                            .collect();
+                        for port_name in ports {
+                            let source = connection::ConnectionSource::Serial(port_name.clone());
+                            if ui
+                                .selectable_value(
+                                    &mut app.selected_source,
+                                    Some(source.clone()),
+                                    &port_name,
+                                )
+                                .changed()
+                            {
+                                app.connect_can();
                                 app.save_settings();
                             }
                         }
-                    });
-                if ui.button("🔄").clicked() {
-                    app.serial_ports = match available_ports() {
-                        Ok(ports) => ports
-                            .into_iter()
-                            .filter(|p| {
-                                let name = p.port_name.to_lowercase();
-                                if cfg!(target_os = "windows") {
-                                    name.starts_with("com")
-                                } else {
-                                    name.starts_with("/dev/tty.usbmodem")
-                                        || name.starts_with("/dev/ttyacm")
-                                }
-                            })
-                            .collect(),
-                        Err(err) => {
-                            log::error!("Failed to get ports: {err}");
-                            vec![]
+                        ui.separator();
+                        ui.label("Network");
+                        let udp_source = connection::ConnectionSource::Udp(app.udp_port);
+                        if ui
+                            .selectable_value(
+                                &mut app.selected_source,
+                                Some(udp_source.clone()),
+                                format!("UDP ({})", app.udp_port),
+                            )
+                            .changed()
+                        {
+                            app.connect_can();
+                            app.save_settings();
                         }
-                    };
+                    });
+
+                if ui.button("🔄").clicked() {
+                    app.serial_ports = util::get_available_serial_ports();
                 }
             });
-            if let Some(ref err) = app.connection_error {
-                ui.colored_label(egui::Color32::RED, format!(" {err}"));
-            }
+
+            ui.horizontal(|ui| {
+                // Connection status indicator
+                let (status_icon, status_color) = match &app.connection_status {
+                    app::ConnectionStatus::Disconnected => {
+                        ("⚪ Disconnected".to_string(), egui::Color32::GRAY)
+                    }
+                    app::ConnectionStatus::Connected => {
+                        ("🟢 Connected".to_string(), egui::Color32::GREEN)
+                    }
+                    app::ConnectionStatus::Error(e) => {
+                        (format!("🔴 Error: {}", e), egui::Color32::RED)
+                    }
+                };
+                ui.label(egui::RichText::new(status_icon).color(status_color));
+            });
 
             ui.horizontal(|ui| {
                 // Clone the sender so we don’t borrow app immutably yet
@@ -123,10 +161,7 @@ pub fn show(app: &mut crate::app::DAQApp, ctx: &egui::Context) {
                     select_dbc(app, &ui_sender); // mutable borrow is fine
                 }
 
-                // Clone the path for reading only
-                let dbc_path = app.dbc_path.clone();
-
-                if let Some(path) = dbc_path {
+                if let Some(path) = app.parser.as_ref().map(|p| &p.dbc_path) {
                     let dbc_name = path
                         .file_name()
                         .map(|n| n.to_string_lossy())

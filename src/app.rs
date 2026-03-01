@@ -1,19 +1,34 @@
-use crate::{can, config, shortcuts, ui, widgets, workspace};
-use eframe::egui::{self};
-use serde::{Deserialize, Serialize};
-use serialport::available_ports;
-use std::fs;
-pub(crate) const SETTINGS_PATH: &str = "settings.json";
-const NORD_THEME_PATH: &str = "themes/nord.toml";
-const CATPPUCCIN_THEME_PATH: &str = "themes/catppuccin.toml";
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub enum ThemeSelection {
-    Default,
-    Nord,
-    Catppuccin,
+use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
+use eframe::egui;
+
+const MIN_UI_SCALE: f32 = 0.4;
+const MAX_UI_SCALE: f32 = 5.0;
+
+pub struct ParserInfo {
+    pub dbc_path: std::path::PathBuf,
+    pub parser: can_decode::Parser,
+}
+
+impl ParserInfo {
+    pub fn new(dbc_path: std::path::PathBuf) -> Self {
+        let parser =
+            can_decode::Parser::from_dbc_file(&dbc_path).expect("Failed to parse DBC file");
+        Self { dbc_path, parser }
+    }
+    pub fn new_maybe(dbc_path: Option<std::path::PathBuf>) -> Option<Self> {
+        dbc_path.map(Self::new)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionStatus {
+    Disconnected,
+    Connected,
+    Error(String),
 }
 
 pub struct DAQApp {
+    pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
@@ -22,89 +37,42 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
-    pub pending_scope_spawns: Vec<(u32, String, String)>,
+    pub action_queue: Vec<action::AppAction>,
+    pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
-    pub theme_selection: ThemeSelection,
+    pub theme_selection: theme::ThemeSelection,
     pub pixels_per_point: f32,
-    pub selected_serial: Option<String>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
-    pub dbc_path: Option<std::path::PathBuf>,
-    pub connection_error: Option<String>,
-    pub can_messages: Vec<can::can_messages::CanMessage>,
+    pub parser: Option<ParserInfo>,
+    pub udp_port: u16,
+    pub can_messages: Vec<can::message::ParsedMessage>,
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct Settings {
-    pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_serial: Option<String>,
-    pub theme: ThemeSelection,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            theme: ThemeSelection::Default,
-            dbc_path: None,
-            selected_serial: None,
-        }
-    }
-}
-
-impl Settings {
-    pub fn load(path: &str) -> Self {
-        if let Ok(json) = fs::read_to_string(path) {
-            serde_json::from_str(&json).unwrap_or_default()
-        } else {
-            let default = Settings::default();
-            default.save(path);
-            default
-        }
-    }
-
-    pub fn save(&self, path: &str) {
-        let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
-        fs::write(path, json).unwrap_or_else(|e| log::error!("Failed to write {}: {}", path, e));
-    }
-}
-
-const MIN_UI_SCALE: f32 = 0.4;
-const MAX_UI_SCALE: f32 = 5.0;
 
 impl DAQApp {
     pub fn save_settings(&self) {
-        let settings = Settings {
-            dbc_path: self.dbc_path.clone(),
-            selected_serial: self.selected_serial.clone(),
+        let settings = settings::Settings {
+            dbc_path: self.parser.as_ref().map(|p| p.dbc_path.clone()),
+            selected_source: self.selected_source.clone(),
+            udp_port: self.udp_port,
             theme: self.theme_selection,
         };
-        settings.save(SETTINGS_PATH);
+        settings.save();
     }
 
     pub fn new(
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        settings: settings::Settings,
         cc: &eframe::CreationContext,
     ) -> Self {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        let settings = Settings::load(SETTINGS_PATH);
         let theme_selection = settings.theme;
-        let theme = match theme_selection {
-            ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
-                .map(|t| t.to_egui_style())
-                .unwrap_or_default(),
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_default()
-            }
-        };
+        let theme_style = theme_selection.get_style();
 
-        let selected_serial = settings.selected_serial.clone();
-        let dbc_path = settings.dbc_path.clone();
         Self {
+            connection_status: ConnectionStatus::Disconnected,
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
@@ -113,25 +81,14 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_receiver,
             ui_sender,
-            pending_scope_spawns: Vec::new(),
-            theme,
+            action_queue: Vec::new(),
+            selected_source: settings.selected_source,
+            theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
-            serial_ports: available_ports()
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|p| {
-                    let name = p.port_name.to_lowercase();
-                    if cfg!(target_os = "windows") {
-                        name.starts_with("com")
-                    } else {
-                        name.starts_with("/dev/tty.usbmodem") || name.starts_with("/dev/ttyacm")
-                    }
-                })
-                .collect(),
-            selected_serial,
-            dbc_path,
-            connection_error: None,
+            serial_ports: util::get_available_serial_ports(),
+            parser: ParserInfo::new_maybe(settings.dbc_path),
+            udp_port: settings.udp_port,
             can_messages: Vec::new(),
         }
     }
@@ -163,66 +120,69 @@ impl DAQApp {
         tabs.set_active(new_tile_id);
     }
 
-    pub fn spawn_viewer_table(&mut self) {
-        let widget = widgets::Widget::ViewerTable(ui::viewer_table::ViewerTable::new(
-            self.next_can_viewer_num,
-        ));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
+    pub fn connect_can(&mut self) {
+        let Some(source) = &self.selected_source else {
+            return;
+        };
+
+        self.connection_status = ConnectionStatus::Disconnected;
+
+        let _ = self
+            .ui_sender
+            .send(ui::ui_messages::UiMessage::Connect(source.clone()));
     }
 
-    pub fn spawn_viewer_list(&mut self) {
-        let widget =
-            widgets::Widget::ViewerList(ui::viewer_list::ViewerList::new(self.next_can_viewer_num));
-        self.next_can_viewer_num += 1;
-        self.add_widget_to_tree(widget);
-    }
+    pub fn handle_action(&mut self, action: action::AppAction) {
+        match action {
+            action::AppAction::SpawnWidget(widget_type) => {
+                let widget = match &widget_type {
+                    action::WidgetType::ViewerTable => widgets::Widget::ViewerTable(
+                        ui::viewer_table::ViewerTable::new(self.next_can_viewer_num),
+                    ),
+                    action::WidgetType::ViewerList => widgets::Widget::ViewerList(
+                        ui::viewer_list::ViewerList::new(self.next_can_viewer_num),
+                    ),
+                    action::WidgetType::Bootloader => widgets::Widget::Bootloader(
+                        ui::bootloader::Bootloader::new(self.next_bootloader_num),
+                    ),
+                    action::WidgetType::Scope {
+                        msg_id,
+                        msg_name,
+                        signal_name,
+                    } => widgets::Widget::Scope(ui::scope::Scope::new(
+                        self.next_scope_num,
+                        *msg_id,
+                        msg_name.clone(),
+                        signal_name.clone(),
+                    )),
+                    action::WidgetType::LogParser => widgets::Widget::LogParser(
+                        ui::log_parser::LogParser::new(self.next_log_parser_num),
+                    ),
+                };
+                self.add_widget_to_tree(widget);
 
-    pub fn spawn_bootloader(&mut self) {
-        let widget =
-            widgets::Widget::Bootloader(ui::bootloader::Bootloader::new(self.next_bootloader_num));
-        self.next_bootloader_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_scope(&mut self, msg_id: u32, msg_name: String, signal_name: String) {
-        let widget = widgets::Widget::Scope(ui::scope::Scope::new(
-            self.next_scope_num,
-            msg_id,
-            msg_name,
-            signal_name,
-        ));
-        self.next_scope_num += 1;
-        self.add_widget_to_tree(widget);
-    }
-
-    pub fn spawn_log_parser(&mut self) {
-        let widget =
-            widgets::Widget::LogParser(ui::log_parser::LogParser::new(self.next_log_parser_num));
-        self.next_log_parser_num += 1;
-        self.add_widget_to_tree(widget);
+                // Increment the appropriate counter
+                match widget_type {
+                    action::WidgetType::ViewerTable | action::WidgetType::ViewerList => {
+                        self.next_can_viewer_num += 1;
+                    }
+                    action::WidgetType::Bootloader => {
+                        self.next_bootloader_num += 1;
+                    }
+                    action::WidgetType::Scope { .. } => {
+                        self.next_scope_num += 1;
+                    }
+                    action::WidgetType::LogParser => {
+                        self.next_log_parser_num += 1;
+                    }
+                }
+            }
+        }
     }
 
     pub fn toggle_theme(&mut self) {
-        // Update theme selection to the next option
-        self.theme_selection = match self.theme_selection {
-            ThemeSelection::Default => ThemeSelection::Nord,
-            ThemeSelection::Nord => ThemeSelection::Catppuccin,
-            ThemeSelection::Catppuccin => ThemeSelection::Default,
-        };
-
-        // Load the selected theme into the actual field
-        self.theme = match self.theme_selection {
-            ThemeSelection::Default => egui::Style::default(),
-            ThemeSelection::Nord => config::ThemeColors::load_from_file(NORD_THEME_PATH)
-                .map(|t| t.to_egui_style())
-                .unwrap_or_default(),
-            ThemeSelection::Catppuccin => {
-                config::ThemeColors::load_from_file(CATPPUCCIN_THEME_PATH)
-                    .map(|t| t.to_egui_style())
-                    .unwrap_or_default()
-            }
-        };
+        self.theme_selection = self.theme_selection.next();
+        self.theme = self.theme_selection.get_style();
     }
 
     // Close the currently active widget in the tile tree
@@ -247,13 +207,17 @@ impl eframe::App for DAQApp {
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
                 can::can_messages::CanMessage::ConnectionFailed(port) => {
-                    self.connection_error = Some(format!("Failed to connect to {port}"));
+                    self.connection_status =
+                        ConnectionStatus::Error(format!("Failed to connect to {port}"));
                 }
                 can::can_messages::CanMessage::ConnectionSuccessful => {
-                    self.connection_error = None;
+                    self.connection_status = ConnectionStatus::Connected;
                 }
-                _ => {
-                    self.can_messages.push(msg);
+                can::can_messages::CanMessage::Disconnection => {
+                    self.connection_status = ConnectionStatus::Disconnected;
+                }
+                can::can_messages::CanMessage::ParsedMessage(parsed) => {
+                    self.can_messages.push(parsed.clone());
                 }
             }
         }
@@ -282,6 +246,11 @@ impl eframe::App for DAQApp {
         ui::sidebar::show(self, ctx);
 
         workspace::show(self, ctx);
+
+        // Drain the action queue and handle all actions
+        for action in std::mem::take(&mut self.action_queue) {
+            self.handle_action(action);
+        }
 
         ctx.request_repaint();
     }
