@@ -39,7 +39,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_messages: &'a [can::can_messages::CanMessage],
+    can_messages: &'a [can::message::ParsedMessage],
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
 }

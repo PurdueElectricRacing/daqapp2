@@ -45,7 +45,7 @@ pub struct DAQApp {
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
-    pub can_messages: Vec<can::can_messages::CanMessage>,
+    pub can_messages: Vec<can::message::ParsedMessage>,
 }
 
 impl DAQApp {
@@ -215,8 +215,8 @@ impl eframe::App for DAQApp {
                 can::can_messages::CanMessage::Disconnection => {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
-                _ => {
-                    self.can_messages.push(msg);
+                can::can_messages::CanMessage::ParsedMessage(parsed) => {
+                    self.can_messages.push(parsed.clone());
                 }
             }
         }

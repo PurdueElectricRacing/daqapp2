@@ -142,11 +142,9 @@ impl ViewerTable {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::can_messages::CanMessage) {
-        if let can::can_messages::CanMessage::ParsedMessage(parsed_msg) = msg {
-            self.decoded_msgs
-                .insert(parsed_msg.decoded.msg_id, parsed_msg.clone());
-        }
+    pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
+        self.decoded_msgs
+            .insert(msg.decoded.msg_id, msg.clone());
     }
 }
 
