@@ -2,7 +2,6 @@ use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widge
 use eframe::egui;
 
 const UI_SCALE_STEP: f32 = 0.2;
-
 pub struct ParserInfo {
     pub dbc_path: std::path::PathBuf,
     pub parser: can_decode::Parser,
@@ -31,6 +30,7 @@ pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
+    pub next_can_list_num: usize,
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
@@ -73,6 +73,7 @@ impl DAQApp {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
+            next_can_list_num: 1,
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
@@ -137,7 +138,7 @@ impl DAQApp {
                         ui::viewer_table::ViewerTable::new(self.next_can_viewer_num),
                     ),
                     action::WidgetType::ViewerList => widgets::Widget::ViewerList(
-                        ui::viewer_list::ViewerList::new(self.next_can_viewer_num),
+                        ui::viewer_list::ViewerList::new(self.next_can_list_num),
                     ),
                     action::WidgetType::Bootloader => widgets::Widget::Bootloader(
                         ui::bootloader::Bootloader::new(self.next_bootloader_num),
@@ -160,8 +161,11 @@ impl DAQApp {
 
                 // Increment the appropriate counter
                 match widget_type {
-                    action::WidgetType::ViewerTable | action::WidgetType::ViewerList => {
+                    action::WidgetType::ViewerTable => {
                         self.next_can_viewer_num += 1;
+                    }
+                    action::WidgetType::ViewerList => {
+                        self.next_can_list_num += 1;
                     }
                     action::WidgetType::Bootloader => {
                         self.next_bootloader_num += 1;
