@@ -1,8 +1,7 @@
 use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
 use eframe::egui;
 
-const MIN_UI_SCALE: f32 = 0.4;
-const MAX_UI_SCALE: f32 = 5.0;
+const UI_SCALE_STEP: f32 = 0.2;
 
 pub struct ParserInfo {
     pub dbc_path: std::path::PathBuf,
@@ -55,7 +54,7 @@ impl DAQApp {
             selected_source: self.selected_source.clone(),
             udp_port: self.udp_port,
             theme: self.theme_selection,
-            pixels_per_point: Some(self.pixels_per_point),
+            pixels_per_point: self.pixels_per_point,
         };
         settings.save();
     }
@@ -64,12 +63,8 @@ impl DAQApp {
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         settings: settings::Settings,
-        cc: &eframe::CreationContext,
+        _cc: &eframe::CreationContext,
     ) -> Self {
-        // Calculate a default ui scale based off the native_pixels_per_point
-        let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
-        let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
-        let pixels_per_point = settings.pixels_per_point.unwrap_or(default_scale);
         let theme_selection = settings.theme;
         let theme_style = theme_selection.get_style();
 
@@ -87,7 +82,7 @@ impl DAQApp {
             selected_source: settings.selected_source,
             theme: theme_style,
             theme_selection,
-            pixels_per_point,
+            pixels_per_point: settings.pixels_per_point,
             serial_ports: util::get_available_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
             udp_port: settings.udp_port,
@@ -134,7 +129,7 @@ impl DAQApp {
             .send(ui::ui_messages::UiMessage::Connect(source.clone()));
     }
 
-    pub fn handle_action(&mut self, action: action::AppAction) {
+    pub fn handle_action(&mut self, action: action::AppAction, ctx: &egui::Context) {
         match action {
             action::AppAction::SpawnWidget(widget_type) => {
                 let widget = match &widget_type {
@@ -186,11 +181,13 @@ impl DAQApp {
                 self.close_active_widget();
             }
             action::AppAction::IncreaseScale => {
-                self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
+                let current_scale = self.pixels_per_point.unwrap_or_else(|| ctx.pixels_per_point());
+                self.pixels_per_point = Some(current_scale + UI_SCALE_STEP);
                 self.save_settings();
             }
             action::AppAction::DecreaseScale => {
-                self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
+                let current_scale = self.pixels_per_point.unwrap_or_else(|| ctx.pixels_per_point());
+                self.pixels_per_point = Some(current_scale - UI_SCALE_STEP);
                 self.save_settings();
             }
         }
@@ -238,7 +235,9 @@ impl eframe::App for DAQApp {
                 }
             }
         }
-        ctx.set_pixels_per_point(self.pixels_per_point);
+        if let Some(ppp) = self.pixels_per_point {
+            ctx.set_pixels_per_point(ppp);
+        }
         ctx.set_style(self.theme.clone());
 
         // Handle keyboard shortcuts
@@ -247,7 +246,7 @@ impl eframe::App for DAQApp {
 
         // Drain the action queue and handle all actions
         for action in std::mem::take(&mut self.action_queue) {
-            self.handle_action(action);
+            self.handle_action(action, ctx);
         }
 
         // Render the most recent state of the UI
