@@ -1,20 +1,23 @@
-use crate::theme;
+use crate::{connection, theme};
 
 pub const SETTINGS_PATH: &str = "settings.json";
+const DEFAULT_UDP_PORT: u16 = 5000;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Settings {
     pub dbc_path: Option<std::path::PathBuf>,
-    pub selected_serial: Option<String>,
+    pub selected_source: Option<connection::ConnectionSource>,
+    pub udp_port: u16,
     pub theme: theme::ThemeSelection,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            theme: theme::ThemeSelection::Default,
             dbc_path: None,
-            selected_serial: None,
+            selected_source: None,
+            udp_port: DEFAULT_UDP_PORT,
+            theme: theme::ThemeSelection::Default,
         }
     }
 }

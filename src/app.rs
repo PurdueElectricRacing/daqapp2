@@ -1,4 +1,4 @@
-use crate::{action, can, settings, shortcuts, theme, ui, util, widgets, workspace};
+use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
 use eframe::egui;
 
 const MIN_UI_SCALE: f32 = 0.4;
@@ -20,7 +20,15 @@ impl ParserInfo {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum ConnectionStatus {
+    Disconnected,
+    Connected,
+    Error(String),
+}
+
 pub struct DAQApp {
+    pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
@@ -30,13 +38,14 @@ pub struct DAQApp {
     pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pub action_queue: Vec<action::AppAction>,
+    pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
     pub theme_selection: theme::ThemeSelection,
     pub pixels_per_point: f32,
-    pub selected_serial: Option<String>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub connection_error: Option<String>,
+    pub udp_port: u16,
     pub can_messages: Vec<can::can_messages::CanMessage>,
 }
 
@@ -44,7 +53,8 @@ impl DAQApp {
     pub fn save_settings(&self) {
         let settings = settings::Settings {
             dbc_path: self.parser.as_ref().map(|p| p.dbc_path.clone()),
-            selected_serial: self.selected_serial.clone(),
+            selected_source: self.selected_source.clone(),
+            udp_port: self.udp_port,
             theme: self.theme_selection,
         };
         settings.save();
@@ -62,8 +72,8 @@ impl DAQApp {
         let theme_selection = settings.theme;
         let theme_style = theme_selection.get_style();
 
-        let selected_serial = settings.selected_serial.clone();
         Self {
+            connection_status: ConnectionStatus::Disconnected,
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
@@ -73,13 +83,14 @@ impl DAQApp {
             can_receiver,
             ui_sender,
             action_queue: Vec::new(),
+            selected_source: settings.selected_source,
             theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
             serial_ports: util::get_avaible_serial_ports(),
-            selected_serial,
             parser: ParserInfo::new_maybe(settings.dbc_path),
             connection_error: None,
+            udp_port: settings.udp_port,
             can_messages: Vec::new(),
         }
     }
@@ -109,6 +120,18 @@ impl DAQApp {
         // Root is already a tab container, add to it
         tabs.add_child(new_tile_id);
         tabs.set_active(new_tile_id);
+    }
+
+    pub fn connect_can(&mut self) {
+        let Some(source) = &self.selected_source else {
+            return;
+        };
+
+        self.connection_status = ConnectionStatus::Disconnected;
+
+        let _ = self
+            .ui_sender
+            .send(ui::ui_messages::UiMessage::Connect(source.clone()));
     }
 
     pub fn handle_action(&mut self, action: action::AppAction) {

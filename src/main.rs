@@ -1,6 +1,7 @@
 mod action;
 mod app;
 mod can;
+mod connection;
 mod settings;
 mod shortcuts;
 mod theme;
@@ -23,7 +24,7 @@ fn main() -> eframe::Result<()> {
     let _can_thread = can::thread::start_can_thread(
         can_sender,
         ui_receiver,
-        settings.selected_serial.clone(),
+        settings.selected_source.clone(),
         settings.dbc_path.clone(),
     );
 

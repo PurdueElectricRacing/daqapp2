@@ -30,6 +30,15 @@
               extensions = [ "rust-src" "clippy" "rustfmt" ];
             })
           ];
+
+          shellHook = ''
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [
+              pkgs.wayland
+              pkgs.libxkbcommon
+              pkgs.mesa
+              pkgs.libGL
+            ]}:$LD_LIBRARY_PATH
+          '';
         };
       });
 }

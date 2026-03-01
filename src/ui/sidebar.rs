@@ -1,4 +1,4 @@
-use crate::{action, app, ui, util};
+use crate::{action, app, connection, ui, util};
 use eframe::egui;
 
 pub fn select_dbc(
@@ -72,31 +72,82 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     action::WidgetType::LogParser,
                 ));
             }
+
+            ui.separator();
+            ui.heading("Connection Settings");
+
             ui.horizontal(|ui| {
-                egui::ComboBox::from_label("Serial Port")
-                    .selected_text(app.selected_serial.as_deref().unwrap_or("Serial Port"))
+                ui.label("UDP Port:");
+                if ui
+                    .add(egui::DragValue::new(&mut app.udp_port).range(1..=65535))
+                    .changed()
+                {
+                    app.save_settings();
+                }
+            });
+
+            ui.horizontal(|ui| {
+                let selected_text = match &app.selected_source {
+                    Some(connection::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
+                    Some(connection::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    None => "Select Source".to_string(),
+                };
+
+                egui::ComboBox::from_label("Source")
+                    .selected_text(selected_text)
                     .show_ui(ui, |ui| {
-                        for port in &app.serial_ports {
-                            let response = ui.selectable_value(
-                                &mut app.selected_serial,
-                                Some(port.port_name.clone()),
-                                &port.port_name,
-                            );
-                            if response.changed() {
-                                app.ui_sender
-                                    .send(ui::ui_messages::UiMessage::SerialSelected(
-                                        port.port_name.clone(),
-                                    ))
-                                    .expect("Failed to send serial selected");
+                        ui.label("Serial Ports");
+                        let ports: Vec<_> = app
+                            .serial_ports
+                            .iter()
+                            .map(|p| p.port_name.clone())
+                            .collect();
+                        for port_name in ports {
+                            let source = connection::ConnectionSource::Serial(port_name.clone());
+                            if ui
+                                .selectable_value(
+                                    &mut app.selected_source,
+                                    Some(source.clone()),
+                                    &port_name,
+                                )
+                                .changed()
+                            {
+                                app.connect_can();
                                 app.save_settings();
                             }
                         }
+                        ui.separator();
+                        ui.label("Network");
+                        let udp_source = connection::ConnectionSource::Udp(app.udp_port);
+                        if ui
+                            .selectable_value(
+                                &mut app.selected_source,
+                                Some(udp_source.clone()),
+                                format!("UDP ({})", app.udp_port),
+                            )
+                            .changed()
+                        {
+                            app.connect_can();
+                            app.save_settings();
+                        }
                     });
+
                 if ui.button("🔄").clicked() {
                     app.serial_ports = util::get_avaible_serial_ports();
                 }
             });
-            if let Some(ref err) = app.connection_error {
+
+            ui.horizontal(|ui| {
+                // Connection status indicator
+                let (status_icon, status_color) = match &app.connection_status {
+                    app::ConnectionStatus::Disconnected => ("⚪", egui::Color32::GRAY),
+                    app::ConnectionStatus::Connected => ("🟢", egui::Color32::GREEN),
+                    app::ConnectionStatus::Error(_) => ("🔴", egui::Color32::RED),
+                };
+                ui.label(egui::RichText::new(status_icon).color(status_color));
+            });
+
+            if let app::ConnectionStatus::Error(ref err) = app.connection_status {
                 ui.colored_label(egui::Color32::RED, format!(" {err}"));
             }
 

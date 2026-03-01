@@ -1,26 +1,73 @@
-use crate::{can, ui};
+use crate::{can, connection, ui};
 use chrono::Local;
-use serialport::ClearBuffer;
-use serialport::SerialPort;
-use slcan::sync::CanSocket;
-use slcan::{CanFrame, NominalBitRate, OperatingMode, ReadError};
-use std::{io, thread, time::Duration};
+use slcan::CanFrame;
+use std::{thread, time::Duration};
 
-const BAUD_RATE: u32 = 115_200;
-const NO_PORT_SLEEP_MS: u64 = 200;
+const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
+
+fn process_can_frame(frame: CanFrame, state: &can::state::State) {
+    match frame {
+        CanFrame::Can2(frame2) => {
+            let id = match frame2.id() {
+                slcan::Id::Standard(sid) => sid.as_raw() as u32,
+                slcan::Id::Extended(eid) => eid.as_raw(),
+            };
+
+            let data = frame2.data().unwrap_or(&[]);
+
+            if let Some(parser) = state.parser.as_ref() {
+                if let Some(decoded) = parser.decode_msg(id, data) {
+                    let parsed_msg = can::message::ParsedMessage {
+                        timestamp: Local::now(),
+                        raw_bytes: data.to_vec(),
+                        decoded,
+                    };
+                    let _ = state
+                        .can_sender
+                        .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                } else {
+                    log::error!(
+                        "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
+                        id,
+                        id,
+                        data
+                    );
+                }
+            } else {
+                log::warn!(
+                    "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
+                    id,
+                    id,
+                    data
+                );
+            }
+        }
+        CanFrame::CanFd(frame_fd) => {
+            let id = match frame_fd.id() {
+                slcan::Id::Standard(sid) => sid.as_raw() as u32,
+                slcan::Id::Extended(eid) => eid.as_raw(),
+            };
+            log::warn!(
+                "Received CAN FD frame id=0x{:X} len={}",
+                id,
+                frame_fd.data().len()
+            );
+        }
+    }
+}
 
 pub fn start_can_thread(
     can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
     ui_receiver: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
-    selected_serial: Option<String>,
+    selected_source: Option<connection::ConnectionSource>,
     dbc_path: Option<std::path::PathBuf>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
-        let mut can: Option<CanSocket<Box<dyn SerialPort>>> = None;
+        let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut pending_connection_error: Option<String> = None;
-        let mut serial_path: Option<String> = selected_serial;
+        let mut current_source: Option<connection::ConnectionSource> = selected_source;
 
         if let Some(path) = dbc_path {
             match can_decode::Parser::from_dbc_file(&path) {
@@ -31,12 +78,13 @@ pub fn start_can_thread(
                 Err(e) => log::error!("Failed to load DBC from settings {:?}: {e}", path),
             }
         }
-        // --- Main loop ---
+
+        // MAIN LOOP
         loop {
-            if let Some(path) = pending_connection_error.take() {
+            if let Some(error_msg) = pending_connection_error.take() {
                 let _ = state
                     .can_sender
-                    .send(can::can_messages::CanMessage::ConnectionFailed(path));
+                    .send(can::can_messages::CanMessage::ConnectionFailed(error_msg));
             }
             // Process UI messages first (DBC load, etc.)
             for msg in state.ui_receiver.try_iter() {
@@ -50,125 +98,80 @@ pub fn start_can_thread(
                             Err(e) => log::error!("Failed to load DBC {:?}: {e}", path),
                         }
                     }
-                    ui::ui_messages::UiMessage::SerialSelected(path) => {
+                    ui::ui_messages::UiMessage::Connect(source) => {
                         // Close existing connection if any
-                        if let Some(mut old) = can.take() {
-                            let _ = old.close();
+                        if let Some(mut old_driver) = driver.take() {
+                            let _ = old_driver.close();
                         }
-
                         state.is_connected = false;
-                        serial_path = Some(path);
+                        current_source = Some(source);
                     }
                 }
             }
 
-            if can.is_none()
-                && let Some(ref path) = serial_path
-            {
-                let port = match serialport::new(path, BAUD_RATE)
-                    .timeout(Duration::from_millis(10))
-                    .open()
-                {
-                    Ok(p) => p,
-                    Err(e) => {
-                        log::error!("Failed to open serialport {}: {e}", path);
-                        pending_connection_error = Some(path.clone());
-                        thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
-                        continue;
+            // Attempt to connect if we don't have a driver but have a source
+            if driver.is_none() {
+                if let Some(ref source) = current_source {
+                    match can::driver::create_driver(source) {
+                        Ok(new_driver) => {
+                            driver = Some(new_driver);
+                            state.is_connected = true;
+                            let _ = state
+                                .can_sender
+                                .send(can::can_messages::CanMessage::ConnectionSuccessful);
+                            log::info!("Connected to {:?}", source);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to create driver for {:?}: {:?}", source, e);
+                            let error_msg = match source {
+                                connection::ConnectionSource::Serial(path) => path.clone(),
+                                connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
+                            };
+                            pending_connection_error = Some(error_msg);
+                            thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
+                            continue;
+                        }
                     }
-                };
-                let _ = port.clear(ClearBuffer::All);
-                let mut socket = CanSocket::new(port.try_clone().expect("clone serialport failed"));
-                if let Err(e) = socket.set_operating_mode(OperatingMode::Normal) {
-                    log::error!("Failed to set operating mode: {e}");
-                    state.is_connected = false;
-                    pending_connection_error = Some(path.clone());
-                    thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
+                } else {
+                    // No source configured, just sleep
+                    thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                     continue;
                 }
-                if let Err(e) = socket.open(NominalBitRate::Rate500Kbit) {
-                    log::error!("Failed to open CAN: {e}");
-                    state.is_connected = false;
-                    pending_connection_error = Some(path.clone());
-                    thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
-                    continue;
-                }
-                state.is_connected = true;
-                let _ = state
-                    .can_sender
-                    .send(can::can_messages::CanMessage::ConnectionSuccessful);
-                can = Some(socket);
             }
 
-            // Try to read a frame
-            let Some(ref mut can_socket) = can else {
-                thread::sleep(Duration::from_millis(NO_PORT_SLEEP_MS));
+            // Try to read a frame from the driver
+            let Some(ref mut active_driver) = driver else {
+                thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                 continue;
             };
-            match can_socket.read() {
-                Ok(frame) => match frame {
-                    CanFrame::Can2(frame2) => {
-                        let id = match frame2.id() {
-                            slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                            slcan::Id::Extended(eid) => eid.as_raw(),
-                        };
 
-                        let data = frame2.data().unwrap_or(&[]);
-
-                        if let Some(parser) = state.parser.as_ref() {
-                            if let Some(decoded) = parser.decode_msg(id, data) {
-                                let parsed_msg = can::message::ParsedMessage {
-                                    timestamp: Local::now(),
-                                    raw_bytes: data.to_vec(),
-                                    decoded,
-                                };
-                                let _ = state
-                                    .can_sender
-                                    .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
-                            } else {
-                                log::error!(
-                                    "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
-                                    id,
-                                    id,
-                                    data
-                                );
-                            }
-                        } else {
-                            log::warn!(
-                                "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
-                                id,
-                                id,
-                                data
-                            );
-                            continue;
-                        };
+            match active_driver.read_frame() {
+                Ok(frame) => {
+                    process_can_frame(frame, &state);
+                }
+                Err(can::driver::DriverError::ReadError(msg)) => {
+                    if msg == "Timeout" {
+                        // Normal timeout, just retry
+                        log::warn!("Driver read timeout, retrying...");
+                        thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
+                    } else {
+                        // Actual error, disconnect
+                        log::error!("Driver read error: {}", msg);
+                        state.is_connected = false;
+                        if let Some(ref source) = current_source {
+                            let error_msg = match source {
+                                connection::ConnectionSource::Serial(path) => path.clone(),
+                                connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
+                            };
+                            pending_connection_error = Some(error_msg);
+                        }
+                        driver = None;
                     }
-                    CanFrame::CanFd(frame_fd) => {
-                        // Optional: Handle FD frames differently or log
-                        log::info!("Received frame: {:?}", frame_fd);
-                        let id = match frame_fd.id() {
-                            slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                            slcan::Id::Extended(eid) => eid.as_raw(),
-                        };
-                        log::warn!(
-                            "Received CAN FD frame id=0x{:X} len={}",
-                            id,
-                            frame_fd.data().len()
-                        );
-                    }
-                },
-                Err(ReadError::Io(e))
-                    if e.kind() == io::ErrorKind::WouldBlock
-                        || e.kind() == io::ErrorKind::TimedOut =>
-                {
-                    thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                 }
                 Err(e) => {
-                    log::error!("Read error: {e}");
+                    log::error!("Unexpected driver error: {:?}", e);
                     state.is_connected = false;
-                    pending_connection_error = serial_path.clone();
-                    can = None;
-                    continue;
+                    driver = None;
                 }
             }
         }
