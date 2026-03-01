@@ -133,7 +133,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     });
 
                 if ui.button("🔄").clicked() {
-                    app.serial_ports = util::get_avaible_serial_ports();
+                    app.serial_ports = util::get_available_serial_ports();
                 }
             });
 

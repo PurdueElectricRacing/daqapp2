@@ -1,4 +1,4 @@
-pub fn get_avaible_serial_ports() -> Vec<serialport::SerialPortInfo> {
+pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
     match serialport::available_ports() {
         Ok(ports) => ports
             .into_iter()

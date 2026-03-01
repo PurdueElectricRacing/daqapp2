@@ -86,7 +86,7 @@ impl DAQApp {
             theme: theme_style,
             theme_selection,
             pixels_per_point: default_scale,
-            serial_ports: util::get_avaible_serial_ports(),
+            serial_ports: util::get_available_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
             udp_port: settings.udp_port,
             can_messages: Vec::new(),
