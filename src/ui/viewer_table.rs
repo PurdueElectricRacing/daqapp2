@@ -143,8 +143,7 @@ impl ViewerTable {
     }
 
     pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
-        self.decoded_msgs
-            .insert(msg.decoded.msg_id, msg.clone());
+        self.decoded_msgs.insert(msg.decoded.msg_id, msg.clone());
     }
 }
 

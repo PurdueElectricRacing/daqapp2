@@ -140,9 +140,15 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 // Connection status indicator
                 let (status_icon, status_color) = match &app.connection_status {
-                    app::ConnectionStatus::Disconnected => ("⚪ Disconnected".to_string(), egui::Color32::GRAY),
-                    app::ConnectionStatus::Connected => ("🟢 Connected".to_string(), egui::Color32::GREEN),
-                    app::ConnectionStatus::Error(e) => (format!("🔴 Error: {}", e), egui::Color32::RED),
+                    app::ConnectionStatus::Disconnected => {
+                        ("⚪ Disconnected".to_string(), egui::Color32::GRAY)
+                    }
+                    app::ConnectionStatus::Connected => {
+                        ("🟢 Connected".to_string(), egui::Color32::GREEN)
+                    }
+                    app::ConnectionStatus::Error(e) => {
+                        (format!("🔴 Error: {}", e), egui::Color32::RED)
+                    }
                 };
                 ui.label(egui::RichText::new(status_icon).color(status_color));
             });
