@@ -12,7 +12,8 @@ pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
             })
             .collect(),
         Err(err) => {
-            panic!("Failed to get serial ports: {err}");
+            log::error!("Error listing serial ports: {}", err);
+            Vec::new()
         }
     }
 }
