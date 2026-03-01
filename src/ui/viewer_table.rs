@@ -127,7 +127,7 @@ impl ViewerTable {
                             msg_id: msg.decoded.msg_id,
                             tx_node: &msg.decoded.tx_node,
                             raw_bytes: &raw_bytes_str,
-                            timestamp: &msg.timestamp.format("%H:%M:%S:%3f").to_string(),
+                            timestamp: &msg.timestamp.format("%-I:%M:%S%.3f").to_string(),
                             signals,
                             search: &self.search,
                         }
