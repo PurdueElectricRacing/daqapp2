@@ -7,6 +7,7 @@ pub enum AppAction {
     DecreaseScale,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum WidgetType {
     ViewerTable,
     ViewerList,
