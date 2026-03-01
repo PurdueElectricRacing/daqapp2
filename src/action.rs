@@ -1,6 +1,7 @@
 pub enum AppAction {
     SpawnWidget(WidgetType),
     ToggleSidebar,
+    ToggleCommandPalette,
     CloseActiveWidget,
     IncreaseScale,
     DecreaseScale,

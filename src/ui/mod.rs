@@ -1,4 +1,5 @@
 pub mod bootloader;
+pub mod command_palette;
 pub mod log_parser;
 pub mod scope;
 pub mod sidebar;

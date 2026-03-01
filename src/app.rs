@@ -28,6 +28,7 @@ pub enum ConnectionStatus {
 pub struct DAQApp {
     pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
+    pub show_command_palette: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
     pub next_can_list_num: usize,
@@ -71,6 +72,7 @@ impl DAQApp {
         Self {
             connection_status: ConnectionStatus::Disconnected,
             is_sidebar_open: true,
+            show_command_palette: false,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
             next_can_list_num: 1,
@@ -181,6 +183,9 @@ impl DAQApp {
             action::AppAction::ToggleSidebar => {
                 self.is_sidebar_open = !self.is_sidebar_open;
             }
+            action::AppAction::ToggleCommandPalette => {
+                self.show_command_palette = !self.show_command_palette;
+            }
             action::AppAction::CloseActiveWidget => {
                 self.close_active_widget();
             }
@@ -259,6 +264,7 @@ impl eframe::App for DAQApp {
 
         // Render the most recent state of the UI
         ui::sidebar::show(self, ctx);
+        ui::command_palette::show(self, ctx);
         workspace::show(self, ctx);
         ctx.request_repaint();
     }
