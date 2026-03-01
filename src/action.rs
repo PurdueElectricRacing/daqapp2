@@ -1,5 +1,9 @@
 pub enum AppAction {
     SpawnWidget(WidgetType),
+    ToggleSidebar,
+    CloseActiveWidget,
+    IncreaseScale,
+    DecreaseScale,
 }
 
 pub enum WidgetType {

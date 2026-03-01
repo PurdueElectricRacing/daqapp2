@@ -177,6 +177,18 @@ impl DAQApp {
                     }
                 }
             }
+            action::AppAction::ToggleSidebar => {
+                self.is_sidebar_open = !self.is_sidebar_open;
+            }
+            action::AppAction::CloseActiveWidget => {
+                self.close_active_widget();
+            }
+            action::AppAction::IncreaseScale => {
+                self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
+            }
+            action::AppAction::DecreaseScale => {
+                self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
+            }
         }
     }
 
@@ -202,6 +214,7 @@ impl eframe::App for DAQApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
     }
+
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
@@ -225,33 +238,17 @@ impl eframe::App for DAQApp {
         ctx.set_style(self.theme.clone());
 
         // Handle keyboard shortcuts
-        let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
-        for action in shortcuts {
-            match action {
-                shortcuts::ShortcutAction::ToggleSidebar => {
-                    self.is_sidebar_open = !self.is_sidebar_open;
-                }
-                shortcuts::ShortcutAction::CloseActiveWidget => {
-                    self.close_active_widget();
-                }
-                shortcuts::ShortcutAction::IncreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
-                }
-                shortcuts::ShortcutAction::DecreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
-                }
-            }
-        }
-
-        ui::sidebar::show(self, ctx);
-
-        workspace::show(self, ctx);
+        self.action_queue
+            .extend(shortcuts::ShortcutHandler::check_shortcuts(ctx));
 
         // Drain the action queue and handle all actions
         for action in std::mem::take(&mut self.action_queue) {
             self.handle_action(action);
         }
 
+        // Render the most recent state of the UI
+        ui::sidebar::show(self, ctx);
+        workspace::show(self, ctx);
         ctx.request_repaint();
     }
 }
