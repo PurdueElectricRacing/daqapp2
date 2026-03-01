@@ -181,12 +181,16 @@ impl DAQApp {
                 self.close_active_widget();
             }
             action::AppAction::IncreaseScale => {
-                let current_scale = self.pixels_per_point.unwrap_or_else(|| ctx.pixels_per_point());
+                let current_scale = self
+                    .pixels_per_point
+                    .unwrap_or_else(|| ctx.pixels_per_point());
                 self.pixels_per_point = Some(current_scale + UI_SCALE_STEP);
                 self.save_settings();
             }
             action::AppAction::DecreaseScale => {
-                let current_scale = self.pixels_per_point.unwrap_or_else(|| ctx.pixels_per_point());
+                let current_scale = self
+                    .pixels_per_point
+                    .unwrap_or_else(|| ctx.pixels_per_point());
                 self.pixels_per_point = Some(current_scale - UI_SCALE_STEP);
                 self.save_settings();
             }
