@@ -66,7 +66,6 @@ pub fn start_can_thread(
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
-        let mut pending_connection_error: Option<String> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
 
         if let Some(path) = dbc_path {
@@ -81,12 +80,8 @@ pub fn start_can_thread(
 
         // MAIN LOOP
         loop {
-            if let Some(error_msg) = pending_connection_error.take() {
-                let _ = state
-                    .can_sender
-                    .send(can::can_messages::CanMessage::ConnectionFailed(error_msg));
-            }
             // Process UI messages first (DBC load, etc.)
+            let mut reaction_messages = Vec::new();
             for msg in state.ui_receiver.try_iter() {
                 match msg {
                     ui::ui_messages::UiMessage::DbcSelected(path) => {
@@ -104,6 +99,11 @@ pub fn start_can_thread(
                             let _ = old_driver.close();
                         }
                         state.is_connected = false;
+                        state
+                            .can_sender
+                            .send(can::can_messages::CanMessage::Disconnection)
+                            .expect("Failed to send disconnected message");
+                        reaction_messages.push(can::can_messages::CanMessage::Disconnection);
                         current_source = Some(source);
                     }
                 }
@@ -127,7 +127,10 @@ pub fn start_can_thread(
                                 connection::ConnectionSource::Serial(path) => path.clone(),
                                 connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
                             };
-                            pending_connection_error = Some(error_msg);
+                            state
+                                .can_sender
+                                .send(can::can_messages::CanMessage::ConnectionFailed(error_msg))
+                                .expect("Failed to send connection failed message");
                             thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                             continue;
                         }
@@ -152,7 +155,6 @@ pub fn start_can_thread(
                 Err(can::driver::DriverError::ReadError(msg)) => {
                     if msg == "Timeout" {
                         // Normal timeout, just retry
-                        log::warn!("Driver read timeout, retrying...");
                         thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                     } else {
                         // Actual error, disconnect
@@ -163,7 +165,10 @@ pub fn start_can_thread(
                                 connection::ConnectionSource::Serial(path) => path.clone(),
                                 connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
                             };
-                            pending_connection_error = Some(error_msg);
+                            state
+                                .can_sender
+                                .send(can::can_messages::CanMessage::ConnectionFailed(error_msg))
+                                .expect("Failed to send connection failed message");
                         }
                         driver = None;
                     }

@@ -140,16 +140,12 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 // Connection status indicator
                 let (status_icon, status_color) = match &app.connection_status {
-                    app::ConnectionStatus::Disconnected => ("⚪", egui::Color32::GRAY),
-                    app::ConnectionStatus::Connected => ("🟢", egui::Color32::GREEN),
-                    app::ConnectionStatus::Error(_) => ("🔴", egui::Color32::RED),
+                    app::ConnectionStatus::Disconnected => ("⚪ Disconnected".to_string(), egui::Color32::GRAY),
+                    app::ConnectionStatus::Connected => ("🟢 Connected".to_string(), egui::Color32::GREEN),
+                    app::ConnectionStatus::Error(e) => (format!("🔴 Error: {}", e), egui::Color32::RED),
                 };
                 ui.label(egui::RichText::new(status_icon).color(status_color));
             });
-
-            if let app::ConnectionStatus::Error(ref err) = app.connection_status {
-                ui.colored_label(egui::Color32::RED, format!(" {err}"));
-            }
 
             ui.horizontal(|ui| {
                 // Clone the sender so we don’t borrow app immutably yet

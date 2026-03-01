@@ -44,7 +44,6 @@ pub struct DAQApp {
     pub pixels_per_point: f32,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
-    pub connection_error: Option<String>,
     pub udp_port: u16,
     pub can_messages: Vec<can::can_messages::CanMessage>,
 }
@@ -89,7 +88,6 @@ impl DAQApp {
             pixels_per_point: default_scale,
             serial_ports: util::get_avaible_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
-            connection_error: None,
             udp_port: settings.udp_port,
             can_messages: Vec::new(),
         }
@@ -212,10 +210,13 @@ impl eframe::App for DAQApp {
         while let Ok(msg) = self.can_receiver.try_recv() {
             match &msg {
                 can::can_messages::CanMessage::ConnectionFailed(port) => {
-                    self.connection_error = Some(format!("Failed to connect to {port}"));
+                    self.connection_status = ConnectionStatus::Error(format!("Failed to connect to {port}"));
                 }
                 can::can_messages::CanMessage::ConnectionSuccessful => {
-                    self.connection_error = None;
+                    self.connection_status = ConnectionStatus::Connected;
+                }
+                can::can_messages::CanMessage::Disconnection => {
+                    self.connection_status = ConnectionStatus::Disconnected;
                 }
                 _ => {
                     self.can_messages.push(msg);
