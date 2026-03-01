@@ -177,9 +177,6 @@ impl DAQApp {
                     }
                 }
             }
-            action::AppAction::CloseTile(tile_id) => {
-                self.tile_tree.tiles.remove(tile_id);
-            }
         }
     }
 

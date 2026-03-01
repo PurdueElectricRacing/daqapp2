@@ -1,6 +1,5 @@
 pub enum AppAction {
     SpawnWidget(WidgetType),
-    CloseTile(egui_tiles::TileId),
 }
 
 pub enum WidgetType {
