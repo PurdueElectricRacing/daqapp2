@@ -28,9 +28,7 @@ pub enum ConnectionStatus {
 pub struct DAQApp {
     pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
-    pub show_command_palette: bool,
-    pub palette_search: String,
-    pub palette_index: usize,
+    pub command_palette: ui::command_palette::CommandPalette,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
     pub next_can_list_num: usize,
@@ -74,9 +72,7 @@ impl DAQApp {
         Self {
             connection_status: ConnectionStatus::Disconnected,
             is_sidebar_open: false,
-            show_command_palette: false,
-            palette_search: String::new(),
-            palette_index: 0,
+            command_palette: ui::command_palette::CommandPalette::new(),
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
             next_can_list_num: 1,
@@ -188,11 +184,7 @@ impl DAQApp {
                 self.is_sidebar_open = !self.is_sidebar_open;
             }
             action::AppAction::ToggleCommandPalette => {
-                self.show_command_palette = !self.show_command_palette;
-                if self.show_command_palette {
-                    self.palette_search.clear();
-                    self.palette_index = 0;
-                }
+                self.command_palette.toggle();
             }
             action::AppAction::CloseActiveWidget => {
                 self.close_active_widget();
@@ -265,6 +257,9 @@ impl eframe::App for DAQApp {
         self.action_queue
             .extend(shortcuts::ShortcutHandler::check_shortcuts(ctx));
 
+        // Command Palette UI and action generation
+        self.action_queue.extend(self.command_palette.ui(ctx));
+
         // Drain the action queue and handle all actions
         for action in std::mem::take(&mut self.action_queue) {
             self.handle_action(action, ctx);
@@ -272,7 +267,6 @@ impl eframe::App for DAQApp {
 
         // Render the most recent state of the UI
         ui::sidebar::show(self, ctx);
-        ui::command_palette::show(self, ctx);
         workspace::show(self, ctx);
         ctx.request_repaint();
     }
