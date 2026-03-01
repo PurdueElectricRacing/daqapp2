@@ -81,7 +81,6 @@ pub fn start_can_thread(
         // MAIN LOOP
         loop {
             // Process UI messages first (DBC load, etc.)
-            let mut reaction_messages = Vec::new();
             for msg in state.ui_receiver.try_iter() {
                 match msg {
                     ui::ui_messages::UiMessage::DbcSelected(path) => {
@@ -103,7 +102,6 @@ pub fn start_can_thread(
                             .can_sender
                             .send(can::can_messages::CanMessage::Disconnection)
                             .expect("Failed to send disconnected message");
-                        reaction_messages.push(can::can_messages::CanMessage::Disconnection);
                         current_source = Some(source);
                     }
                 }
