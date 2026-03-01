@@ -6,12 +6,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
         return;
     }
 
-    let cmd_list = [
-        ("Spawn CAN Table", action::WidgetType::ViewerTable),
-        ("Spawn CAN List", action::WidgetType::ViewerList),
-        ("Spawn Bootloader", action::WidgetType::Bootloader),
-        ("Spawn Log Parser", action::WidgetType::LogParser),
-    ];
+    let cmd_list = action::AppAction::cmd_palette_list();
 
     // filtering Logic
     let filtered_options: Vec<_> = cmd_list

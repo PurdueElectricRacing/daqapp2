@@ -19,3 +19,14 @@ pub enum WidgetType {
     },
     LogParser,
 }
+
+impl AppAction {
+    pub fn cmd_palette_list() -> Vec<(&'static str, WidgetType)> {
+        vec![
+            ("Spawn CAN Table", WidgetType::ViewerTable),
+            ("Spawn CAN List", WidgetType::ViewerList),
+            ("Spawn Bootloader", WidgetType::Bootloader),
+            ("Spawn Log Parser", WidgetType::LogParser),
+        ]
+    }
+}
