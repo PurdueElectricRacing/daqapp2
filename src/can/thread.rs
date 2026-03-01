@@ -152,25 +152,32 @@ pub fn start_can_thread(
                 Ok(frame) => {
                     process_can_frame(frame, &state);
                 }
-                Err(can::driver::DriverError::ReadError(msg)) => {
-                    if msg == "Timeout" {
-                        // Normal timeout, just retry
-                        thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
-                    } else {
-                        // Actual error, disconnect
-                        log::error!("Driver read error: {}", msg);
-                        state.is_connected = false;
-                        if let Some(ref source) = current_source {
-                            let error_msg = match source {
-                                connection::ConnectionSource::Serial(path) => path.clone(),
-                                connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
-                            };
-                            state
-                                .can_sender
-                                .send(can::can_messages::CanMessage::ConnectionFailed(error_msg))
-                                .expect("Failed to send connection failed message");
+                Err(can::driver::DriverError::ReadError(error_type)) => {
+                    match error_type {
+                        can::driver::DriverReadError::Timeout => {
+                            // Normal timeout, just retry
+                            thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
                         }
-                        driver = None;
+                        other => {
+                            // Actual error, disconnect
+                            log::error!("Driver read error: {:?}", other);
+                            state.is_connected = false;
+                            if let Some(ref source) = current_source {
+                                let error_msg = match source {
+                                    connection::ConnectionSource::Serial(path) => path.clone(),
+                                    connection::ConnectionSource::Udp(port) => {
+                                        format!("UDP:{}", port)
+                                    }
+                                };
+                                state
+                                    .can_sender
+                                    .send(can::can_messages::CanMessage::ConnectionFailed(
+                                        error_msg,
+                                    ))
+                                    .expect("Failed to send connection failed message");
+                            }
+                            driver = None;
+                        }
                     }
                 }
                 Err(e) => {

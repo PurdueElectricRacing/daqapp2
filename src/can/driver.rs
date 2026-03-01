@@ -10,9 +10,16 @@ const SERIAL_TIMEOUT_MS: u64 = 10;
 pub type DriverResult<T> = Result<T, DriverError>;
 
 #[derive(Debug)]
+pub enum DriverReadError {
+    Timeout,
+    IoError(String),
+    Other(String),
+}
+
+#[derive(Debug)]
 pub enum DriverError {
     ConnectionFailed(String),
-    ReadError(String),
+    ReadError(DriverReadError),
     WriteError(String),
 }
 
@@ -66,15 +73,18 @@ impl Driver for SerialDriver {
                 if io_err.kind() == std::io::ErrorKind::WouldBlock
                     || io_err.kind() == std::io::ErrorKind::TimedOut
                 {
-                    DriverError::ReadError("Timeout".to_string())
+                    DriverError::ReadError(DriverReadError::Timeout)
                 } else {
                     self.connected = false;
-                    DriverError::ReadError(format!("IO error: {}", io_err))
+                    DriverError::ReadError(DriverReadError::IoError(format!(
+                        "I/O error: {}",
+                        io_err
+                    )))
                 }
             }
             other => {
                 self.connected = false;
-                DriverError::ReadError(format!("Read error: {}", other))
+                DriverError::ReadError(DriverReadError::Other(format!("Read error: {:?}", other)))
             }
         })
     }
@@ -113,7 +123,9 @@ impl Driver for UdpDriver {
     fn read_frame(&mut self) -> DriverResult<CanFrame> {
         // TODO: possibly need to handle the the fact that one UDP packet could contain multiple CAN frames
         // and the data is in PER DAQ log format, not raw CAN frames
-        Err(DriverError::ReadError("UDP not implemented".to_string()))
+        Err(DriverError::ReadError(DriverReadError::Other(
+            "UDP read not implemented".to_string(),
+        )))
     }
 
     fn is_connected(&self) -> bool {
