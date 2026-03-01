@@ -63,10 +63,7 @@ impl ViewerList {
                     &self.decoded_msgs
                 };
                 for msg in msgs.iter().rev() {
-                    let mut signal_keys = msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
-                    signal_keys.sort();
-                    for signal_name in signal_keys {
-                        let signal = &msg.decoded.signals[&signal_name];
+                    for (sig_name, signal) in msg.decoded.signals.iter() {
                         body.row(18.0, |mut row| {
                             row.col(|ui| {
                                 ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
@@ -78,7 +75,7 @@ impl ViewerList {
                                 ));
                             });
                             row.col(|ui| {
-                                ui.label(signal.name.to_string());
+                                ui.label(sig_name.to_string());
                             });
                             row.col(|ui| {
                                 if signal.unit.is_empty() {
