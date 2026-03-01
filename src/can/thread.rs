@@ -23,9 +23,10 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
                         raw_bytes: data.to_vec(),
                         decoded,
                     };
-                    let _ = state
+                    state
                         .can_sender
-                        .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg));
+                        .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg))
+                        .expect("Failed to send parsed CAN message");
                 } else {
                     log::error!(
                         "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
@@ -114,9 +115,10 @@ pub fn start_can_thread(
                         Ok(new_driver) => {
                             driver = Some(new_driver);
                             state.is_connected = true;
-                            let _ = state
+                            state
                                 .can_sender
-                                .send(can::can_messages::CanMessage::ConnectionSuccessful);
+                                .send(can::can_messages::CanMessage::ConnectionSuccessful)
+                                .expect("Failed to send connection successful message");
                             log::info!("Connected to {:?}", source);
                         }
                         Err(e) => {
