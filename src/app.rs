@@ -1,9 +1,7 @@
 use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
 use eframe::egui;
 
-const MIN_UI_SCALE: f32 = 0.4;
-const MAX_UI_SCALE: f32 = 5.0;
-
+const UI_SCALE_STEP: f32 = 0.2;
 pub struct ParserInfo {
     pub dbc_path: std::path::PathBuf,
     pub parser: can_decode::Parser,
@@ -32,6 +30,7 @@ pub struct DAQApp {
     pub is_sidebar_open: bool,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
+    pub next_can_list_num: usize,
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
@@ -41,7 +40,7 @@ pub struct DAQApp {
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
     pub theme_selection: theme::ThemeSelection,
-    pub pixels_per_point: f32,
+    pub pixels_per_point: Option<f32>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
@@ -55,6 +54,7 @@ impl DAQApp {
             selected_source: self.selected_source.clone(),
             udp_port: self.udp_port,
             theme: self.theme_selection,
+            pixels_per_point: self.pixels_per_point,
         };
         settings.save();
     }
@@ -63,11 +63,8 @@ impl DAQApp {
         can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         settings: settings::Settings,
-        cc: &eframe::CreationContext,
+        _cc: &eframe::CreationContext,
     ) -> Self {
-        // Calculate a default ui scale based off the native_pixels_per_point
-        let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
-        let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
         let theme_selection = settings.theme;
         let theme_style = theme_selection.get_style();
 
@@ -76,6 +73,7 @@ impl DAQApp {
             is_sidebar_open: true,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
+            next_can_list_num: 1,
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
@@ -85,7 +83,7 @@ impl DAQApp {
             selected_source: settings.selected_source,
             theme: theme_style,
             theme_selection,
-            pixels_per_point: default_scale,
+            pixels_per_point: settings.pixels_per_point,
             serial_ports: util::get_available_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
             udp_port: settings.udp_port,
@@ -132,7 +130,7 @@ impl DAQApp {
             .send(ui::ui_messages::UiMessage::Connect(source.clone()));
     }
 
-    pub fn handle_action(&mut self, action: action::AppAction) {
+    pub fn handle_action(&mut self, action: action::AppAction, ctx: &egui::Context) {
         match action {
             action::AppAction::SpawnWidget(widget_type) => {
                 let widget = match &widget_type {
@@ -140,7 +138,7 @@ impl DAQApp {
                         ui::viewer_table::ViewerTable::new(self.next_can_viewer_num),
                     ),
                     action::WidgetType::ViewerList => widgets::Widget::ViewerList(
-                        ui::viewer_list::ViewerList::new(self.next_can_viewer_num),
+                        ui::viewer_list::ViewerList::new(self.next_can_list_num),
                     ),
                     action::WidgetType::Bootloader => widgets::Widget::Bootloader(
                         ui::bootloader::Bootloader::new(self.next_bootloader_num),
@@ -163,8 +161,11 @@ impl DAQApp {
 
                 // Increment the appropriate counter
                 match widget_type {
-                    action::WidgetType::ViewerTable | action::WidgetType::ViewerList => {
+                    action::WidgetType::ViewerTable => {
                         self.next_can_viewer_num += 1;
+                    }
+                    action::WidgetType::ViewerList => {
+                        self.next_can_list_num += 1;
                     }
                     action::WidgetType::Bootloader => {
                         self.next_bootloader_num += 1;
@@ -176,6 +177,26 @@ impl DAQApp {
                         self.next_log_parser_num += 1;
                     }
                 }
+            }
+            action::AppAction::ToggleSidebar => {
+                self.is_sidebar_open = !self.is_sidebar_open;
+            }
+            action::AppAction::CloseActiveWidget => {
+                self.close_active_widget();
+            }
+            action::AppAction::IncreaseScale => {
+                let current_scale = self
+                    .pixels_per_point
+                    .unwrap_or_else(|| ctx.pixels_per_point());
+                self.pixels_per_point = Some(current_scale + UI_SCALE_STEP);
+                self.save_settings();
+            }
+            action::AppAction::DecreaseScale => {
+                let current_scale = self
+                    .pixels_per_point
+                    .unwrap_or_else(|| ctx.pixels_per_point());
+                self.pixels_per_point = Some(current_scale - UI_SCALE_STEP);
+                self.save_settings();
             }
         }
     }
@@ -202,6 +223,7 @@ impl eframe::App for DAQApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
     }
+
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
@@ -221,37 +243,23 @@ impl eframe::App for DAQApp {
                 }
             }
         }
-        // ctx.set_pixels_per_point(self.pixels_per_point);
+        if let Some(ppp) = self.pixels_per_point {
+            ctx.set_pixels_per_point(ppp);
+        }
         ctx.set_style(self.theme.clone());
 
         // Handle keyboard shortcuts
-        let shortcuts = shortcuts::ShortcutHandler::check_shortcuts(ctx);
-        for action in shortcuts {
-            match action {
-                shortcuts::ShortcutAction::ToggleSidebar => {
-                    self.is_sidebar_open = !self.is_sidebar_open;
-                }
-                shortcuts::ShortcutAction::CloseActiveWidget => {
-                    self.close_active_widget();
-                }
-                shortcuts::ShortcutAction::IncreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
-                }
-                shortcuts::ShortcutAction::DecreaseScale => {
-                    self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
-                }
-            }
-        }
-
-        ui::sidebar::show(self, ctx);
-
-        workspace::show(self, ctx);
+        self.action_queue
+            .extend(shortcuts::ShortcutHandler::check_shortcuts(ctx));
 
         // Drain the action queue and handle all actions
         for action in std::mem::take(&mut self.action_queue) {
-            self.handle_action(action);
+            self.handle_action(action, ctx);
         }
 
+        // Render the most recent state of the UI
+        ui::sidebar::show(self, ctx);
+        workspace::show(self, ctx);
         ctx.request_repaint();
     }
 }

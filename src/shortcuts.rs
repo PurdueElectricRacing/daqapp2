@@ -1,17 +1,10 @@
+use crate::action::AppAction;
 use eframe::egui;
-
-#[derive(Debug, PartialEq)]
-pub enum ShortcutAction {
-    ToggleSidebar,
-    CloseActiveWidget,
-    IncreaseScale,
-    DecreaseScale,
-}
 
 pub struct ShortcutHandler;
 
 impl ShortcutHandler {
-    pub fn check_shortcuts(ctx: &egui::Context) -> Vec<ShortcutAction> {
+    pub fn check_shortcuts(ctx: &egui::Context) -> Vec<AppAction> {
         let mut actions = Vec::new();
 
         // Get input state
@@ -19,22 +12,22 @@ impl ShortcutHandler {
 
         // CMD+S = toggle sidebar
         if input.modifiers.command_only() && input.key_pressed(egui::Key::S) {
-            actions.push(ShortcutAction::ToggleSidebar);
+            actions.push(AppAction::ToggleSidebar);
         }
 
         // CMD+W = close window
         if input.modifiers.command_only() && input.key_pressed(egui::Key::W) {
-            actions.push(ShortcutAction::CloseActiveWidget);
+            actions.push(AppAction::CloseActiveWidget);
         }
 
         // CMD+Plus = increase scale
         if input.modifiers.command_only() && input.key_pressed(egui::Key::Equals) {
-            actions.push(ShortcutAction::IncreaseScale);
+            actions.push(AppAction::IncreaseScale);
         }
 
         // CMD+Minus = decrease scale
         if input.modifiers.command_only() && input.key_pressed(egui::Key::Minus) {
-            actions.push(ShortcutAction::DecreaseScale);
+            actions.push(AppAction::DecreaseScale);
         }
 
         actions
