@@ -53,7 +53,6 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
-        .fixed_size([300.0, 400.0])
         .show(ctx, |ui| {
             ui.vertical_centered_justified(|ui| {
                 ui.heading("Command Palette");
@@ -62,20 +61,22 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 for (i, (label, widget_type)) in options.iter().enumerate() {
                     let is_selected = i == index;
 
-                    // Concise button styling that respects themes
-                    let btn = egui::Button::new(*label)
+                    // Use the selection accent colors instead of neutral widget colors
+                    let selection = ui.visuals().selection;
+
+                    let button = egui::Button::new(*label)
                         .fill(if is_selected {
-                            ui.visuals().widgets.hovered.bg_fill
+                            selection.bg_fill
                         } else {
                             egui::Color32::TRANSPARENT
                         })
                         .stroke(if is_selected {
-                            ui.visuals().widgets.hovered.bg_stroke
+                            selection.stroke
                         } else {
                             egui::Stroke::NONE
                         });
 
-                    if ui.add(btn).clicked() {
+                    if ui.add(button).clicked() {
                         app.action_queue
                             .push(action::AppAction::SpawnWidget(widget_type.clone()));
                         app.show_command_palette = false;

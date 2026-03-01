@@ -20,8 +20,8 @@ impl ShortcutHandler {
             actions.push(AppAction::CloseActiveWidget);
         }
 
-        // CMD+T = command palette
-        if input.modifiers.command_only() && input.key_pressed(egui::Key::T) {
+        // CMD+P = command palette
+        if input.modifiers.command_only() && input.key_pressed(egui::Key::P) {
             actions.push(AppAction::ToggleCommandPalette);
         }
 
