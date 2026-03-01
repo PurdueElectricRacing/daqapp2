@@ -29,6 +29,8 @@ pub struct DAQApp {
     pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
     pub show_command_palette: bool,
+    pub palette_search: String,
+    pub palette_index: usize,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
     pub next_can_list_num: usize,
@@ -71,8 +73,10 @@ impl DAQApp {
 
         Self {
             connection_status: ConnectionStatus::Disconnected,
-            is_sidebar_open: true,
+            is_sidebar_open: false,
             show_command_palette: false,
+            palette_search: String::new(),
+            palette_index: 0,
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
             next_can_list_num: 1,
@@ -185,6 +189,10 @@ impl DAQApp {
             }
             action::AppAction::ToggleCommandPalette => {
                 self.show_command_palette = !self.show_command_palette;
+                if self.show_command_palette {
+                    self.palette_search.clear();
+                    self.palette_index = 0;
+                }
             }
             action::AppAction::CloseActiveWidget => {
                 self.close_active_widget();
