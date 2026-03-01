@@ -41,7 +41,7 @@ pub struct DAQApp {
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
     pub theme_selection: theme::ThemeSelection,
-    pub pixels_per_point: f32,
+    pub pixels_per_point: Option<f32>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
@@ -55,6 +55,7 @@ impl DAQApp {
             selected_source: self.selected_source.clone(),
             udp_port: self.udp_port,
             theme: self.theme_selection,
+            pixels_per_point: Some(self.pixels_per_point),
         };
         settings.save();
     }
@@ -68,6 +69,7 @@ impl DAQApp {
         // Calculate a default ui scale based off the native_pixels_per_point
         let native_ppp = cc.egui_ctx.native_pixels_per_point().unwrap_or(1.0);
         let default_scale = (native_ppp * 2.4).clamp(MIN_UI_SCALE, MAX_UI_SCALE);
+        let pixels_per_point = settings.pixels_per_point.unwrap_or(default_scale);
         let theme_selection = settings.theme;
         let theme_style = theme_selection.get_style();
 
@@ -85,7 +87,7 @@ impl DAQApp {
             selected_source: settings.selected_source,
             theme: theme_style,
             theme_selection,
-            pixels_per_point: default_scale,
+            pixels_per_point,
             serial_ports: util::get_available_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
             udp_port: settings.udp_port,
@@ -185,9 +187,11 @@ impl DAQApp {
             }
             action::AppAction::IncreaseScale => {
                 self.pixels_per_point = (self.pixels_per_point + 0.2).min(MAX_UI_SCALE);
+                self.save_settings();
             }
             action::AppAction::DecreaseScale => {
                 self.pixels_per_point = (self.pixels_per_point - 0.2).max(MIN_UI_SCALE);
+                self.save_settings();
             }
         }
     }
@@ -234,7 +238,7 @@ impl eframe::App for DAQApp {
                 }
             }
         }
-        // ctx.set_pixels_per_point(self.pixels_per_point);
+        ctx.set_pixels_per_point(self.pixels_per_point);
         ctx.set_style(self.theme.clone());
 
         // Handle keyboard shortcuts

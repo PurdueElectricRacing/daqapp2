@@ -9,6 +9,7 @@ pub struct Settings {
     pub selected_source: Option<connection::ConnectionSource>,
     pub udp_port: u16,
     pub theme: theme::ThemeSelection,
+    pub pixels_per_point: Option<f32>,
 }
 
 impl Default for Settings {
@@ -18,6 +19,7 @@ impl Default for Settings {
             selected_source: None,
             udp_port: DEFAULT_UDP_PORT,
             theme: theme::ThemeSelection::Default,
+            pixels_per_point: None,
         }
     }
 }
