@@ -28,6 +28,7 @@ pub enum ConnectionStatus {
 pub struct DAQApp {
     pub connection_status: ConnectionStatus,
     pub is_sidebar_open: bool,
+    pub command_palette: ui::command_palette::CommandPalette,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
     pub next_can_viewer_num: usize,
     pub next_can_list_num: usize,
@@ -71,6 +72,7 @@ impl DAQApp {
         Self {
             connection_status: ConnectionStatus::Disconnected,
             is_sidebar_open: true,
+            command_palette: ui::command_palette::CommandPalette::new(),
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
             next_can_list_num: 1,
@@ -181,6 +183,9 @@ impl DAQApp {
             action::AppAction::ToggleSidebar => {
                 self.is_sidebar_open = !self.is_sidebar_open;
             }
+            action::AppAction::ToggleCommandPalette => {
+                self.command_palette.toggle();
+            }
             action::AppAction::CloseActiveWidget => {
                 self.close_active_widget();
             }
@@ -251,6 +256,9 @@ impl eframe::App for DAQApp {
         // Handle keyboard shortcuts
         self.action_queue
             .extend(shortcuts::ShortcutHandler::check_shortcuts(ctx));
+
+        // Command Palette UI and action generation
+        self.action_queue.extend(self.command_palette.ui(ctx));
 
         // Drain the action queue and handle all actions
         for action in std::mem::take(&mut self.action_queue) {

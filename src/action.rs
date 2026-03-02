@@ -1,11 +1,13 @@
 pub enum AppAction {
     SpawnWidget(WidgetType),
     ToggleSidebar,
+    ToggleCommandPalette,
     CloseActiveWidget,
     IncreaseScale,
     DecreaseScale,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum WidgetType {
     ViewerTable,
     ViewerList,
@@ -16,4 +18,15 @@ pub enum WidgetType {
         signal_name: String,
     },
     LogParser,
+}
+
+impl AppAction {
+    pub fn cmd_palette_list() -> Vec<(&'static str, WidgetType)> {
+        vec![
+            ("Spawn CAN Table", WidgetType::ViewerTable),
+            ("Spawn CAN List", WidgetType::ViewerList),
+            ("Spawn Bootloader", WidgetType::Bootloader),
+            ("Spawn Log Parser", WidgetType::LogParser),
+        ]
+    }
 }
