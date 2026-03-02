@@ -3,8 +3,8 @@ use serde::de::value::Error;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode};
-use std::time::Duration;
 use std::net::UdpSocket;
+use std::time::Duration;
 
 const SERIAL_BAUD_RATE: u32 = 115_200;
 const SERIAL_TIMEOUT_MS: u64 = 10;
@@ -116,21 +116,23 @@ impl UdpDriver {
     pub fn new(port: u16) -> DriverResult<Self> {
         // TODO: Implement UDP connection
         let udp_addr = format!("0.0.0.0:{}", port);
-        let socket = UdpSocket::bind(udp_addr)
-            .map_err(|e| {
-                DriverError::ConnectionFailed(format!("Failed to bind to port {}: {}", port, e))
-            })?;
+        let socket = UdpSocket::bind(udp_addr).map_err(|e| {
+            DriverError::ConnectionFailed(format!("Failed to bind to port {}: {}", port, e))
+        })?;
         // use a short read timeout instead of nonblocking so recv_from returns from timeout??
         // i think it should also work in nonblocking mode i just put it like this for testing
-        socket.set_broadcast(true)
-            .map_err(|e| DriverError::ConnectionFailed(format!("Failed to set broadcast: {}", e)))?;
+        socket.set_broadcast(true).map_err(|e| {
+            DriverError::ConnectionFailed(format!("Failed to set broadcast: {}", e))
+        })?;
 
         socket
             .set_read_timeout(Some(Duration::from_millis(5000)))
-            .map_err(|e| DriverError::ConnectionFailed(format!("Failed to set read timeout: {}", e)))?;
+            .map_err(|e| {
+                DriverError::ConnectionFailed(format!("Failed to set read timeout: {}", e))
+            })?;
         log::info!("Socket local addr: {:?}", socket.local_addr());
         log::info!("Socket read timeout: {:?}", socket.read_timeout());
-        
+
         Ok(Self {
             port,
             socket,
@@ -143,17 +145,17 @@ impl Driver for UdpDriver {
     fn read_frame(&mut self) -> DriverResult<CanFrame> {
         // TODO: possibly need to handle the the fact that one UDP packet could contain multiple CAN frames
 
-        log::info!("Trying to read UDP frame..."); 
+        log::info!("Trying to read UDP frame...");
         // and the data is in PER DAQ log format, not raw CAN frames
         let mut buf = [0; 2048];
         match self.socket.recv_from(&mut buf) {
             Ok((num_bytes, src_port)) => {
                 // TODO: parse buffer into one or more CanFrame(s) per your protocol.
-                log::info!("Recieved byte buf"); 
+                log::info!("Recieved byte buf");
                 parse_udp_buffer(&buf, num_bytes)
-                }
+            }
             Err(e) => {
-                log::warn!("{}",e);
+                log::warn!("{}", e);
                 if e.kind() == std::io::ErrorKind::WouldBlock
                     || e.kind() == std::io::ErrorKind::TimedOut
                 {
@@ -180,12 +182,15 @@ impl Driver for UdpDriver {
     }
 }
 
-pub fn parse_udp_buffer (buf: &[u8; 2048], num_bytes: usize) -> DriverResult<CanFrame> {
+pub fn parse_udp_buffer(buf: &[u8; 2048], num_bytes: usize) -> DriverResult<CanFrame> {
     if num_bytes < 5 {
-        return Err(DriverError::ReadError(DriverReadError::Other(format!(" Received packet too small: {} bytes", num_bytes))));
+        return Err(DriverError::ReadError(DriverReadError::Other(format!(
+            " Received packet too small: {} bytes",
+            num_bytes
+        ))));
     }
 
-    log::info!("Parsing UDP packet"); 
+    log::info!("Parsing UDP packet");
     // parse can frame from UDP packet according to new timestamped frame format
     // format: [4 bytes ticks_ms] [4 bytes identity] [8 bytes payload]
     // identity format: [1 bit bus ID] [1 bit isExtID] [1 bit reserved] [29 bits CAN ID]
@@ -195,18 +200,21 @@ pub fn parse_udp_buffer (buf: &[u8; 2048], num_bytes: usize) -> DriverResult<Can
     let mask_id = (1u32 << 29) - 1;
     let id = identity & mask_id;
     if id <= 0x7FF {
-        let sid = slcan::StandardId::new(id as u16)
-            .ok_or_else(|| DriverError::ReadError(DriverReadError::Other("invalid standard id".into())))?;
-        let can2 = slcan::Can2Frame::new_data(sid, payload)
-            .ok_or_else(|| DriverError::ReadError(DriverReadError::Other("invalid CAN2 data".into())))?;
+        let sid = slcan::StandardId::new(id as u16).ok_or_else(|| {
+            DriverError::ReadError(DriverReadError::Other("invalid standard id".into()))
+        })?;
+        let can2 = slcan::Can2Frame::new_data(sid, payload).ok_or_else(|| {
+            DriverError::ReadError(DriverReadError::Other("invalid CAN2 data".into()))
+        })?;
         Ok(can2.into())
-    }
-    else {
+    } else {
         //extid
-        let eid = slcan::ExtendedId::new(id)
-            .ok_or_else(|| DriverError::ReadError(DriverReadError::Other("invalid extended id".into())))?;
-        let can2 = slcan::Can2Frame::new_data(eid, payload)
-            .ok_or_else(|| DriverError::ReadError(DriverReadError::Other("invalid CAN2 data".into())))?;
+        let eid = slcan::ExtendedId::new(id).ok_or_else(|| {
+            DriverError::ReadError(DriverReadError::Other("invalid extended id".into()))
+        })?;
+        let can2 = slcan::Can2Frame::new_data(eid, payload).ok_or_else(|| {
+            DriverError::ReadError(DriverReadError::Other("invalid CAN2 data".into()))
+        })?;
         Ok(can2.into())
     }
 }
