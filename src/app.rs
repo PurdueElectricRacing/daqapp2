@@ -71,7 +71,7 @@ impl DAQApp {
 
         Self {
             connection_status: ConnectionStatus::Disconnected,
-            is_sidebar_open: false,
+            is_sidebar_open: true,
             command_palette: ui::command_palette::CommandPalette::new(),
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
             next_can_viewer_num: 1,
