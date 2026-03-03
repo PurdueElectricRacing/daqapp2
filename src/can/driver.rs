@@ -47,7 +47,7 @@ impl SerialDriver {
             })?;
 
         let _ = port.clear(ClearBuffer::All);
-        let mut socket = CanSocket::new(port.try_clone().expect("Failed to clone serial port"));
+        let mut socket = CanSocket::new(port);
 
         socket
             .set_operating_mode(OperatingMode::Normal)
