@@ -99,18 +99,16 @@ impl ViewerTable {
                     msg_keys.sort();
                     for msg_id in msg_keys {
                         let msg = &msgs[&msg_id];
-                        let mut signal_keys =
-                            msg.decoded.signals.keys().cloned().collect::<Vec<_>>();
-                        signal_keys.sort();
-                        let signals: Vec<(&str, String)> = signal_keys
+                        let signals: Vec<(&str, String)> = msg
+                            .decoded
+                            .signals
                             .iter()
-                            .map(|sig_name| {
-                                let signal = &msg.decoded.signals[sig_name];
+                            .map(|(sig_name, signal)| {
                                 if signal.unit.is_empty() {
-                                    (signal.name.as_str(), format!("{:.2}", signal.value))
+                                    (sig_name.as_str(), format!("{:.2}", signal.value))
                                 } else {
                                     (
-                                        signal.name.as_str(),
+                                        sig_name.as_str(),
                                         format!("{:.2} {}", signal.value, signal.unit),
                                     )
                                 }
