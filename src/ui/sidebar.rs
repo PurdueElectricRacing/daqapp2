@@ -9,11 +9,13 @@ pub fn select_dbc(
         .add_filter("DBC Files", &["dbc"])
         .pick_file()
     {
-        app.parser = Some(app::ParserInfo::new(path.clone()));
-        ui_sender
-            .send(ui::ui_messages::UiMessage::DbcSelected(path))
-            .expect("Failed to send DBC selected message");
-        app.save_settings();
+        app.parser = app::ParserInfo::new(path.clone());
+        if app.parser.is_some() {
+            ui_sender
+                .send(ui::ui_messages::UiMessage::DbcSelected(path))
+                .expect("Failed to send DBC selected message");
+            app.save_settings();
+        }
     }
 }
 
