@@ -1,10 +1,12 @@
 use crate::{action, can};
 use eframe::egui;
 
+type MsgMap = hashbrown::HashMap<u32, can::message::ParsedMessage>;
+
 pub struct ViewerTable {
     pub title: String,
-    pub decoded_msgs: hashbrown::HashMap<u32, can::message::ParsedMessage>,
-    pub frozen_msgs: Option<hashbrown::HashMap<u32, can::message::ParsedMessage>>,
+    pub decoded_msgs: MsgMap,
+    pub frozen_msgs: Option<MsgMap>,
     pub paused: bool,
     pub search: String,
 }
@@ -13,7 +15,7 @@ impl ViewerTable {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
-            decoded_msgs: hashbrown::HashMap::new(),
+            decoded_msgs: MsgMap::new(),
             frozen_msgs: None,
             paused: false,
             search: String::new(),
