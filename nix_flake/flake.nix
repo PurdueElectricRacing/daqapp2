@@ -25,6 +25,7 @@
             libxkbcommon
             mesa
             libGL
+            zenity
 
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "clippy" "rustfmt" ];
