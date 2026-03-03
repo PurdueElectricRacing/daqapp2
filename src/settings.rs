@@ -36,6 +36,7 @@ impl Settings {
     }
 
     pub fn save(&self) {
+        // Expect okay. If it doesn't fail in testing, it shouldn't fail later.
         let json = serde_json::to_string_pretty(self).expect("Failed to serialize settings");
         std::fs::write(SETTINGS_PATH, json)
             .unwrap_or_else(|e| log::error!("Failed to write {}: {}", SETTINGS_PATH, e));
