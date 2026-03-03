@@ -25,7 +25,7 @@
             libxkbcommon
             mesa
             libGL
-            zenity
+            dbus
 
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "clippy" "rustfmt" ];
@@ -38,6 +38,7 @@
               pkgs.libxkbcommon
               pkgs.mesa
               pkgs.libGL
+              pkgs.dbus
             ]}:$LD_LIBRARY_PATH
           '';
         };
