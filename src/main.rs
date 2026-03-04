@@ -18,6 +18,11 @@ fn main() -> eframe::Result<()> {
 
     let (can_to_ui_tx, can_to_ui_rx) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_to_can_tx, ui_to_can_rx) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
+    
+    let (ui_to_send_tx, ui_to_send_rx) = std::sync::mpsc::channel::<send::messages::ToSendThread>();
+    let (send_to_ui_tx, send_to_ui_rx) = std::sync::mpsc::channel::<send::messages::FromSendThreadToUi>();
+    let (send_to_can_tx, send_to_can_rx) = std::sync::mpsc::channel::<send::messages::FromSendThreadToCan>();
+    
     let settings = settings::Settings::load();
     if let Some(ref selected_source) = settings.selected_source {
         ui_to_can_tx
