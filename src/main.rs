@@ -16,26 +16,25 @@ fn main() -> eframe::Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
-    let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-
+    let (can_to_ui_tx, can_to_ui_rx) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
+    let (ui_to_can_tx, ui_to_can_rx) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
     let settings = settings::Settings::load();
     if let Some(ref selected_source) = settings.selected_source {
-        ui_sender
+        ui_to_can_tx
             .send(ui::ui_messages::UiMessage::Connect(selected_source.clone()))
             .expect("Failed to send connect message to CAN thread");
     }
 
     let _can_thread =
-        can::thread::start_can_thread(can_sender, ui_receiver, settings.selected_source.clone());
+        can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, settings.selected_source.clone());
 
     eframe::run_native(
         "DaqApp2",
         eframe::NativeOptions::default(),
         Box::new(|cc| {
             Ok(Box::new(app::DAQApp::new(
-                can_receiver,
-                ui_sender,
+                can_to_ui_rx,
+                ui_to_can_tx,
                 settings,
                 cc,
             )))

@@ -141,7 +141,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 // Clone the sender so we don’t borrow app immutably yet
-                let ui_sender = app.ui_sender.clone();
+                let ui_sender = app.ui_to_can_tx.clone();
 
                 if ui.button("📁 Select DBC").clicked() {
                     select_dbc(app, &ui_sender); // mutable borrow is fine

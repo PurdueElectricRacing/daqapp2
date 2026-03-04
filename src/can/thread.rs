@@ -24,7 +24,7 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
                         decoded,
                     };
                     state
-                        .can_sender
+                        .can_to_ui_tx
                         .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg))
                         .expect("Failed to send parsed CAN message");
                 } else {
@@ -59,19 +59,19 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
 }
 
 pub fn start_can_thread(
-    can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
-    ui_receiver: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
+    can_to_ui_tx: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
+    ui_to_can_rx: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
     selected_source: Option<connection::ConnectionSource>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let mut state = can::state::State::new(can_sender, ui_receiver);
+        let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
 
         // MAIN LOOP
         loop {
             // Process UI messages first (DBC load, etc.)
-            for msg in state.ui_receiver.try_iter() {
+            for msg in state.ui_to_can_rx.try_iter() {
                 match msg {
                     ui::ui_messages::UiMessage::DbcSelected(path) => {
                         match can_decode::Parser::from_dbc_file(&path) {
@@ -89,7 +89,7 @@ pub fn start_can_thread(
                         }
                         state.is_connected = false;
                         state
-                            .can_sender
+                            .can_to_ui_tx
                             .send(can::can_messages::CanMessage::Disconnection)
                             .expect("Failed to send disconnected message");
                         current_source = Some(source);
@@ -105,7 +105,7 @@ pub fn start_can_thread(
                             driver = Some(new_driver);
                             state.is_connected = true;
                             state
-                                .can_sender
+                                .can_to_ui_tx
                                 .send(can::can_messages::CanMessage::ConnectionSuccessful)
                                 .expect("Failed to send connection successful message");
                             log::info!("Connected to {:?}", source);
@@ -117,7 +117,7 @@ pub fn start_can_thread(
                                 connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
                             };
                             state
-                                .can_sender
+                                .can_to_ui_tx
                                 .send(can::can_messages::CanMessage::ConnectionFailed(error_msg))
                                 .expect("Failed to send connection failed message");
                             thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
@@ -159,7 +159,7 @@ pub fn start_can_thread(
                                     }
                                 };
                                 state
-                                    .can_sender
+                                    .can_to_ui_tx
                                     .send(can::can_messages::CanMessage::ConnectionFailed(
                                         error_msg,
                                     ))
