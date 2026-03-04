@@ -1,6 +1,7 @@
 mod action;
 mod app;
 mod can;
+mod daq_log_parse;
 mod connection;
 mod settings;
 mod shortcuts;
