@@ -28,6 +28,8 @@ pub enum DriverError {
 pub trait Driver {
     fn read_frame(&mut self) -> DriverResult<CanFrame>;
 
+    fn write_frame(&mut self, frame: CanFrame) -> DriverResult<()>;
+
     fn is_connected(&self) -> bool;
 
     fn close(&mut self) -> DriverResult<()>;
@@ -88,6 +90,13 @@ impl Driver for SerialDriver {
                 self.connected = false;
                 DriverError::ReadError(DriverReadError::Other(format!("Read error: {:?}", other)))
             }
+        })
+    }
+
+    fn write_frame(&mut self, frame: CanFrame) -> DriverResult<()> {
+        self.socket.send(frame).map_err(|e| {
+            self.connected = false;
+            DriverError::WriteError(format!("Failed to write frame: {}", e))
         })
     }
 
@@ -170,6 +179,12 @@ impl Driver for UdpDriver {
                 }
             }
         }
+    }
+
+    fn write_frame(&mut self, _frame: CanFrame) -> DriverResult<()> {
+        Err(DriverError::WriteError(
+            "UDP write not implemented".to_string(),
+        ))
     }
 
     fn is_connected(&self) -> bool {
