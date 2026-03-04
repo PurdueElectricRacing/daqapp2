@@ -2,6 +2,7 @@ mod action;
 mod app;
 mod can;
 mod connection;
+mod send;
 mod settings;
 mod shortcuts;
 mod theme;
