@@ -19,14 +19,16 @@ fn main() -> eframe::Result<()> {
 
     let (can_sender, can_receiver) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_sender, ui_receiver) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
-    let settings = settings::Settings::load();
 
-    let _can_thread = can::thread::start_can_thread(
-        can_sender,
-        ui_receiver,
-        settings.selected_source.clone(),
-        settings.dbc_path.clone(),
-    );
+    let settings = settings::Settings::load();
+    if let Some(ref selected_source) = settings.selected_source {
+        ui_sender
+            .send(ui::ui_messages::UiMessage::Connect(selected_source.clone()))
+            .expect("Failed to send connect message to CAN thread");
+    }
+
+    let _can_thread =
+        can::thread::start_can_thread(can_sender, ui_receiver, settings.selected_source.clone());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
