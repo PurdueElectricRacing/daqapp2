@@ -24,10 +24,10 @@ impl TableBuilder {
     pub fn create_header(&mut self, parser: &can_decode::Parser) {
         // old code from per log parser, idk why it doesnt work here 
         let mut message_defs = parser.msg_defs();
-        // message_defs.sort_by_key(|m| match m.message_id() {
-        //     can_dbc::MessageId::Standard(id) => *id as u32,
-        //     can_dbc::MessageId::Extended(id) => *id,
-        // });
+        message_defs.sort_by_key(|m| match m.id {
+            can_dbc::MessageId::Standard(id) => id as u32,
+            can_dbc::MessageId::Extended(id) => id,
+        });
 
         self.bus_row.push("Bus".to_string());
         self.node_row.push("Node".to_string());
@@ -40,20 +40,19 @@ impl TableBuilder {
             let bus_id = "Main";
             let node = match msg.transmitter {
                 can_dbc::Transmitter::NodeName(n) => n,
-                can_dbc::Transmitter::VectorXXX => "N/A",
+                can_dbc::Transmitter::VectorXXX => "N/A".to_string(),
             };
-            let msg_name = msg.message_name();
 
-            for sig in msg.signals() {
-                let key = format!("{}|{}", msg.message_name(), sig.name());
+            for sig in msg.signals {
+                let key = format!("{}|{}", msg.name, sig.name);
                 if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
                     e.insert(col_idx);
                     col_idx += 1;
 
                     self.bus_row.push(bus_id.to_string());
                     self.node_row.push(node.to_string());
-                    self.message_row.push(msg_name.to_string());
-                    self.signal_row.push(sig.name().to_string());
+                    self.message_row.push(msg.name.to_string());
+                    self.signal_row.push(sig.name.to_string());
                 }
             }
         }

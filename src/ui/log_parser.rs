@@ -29,7 +29,7 @@ impl LogParser {
         }
     }
 
-    fn parse_logs(&mut self, parser: Option<app::ParserInfo>) {
+    fn parse_logs(&mut self, parser: Option<&app::ParserInfo>) {
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
@@ -50,19 +50,18 @@ impl LogParser {
         let actual_parser: can_decode::Parser;
         match parser {
             Some(p) => {
-                log::info!("Using DBC: {:?}", p.dbc_path),
-                actual_parser = p.parser.clone();
-            }
-            None => log::warn!("No DBC selected"),
-        }
-        log::info!("Parsing logs from: {}", logs_dir.display());
-        log::info!("Output to: {}", output_dir.display());
-        let parsed = daq_log_parse::parse::parse_log_files(logs_dir, &actual_parser);
-        let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
+                log::info!("Using DBC: {:?}", p.dbc_path);
+                log::info!("Parsing logs from: {}", logs_dir.display());
+                log::info!("Output to: {}", output_dir.display());
+                let parsed = daq_log_parse::parse::parse_log_files(logs_dir, &p.parser);
+                let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
 
-        let mut table_builder = daq_log_parse::table::TableBuilder::new();
-        table_builder.create_header(&actual_parser);
-        table_builder.create_and_write_tables(&output_dir, chunked_parsed);
+                let mut table_builder = daq_log_parse::table::TableBuilder::new();
+                table_builder.create_header(&p.parser);
+                table_builder.create_and_write_tables(&output_dir, chunked_parsed);
+            }
+            None => log::warn!("No DBC selected, not parsing"),
+        }
     }
 
     pub fn show(
