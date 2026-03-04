@@ -5,15 +5,12 @@ pub struct ParsedMessage {
     pub decoded: can_decode::DecodedMessage,
 }
 
-#[repr(C, packed)]
-#[derive(Pod, Zeroable, Copy, Clone, Debug)]
+#[repr(C)]
+#[derive(Pod, Zeroable, Copy, Clone)]
 // based on definition of timestamped_frame_t in spmc.h in firmware repo
 struct RawFrame {
-    frame_type: u8,    
-    tick_ms: u32,
-    msg_id: u32,         
-    bus_id: u8,         
-    dlc: u8,
+    ticks_ms: u32,
+    identity: u32,
     data: [u8; 8],
 }
 
@@ -48,40 +45,33 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
 
     // should be 16 bytes
     let frame_size = size_of::<RawFrame>();
-    log::info!("frame_size: {}", frame_size);
+
         assert!(
             content.len() % frame_size == 0,
             "File size is not a multiple of frame size"
         );
     for frame in frames {
-        // Copy fields to local variables to avoid unaligned reference errors
-        println!();
-        println!("raw frame: {:?}", frame);
-        let tick_ms = frame.tick_ms;
-        let msg_id = frame.msg_id;
-        let data = frame.data; 
-
         let arb_id: u32;
 
-        if (msg_id & consts::CAN_EFF_FLAG) != 0 {
-            arb_id = msg_id & consts::CAN_EID_MASK;
+        if (frame.identity & consts::IS_EID_MASK) != 0 {
+            arb_id = frame.identity & consts::CAN_EID_MASK;
         }
         else {
-            arb_id = msg_id & consts::CAN_STD_ID_MASK;
+            arb_id = frame.identity & consts::CAN_STD_ID_MASK;
         }
-        
-        if let Some(decoded) = parser.decode_msg(arb_id, &data) {
-            log::info!("parsed can msg: {:?}", decoded);
+
+        if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
             parsed.push(ParsedMessage {
-                timestamp: tick_ms,
+                timestamp: frame.ticks_ms,
                 decoded,
             });
-        } else {
+        }
+        else {
             log::error!(
                 "Failed to decode message at {} ms with CAN ID {:X} and data {:?}",
-                tick_ms,
+                frame.ticks_ms,
                 arb_id,
-                data,
+                frame.data,
             );
         }
     }
