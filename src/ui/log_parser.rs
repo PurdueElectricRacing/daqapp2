@@ -49,7 +49,7 @@ impl LogParser {
 
         match parser {
             Some(p) => {
-                // TODO: make proper UI indication that parse has been completed/successful 
+                // TODO: make proper UI indication that parse has been completed/successful
 
                 log::info!("Using DBC: {:?}", p.dbc_path);
                 log::info!("Parsing logs from: {}", logs_dir.display());

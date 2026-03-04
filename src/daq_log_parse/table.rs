@@ -22,7 +22,7 @@ impl TableBuilder {
     }
 
     pub fn create_header(&mut self, parser: &can_decode::Parser) {
-        // old code from per log parser, idk why it doesnt work here 
+        // old code from per log parser, idk why it doesnt work here
         let mut message_defs = parser.msg_defs();
         message_defs.sort_by_key(|m| match m.id {
             can_dbc::MessageId::Standard(id) => id as u32,
