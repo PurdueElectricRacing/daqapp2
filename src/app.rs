@@ -40,8 +40,8 @@ pub struct DAQApp {
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
-    pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
+    pub ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
     pub action_queue: Vec<action::AppAction>,
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
@@ -66,8 +66,8 @@ impl DAQApp {
     }
 
     pub fn new(
-        can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
+        ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
         settings: settings::Settings,
         _cc: &eframe::CreationContext,
     ) -> Self {
@@ -84,8 +84,8 @@ impl DAQApp {
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
-            can_receiver,
-            ui_sender,
+            can_to_ui_rx,
+            ui_to_can_tx,
             action_queue: Vec::new(),
             selected_source: settings.selected_source,
             theme: theme_style,
@@ -133,7 +133,7 @@ impl DAQApp {
         self.connection_status = ConnectionStatus::Disconnected;
 
         let _ = self
-            .ui_sender
+            .ui_to_can_tx
             .send(ui::ui_messages::UiMessage::Connect(source.clone()));
     }
 
@@ -232,7 +232,7 @@ impl DAQApp {
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.can_messages.clear();
-        while let Ok(msg) = self.can_receiver.try_recv() {
+        while let Ok(msg) = self.can_to_ui_rx.try_recv() {
             match &msg {
                 can::can_messages::CanMessage::ConnectionFailed(port) => {
                     self.connection_status =
