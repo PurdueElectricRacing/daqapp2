@@ -62,22 +62,11 @@ pub fn start_can_thread(
     can_sender: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
     ui_receiver: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
     selected_source: Option<connection::ConnectionSource>,
-    dbc_path: Option<std::path::PathBuf>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         let mut state = can::state::State::new(can_sender, ui_receiver);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
-
-        if let Some(path) = dbc_path {
-            match can_decode::Parser::from_dbc_file(&path) {
-                Ok(parser) => {
-                    state.parser = Some(parser);
-                    log::info!("Loaded DBC from settings: {:?}", path);
-                }
-                Err(e) => log::error!("Failed to load DBC from settings {:?}: {e}", path),
-            }
-        }
 
         // MAIN LOOP
         loop {

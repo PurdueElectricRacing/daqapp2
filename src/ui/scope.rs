@@ -38,11 +38,7 @@ impl Scope {
         }
 
         // Initialize reference time on first sample
-        if self.reference_time.is_none() {
-            self.reference_time = Some(timestamp);
-        }
-
-        let reference = self.reference_time.unwrap();
+        let reference = *self.reference_time.get_or_insert(timestamp);
 
         // Calculate relative time in seconds
         let relative_time = (timestamp - reference).num_milliseconds() as f64 / 1000.0;

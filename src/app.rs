@@ -8,13 +8,18 @@ pub struct ParserInfo {
 }
 
 impl ParserInfo {
-    pub fn new(dbc_path: std::path::PathBuf) -> Self {
-        let parser =
-            can_decode::Parser::from_dbc_file(&dbc_path).expect("Failed to parse DBC file");
-        Self { dbc_path, parser }
+    // Returns None if parsing fails (missing file, invalid file, etc)
+    pub fn new(dbc_path: std::path::PathBuf) -> Option<Self> {
+        let parser = can_decode::Parser::from_dbc_file(&dbc_path)
+            .map_err(|e| {
+                log::error!("Failed to parse DBC file at {}: {}", dbc_path.display(), e);
+                e
+            })
+            .ok()?;
+        Some(Self { dbc_path, parser })
     }
     pub fn new_maybe(dbc_path: Option<std::path::PathBuf>) -> Option<Self> {
-        dbc_path.map(Self::new)
+        dbc_path.and_then(Self::new)
     }
 }
 
