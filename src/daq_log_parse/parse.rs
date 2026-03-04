@@ -18,7 +18,6 @@ pub fn parse_log_files(
     in_folder: &std::path::Path,
     parser: &can_decode::Parser,
 ) -> Vec<ParsedMessage> {
-    
     let mut all_parsed = Vec::new();
     let mut file_paths = std::fs::read_dir(in_folder)
         .unwrap()
@@ -46,17 +45,16 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
     // should be 16 bytes
     let frame_size = size_of::<RawFrame>();
 
-        assert!(
-            content.len() % frame_size == 0,
-            "File size is not a multiple of frame size"
-        );
+    assert!(
+        content.len() % frame_size == 0,
+        "File size is not a multiple of frame size"
+    );
     for frame in frames {
         let arb_id: u32;
 
         if (frame.identity & consts::IS_EID_MASK) != 0 {
             arb_id = frame.identity & consts::CAN_EID_MASK;
-        }
-        else {
+        } else {
             arb_id = frame.identity & consts::CAN_STD_ID_MASK;
         }
 
@@ -65,8 +63,7 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
                 timestamp: frame.ticks_ms,
                 decoded,
             });
-        }
-        else {
+        } else {
             log::error!(
                 "Failed to decode message at {} ms with CAN ID {:X} and data {:?}",
                 frame.ticks_ms,
