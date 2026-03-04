@@ -53,6 +53,7 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
     for frame in frames {
         let arb_id = frame.identity & consts::CAN_STD_ID_MASK;
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
+            log::info!("parsed can msg: {:?}", decoded);
             parsed.push(ParsedMessage {
                 timestamp: frame.ticks_ms,
                 decoded,
