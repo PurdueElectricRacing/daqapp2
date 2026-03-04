@@ -33,6 +33,7 @@ impl LogParser {
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
+                // TODO: make persistent log directories
                 log::error!("Error: Logs directory not selected");
                 return;
             }
@@ -46,10 +47,10 @@ impl LogParser {
             }
         };
 
-        // TODO: Implement log parsing
-        let actual_parser: can_decode::Parser;
         match parser {
             Some(p) => {
+                // TODO: make proper UI indication that parse has been completed/successful 
+
                 log::info!("Using DBC: {:?}", p.dbc_path);
                 log::info!("Parsing logs from: {}", logs_dir.display());
                 log::info!("Output to: {}", output_dir.display());
@@ -60,6 +61,7 @@ impl LogParser {
                 table_builder.create_header(&p.parser);
                 table_builder.create_and_write_tables(&output_dir, chunked_parsed);
             }
+            // TODO: make proper UI indication that parse has failed
             None => log::warn!("No DBC selected, not parsing"),
         }
     }
