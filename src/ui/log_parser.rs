@@ -61,7 +61,7 @@ impl LogParser {
                 table_builder.create_header(&p.parser);
                 table_builder.create_and_write_tables(&output_dir, chunked_parsed);
             }
-            // TODO: make proper UI indication that parse has failed
+            // TODO: make proper UI indication that parse has failed / not occured
             None => log::warn!("No DBC selected, not parsing"),
         }
     }
