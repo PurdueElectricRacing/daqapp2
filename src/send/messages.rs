@@ -22,6 +22,7 @@ pub enum FromSendThreadToUi {
     MessageSent {
         msg_id: u32,
         timestamp: chrono::DateTime<chrono::Local>,
+        amount_left: SendAmount,
     },
 }
 
