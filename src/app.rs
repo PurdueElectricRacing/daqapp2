@@ -1,4 +1,6 @@
-use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
+use crate::{
+    action, can, connection, send, settings, shortcuts, theme, ui, util, widgets, workspace,
+};
 use eframe::egui;
 
 const UI_SCALE_STEP: f32 = 0.2;
@@ -42,6 +44,8 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub send_to_ui_rx: std::sync::mpsc::Receiver<send::messages::FromSendThreadToUi>,
+    pub ui_to_send_tx: std::sync::mpsc::Sender<send::messages::ToSendThread>,
     pub action_queue: Vec<action::AppAction>,
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
@@ -68,6 +72,8 @@ impl DAQApp {
     pub fn new(
         can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
         ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        send_to_ui_rx: std::sync::mpsc::Receiver<send::messages::FromSendThreadToUi>,
+        ui_to_send_tx: std::sync::mpsc::Sender<send::messages::ToSendThread>,
         settings: settings::Settings,
         _cc: &eframe::CreationContext,
     ) -> Self {
@@ -86,6 +92,8 @@ impl DAQApp {
             next_log_parser_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
+            send_to_ui_rx,
+            ui_to_send_tx,
             action_queue: Vec::new(),
             selected_source: settings.selected_source,
             theme: theme_style,

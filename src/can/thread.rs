@@ -1,4 +1,4 @@
-use crate::{can, connection, ui};
+use crate::{can, connection, send, ui};
 use chrono::Local;
 use slcan::CanFrame;
 use std::{thread, time::Duration};
@@ -61,10 +61,11 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
 pub fn start_can_thread(
     can_to_ui_tx: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
     ui_to_can_rx: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
+    send_to_can_rx: std::sync::mpsc::Receiver<send::messages::FromSendThreadToCan>,
     selected_source: Option<connection::ConnectionSource>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx);
+        let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx, send_to_can_rx);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
 
