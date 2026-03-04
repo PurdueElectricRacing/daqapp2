@@ -19,12 +19,6 @@ fn main() -> eframe::Result<()> {
     let (can_to_ui_tx, can_to_ui_rx) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
     let (ui_to_can_tx, ui_to_can_rx) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
 
-    let (ui_to_send_tx, ui_to_send_rx) = std::sync::mpsc::channel::<send::messages::ToSendThread>();
-    let (send_to_ui_tx, send_to_ui_rx) =
-        std::sync::mpsc::channel::<send::messages::FromSendThreadToUi>();
-    let (send_to_can_tx, send_to_can_rx) =
-        std::sync::mpsc::channel::<send::messages::FromSendThreadToCan>();
-
     let settings = settings::Settings::load();
     if let Some(ref selected_source) = settings.selected_source {
         ui_to_can_tx
@@ -33,10 +27,8 @@ fn main() -> eframe::Result<()> {
     }
 
     let _can_thread =
-        can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, send_to_can_rx, settings.selected_source.clone());
+        can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, settings.selected_source.clone());
 
-    let _send_thread =
-        send::thread::start_send_thread(ui_to_send_rx, send_to_ui_tx, send_to_can_tx);
 
     eframe::run_native(
         "DaqApp2",
@@ -45,8 +37,6 @@ fn main() -> eframe::Result<()> {
             Ok(Box::new(app::DAQApp::new(
                 can_to_ui_rx,
                 ui_to_can_tx,
-                send_to_ui_rx,
-                ui_to_send_tx,
                 settings,
                 cc,
             )))
