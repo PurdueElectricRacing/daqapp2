@@ -70,8 +70,8 @@ pub fn start_can_thread(
 
         // MAIN LOOP
         loop {
-            // Process UI messages first (DBC load, etc.)
-            for msg in state.ui_to_can_rx.try_iter() {
+            // Process UI messages first (DBC load, new message to send, etc.)
+            while let Ok(msg) = state.ui_to_can_rx.try_recv() {
                 match msg {
                     messages::MsgFromUi::DbcSelected(path) => {
                         match can_decode::Parser::from_dbc_file(&path) {
@@ -95,10 +95,10 @@ pub fn start_can_thread(
                         current_source = Some(source);
                     }
                     messages::MsgFromUi::AddSendMessage(add_send_msg) => {
-                        todo!()
+                        state.add_send_message(add_send_msg);
                     }
                     messages::MsgFromUi::DeleteSendMessage { msg_id } => {
-                        todo!()
+                        state.delete_send_message(msg_id);
                     }
                 }
             }
