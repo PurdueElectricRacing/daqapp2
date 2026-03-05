@@ -1,5 +1,5 @@
 use crate::{
-    action, can, connection, send, settings, shortcuts, theme, ui, util, widgets, workspace,
+    action, can, connection, messages, settings, shortcuts, theme, ui, util, widgets, workspace,
 };
 use eframe::egui;
 
@@ -42,8 +42,8 @@ pub struct DAQApp {
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
-    pub can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    pub ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
+    pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
@@ -52,7 +52,7 @@ pub struct DAQApp {
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
-    pub can_messages: Vec<can::message::ParsedMessage>,
+    pub can_messages: Vec<messages::ParsedMessage>,
 }
 
 impl DAQApp {
@@ -68,8 +68,8 @@ impl DAQApp {
     }
 
     pub fn new(
-        can_to_ui_rx: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_to_can_tx: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
+        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
         settings: settings::Settings,
         _cc: &eframe::CreationContext,
     ) -> Self {
@@ -136,7 +136,7 @@ impl DAQApp {
 
         let _ = self
             .ui_to_can_tx
-            .send(ui::ui_messages::UiMessage::Connect(source.clone()));
+            .send(messages::MsgFromUi::Connect(source.clone()));
     }
 
     pub fn handle_action(&mut self, action: action::AppAction, ctx: &egui::Context) {
@@ -236,18 +236,25 @@ impl eframe::App for DAQApp {
         self.can_messages.clear();
         while let Ok(msg) = self.can_to_ui_rx.try_recv() {
             match &msg {
-                can::can_messages::CanMessage::ConnectionFailed(port) => {
+                messages::MsgFromCan::ConnectionFailed(port) => {
                     self.connection_status =
                         ConnectionStatus::Error(format!("Failed to connect to {port}"));
                 }
-                can::can_messages::CanMessage::ConnectionSuccessful => {
+                messages::MsgFromCan::ConnectionSuccessful => {
                     self.connection_status = ConnectionStatus::Connected;
                 }
-                can::can_messages::CanMessage::Disconnection => {
+                messages::MsgFromCan::Disconnection => {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
-                can::can_messages::CanMessage::ParsedMessage(parsed) => {
+                messages::MsgFromCan::ParsedMessage(parsed) => {
                     self.can_messages.push(parsed.clone());
+                }
+                messages::MsgFromCan::MessageSent {
+                    msg_id,
+                    timestamp,
+                    amount_left,
+                } => {
+                    todo!("Next commit");
                 }
             }
         }

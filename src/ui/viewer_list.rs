@@ -1,4 +1,4 @@
-use crate::can;
+use crate::messages;
 use eframe::egui;
 use std::collections::VecDeque;
 
@@ -6,8 +6,8 @@ const MAX_MESSAGES: usize = 200;
 
 pub struct ViewerList {
     pub title: String,
-    pub decoded_msgs: VecDeque<can::message::ParsedMessage>,
-    pub frozen_msgs: Option<VecDeque<can::message::ParsedMessage>>,
+    pub decoded_msgs: VecDeque<messages::ParsedMessage>,
+    pub frozen_msgs: Option<VecDeque<messages::ParsedMessage>>,
     pub paused: bool,
 }
 
@@ -94,7 +94,7 @@ impl ViewerList {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
+    pub fn handle_can_message(&mut self, msg: &messages::ParsedMessage) {
         if self.paused {
             return;
         }

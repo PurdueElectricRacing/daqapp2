@@ -1,9 +1,9 @@
-use crate::{action, app, connection, ui, util};
+use crate::{action, app, connection, messages, util};
 use eframe::egui;
 
 pub fn select_dbc(
     app: &mut app::DAQApp,
-    ui_sender: &std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
 ) {
     if let Some(path) = rfd::FileDialog::new()
         .add_filter("DBC Files", &["dbc"])
@@ -11,8 +11,8 @@ pub fn select_dbc(
     {
         app.parser = app::ParserInfo::new(path.clone());
         if app.parser.is_some() {
-            ui_sender
-                .send(ui::ui_messages::UiMessage::DbcSelected(path))
+            ui_to_can_tx
+                .send(messages::MsgFromUi::DbcSelected(path))
                 .expect("Failed to send DBC selected message");
             app.save_settings();
         }
@@ -141,10 +141,10 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 // Clone the sender so we don’t borrow app immutably yet
-                let ui_sender = app.ui_to_can_tx.clone();
+                let ui_to_can_tx = app.ui_to_can_tx.clone();
 
                 if ui.button("📁 Select DBC").clicked() {
-                    select_dbc(app, &ui_sender); // mutable borrow is fine
+                    select_dbc(app, &ui_to_can_tx); // mutable borrow is fine
                 }
 
                 if let Some(path) = app.parser.as_ref().map(|p| &p.dbc_path) {

@@ -1,4 +1,4 @@
-use crate::can;
+use crate::messages;
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use std::collections::VecDeque;
@@ -153,7 +153,7 @@ impl Scope {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
+    pub fn handle_can_message(&mut self, msg: &messages::ParsedMessage) {
         if msg.decoded.msg_id != self.msg_id {
             return;
         }

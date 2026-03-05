@@ -1,4 +1,4 @@
-use crate::{can, connection, send, ui};
+use crate::{can, connection, messages};
 use chrono::Local;
 use slcan::CanFrame;
 use std::{thread, time::Duration};
@@ -18,14 +18,14 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
 
             if let Some(parser) = state.parser.as_ref() {
                 if let Some(decoded) = parser.decode_msg(id, data) {
-                    let parsed_msg = can::message::ParsedMessage {
+                    let parsed_msg = messages::ParsedMessage {
                         timestamp: Local::now(),
                         raw_bytes: data.to_vec(),
                         decoded,
                     };
                     state
                         .can_to_ui_tx
-                        .send(can::can_messages::CanMessage::ParsedMessage(parsed_msg))
+                        .send(messages::MsgFromCan::ParsedMessage(parsed_msg))
                         .expect("Failed to send parsed CAN message");
                 } else {
                     log::error!(
@@ -59,8 +59,8 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
 }
 
 pub fn start_can_thread(
-    can_to_ui_tx: std::sync::mpsc::Sender<can::can_messages::CanMessage>,
-    ui_to_can_rx: std::sync::mpsc::Receiver<ui::ui_messages::UiMessage>,
+    can_to_ui_tx: std::sync::mpsc::Sender<messages::MsgFromCan>,
+    ui_to_can_rx: std::sync::mpsc::Receiver<messages::MsgFromUi>,
     selected_source: Option<connection::ConnectionSource>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
@@ -73,7 +73,7 @@ pub fn start_can_thread(
             // Process UI messages first (DBC load, etc.)
             for msg in state.ui_to_can_rx.try_iter() {
                 match msg {
-                    ui::ui_messages::UiMessage::DbcSelected(path) => {
+                    messages::MsgFromUi::DbcSelected(path) => {
                         match can_decode::Parser::from_dbc_file(&path) {
                             Ok(parser) => {
                                 state.parser = Some(parser);
@@ -82,7 +82,7 @@ pub fn start_can_thread(
                             Err(e) => log::error!("Failed to load DBC {:?}: {e}", path),
                         }
                     }
-                    ui::ui_messages::UiMessage::Connect(source) => {
+                    messages::MsgFromUi::Connect(source) => {
                         // Close existing connection if any
                         if let Some(mut old_driver) = driver.take() {
                             let _ = old_driver.close();
@@ -90,9 +90,15 @@ pub fn start_can_thread(
                         state.is_connected = false;
                         state
                             .can_to_ui_tx
-                            .send(can::can_messages::CanMessage::Disconnection)
+                            .send(messages::MsgFromCan::Disconnection)
                             .expect("Failed to send disconnected message");
                         current_source = Some(source);
+                    }
+                    messages::MsgFromUi::AddSendMessage(add_send_msg) => {
+                        todo!()
+                    }
+                    messages::MsgFromUi::DeleteSendMessage { msg_id } => {
+                        todo!()
                     }
                 }
             }
@@ -175,7 +181,7 @@ pub fn start_can_thread(
                             state.is_connected = true;
                             state
                                 .can_to_ui_tx
-                                .send(can::can_messages::CanMessage::ConnectionSuccessful)
+                                .send(messages::MsgFromCan::ConnectionSuccessful)
                                 .expect("Failed to send connection successful message");
                             log::info!("Connected to {:?}", source);
                         }
@@ -187,7 +193,7 @@ pub fn start_can_thread(
                             };
                             state
                                 .can_to_ui_tx
-                                .send(can::can_messages::CanMessage::ConnectionFailed(error_msg))
+                                .send(messages::MsgFromCan::ConnectionFailed(error_msg))
                                 .expect("Failed to send connection failed message");
                             thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                             continue;
@@ -229,9 +235,7 @@ pub fn start_can_thread(
                                 };
                                 state
                                     .can_to_ui_tx
-                                    .send(can::can_messages::CanMessage::ConnectionFailed(
-                                        error_msg,
-                                    ))
+                                    .send(messages::MsgFromCan::ConnectionFailed(error_msg))
                                     .expect("Failed to send connection failed message");
                             }
                             driver = None;

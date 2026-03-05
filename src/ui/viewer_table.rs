@@ -1,7 +1,7 @@
-use crate::{action, can};
+use crate::{action, messages};
 use eframe::egui;
 
-type MsgMap = hashbrown::HashMap<u32, can::message::ParsedMessage>;
+type MsgMap = hashbrown::HashMap<u32, messages::ParsedMessage>;
 
 pub struct ViewerTable {
     pub title: String,
@@ -141,7 +141,7 @@ impl ViewerTable {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
+    pub fn handle_can_message(&mut self, msg: &messages::ParsedMessage) {
         self.decoded_msgs.insert(msg.decoded.msg_id, msg.clone());
     }
 }

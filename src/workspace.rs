@@ -1,4 +1,4 @@
-use crate::{action, app, can, widgets};
+use crate::{action, app, messages, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
@@ -21,7 +21,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_messages: &'a [can::message::ParsedMessage],
+    can_messages: &'a [messages::ParsedMessage],
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
 }

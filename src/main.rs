@@ -2,7 +2,7 @@ mod action;
 mod app;
 mod can;
 mod connection;
-mod send;
+mod messages;
 mod settings;
 mod shortcuts;
 mod theme;
@@ -16,8 +16,8 @@ fn main() -> eframe::Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let (can_to_ui_tx, can_to_ui_rx) = std::sync::mpsc::channel::<can::can_messages::CanMessage>();
-    let (ui_to_can_tx, ui_to_can_rx) = std::sync::mpsc::channel::<ui::ui_messages::UiMessage>();
+    let (can_to_ui_tx, can_to_ui_rx) = std::sync::mpsc::channel::<messages::MsgFromCan>();
+    let (ui_to_can_tx, ui_to_can_rx) = std::sync::mpsc::channel::<messages::MsgFromUi>();
 
     let settings = settings::Settings::load();
     if let Some(ref selected_source) = settings.selected_source {
