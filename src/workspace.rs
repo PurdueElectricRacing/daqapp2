@@ -2,40 +2,22 @@ use crate::{action, app, can, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
-    let rounding = if cfg!(target_os = "macos") {
-        egui::CornerRadius {
-            nw: 0,
-            ne: 12,
-            sw: 0,
-            se: 12,
+    egui::CentralPanel::default().show(ctx, |ui| {
+        if app.tile_tree.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.label("No widgets in workspace yet.");
+                ui.label("CMD+S to toggle the sidebar.");
+                ui.label("CMD+P to toggle the command palette.");
+            });
+        } else {
+            let mut behavior = WorkspaceTileBehavior {
+                can_messages: &app.can_messages,
+                action_queue: &mut app.action_queue,
+                parser: app.parser.as_ref(),
+            };
+            app.tile_tree.ui(&mut behavior, ui);
         }
-    } else {
-        egui::CornerRadius::ZERO
-    };
-
-    egui::CentralPanel::default()
-        .frame(
-            egui::Frame::new()
-                .fill(ctx.style().visuals.window_fill())
-                .corner_radius(rounding)
-                .inner_margin(10.0),
-        )
-        .show(ctx, |ui| {
-            if app.tile_tree.is_empty() {
-                ui.vertical_centered(|ui| {
-                    ui.label("No widgets in workspace yet.");
-                    ui.label("CMD+S to toggle the sidebar.");
-                    ui.label("Use the sidebar to spawn widgets.");
-                });
-            } else {
-                let mut behavior = WorkspaceTileBehavior {
-                    can_messages: &app.can_messages,
-                    action_queue: &mut app.action_queue,
-                    parser: app.parser.as_ref(),
-                };
-                app.tile_tree.ui(&mut behavior, ui);
-            }
-        });
+    });
 }
 
 struct WorkspaceTileBehavior<'a> {

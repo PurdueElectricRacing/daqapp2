@@ -230,10 +230,6 @@ impl DAQApp {
 }
 
 impl eframe::App for DAQApp {
-    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        egui::Rgba::TRANSPARENT.to_array() // Make sure we don't paint anything behind the rounded corners
-    }
-
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.can_messages.clear();
         while let Ok(msg) = self.can_receiver.try_recv() {
