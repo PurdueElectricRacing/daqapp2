@@ -102,75 +102,68 @@ pub fn start_can_thread(
                     }
                 }
             }
-            // Process send thread messages (requests to send CAN frames)
-            // for msg in state.send_to_can_rx.try_iter() {
-            //     match msg {
-            //         send::messages::FromSendThreadToCan::Send {
-            //             msg_id,
-            //             is_msg_id_extended,
-            //             msg_bytes,
-            //         } => {
-            //             if let Some(ref mut active_driver) = driver {
-            //                 let id = if is_msg_id_extended {
-            //                     slcan::Id::Extended(slcan::ExtendedId::new(msg_id).unwrap())
-            //                 } else {
-            //                     slcan::Id::Standard(slcan::StandardId::new(msg_id as u16).unwrap())
-            //                 };
-            //                 if let Some(can2_frame) = slcan::Can2Frame::new_data(id, &msg_bytes) {
-            //                     let frame = CanFrame::Can2(can2_frame);
-            //                     match active_driver.write_frame(frame) {
-            //                         Ok(_) => {
-            //                             log::info!(
-            //                                 "Sent CAN frame with ID 0x{:X} ({}), data: {:02X?}",
-            //                                 msg_id,
-            //                                 msg_id,
-            //                                 msg_bytes
-            //                             );
-            //                             // TODO
-            //                             // state.send_to_ui_tx
-            //                             //     .send(send::messages::FromSendThreadToUi::MessageSent {
-            //                             //         msg_id,
-            //                             //         timestamp: Local::now(),
-            //                             //     })
-            //                             //     .expect("Failed to send message sent confirmation");
-            //                         }
-            //                         Err(e) => {
-            //                             log::error!("Failed to send CAN frame: {:?}", e);
-            //                             state.is_connected = false;
-            //                             let error_msg = if let Some(ref source) = current_source {
-            //                                 match source {
-            //                                     connection::ConnectionSource::Serial(path) => {
-            //                                         path.clone()
-            //                                     }
-            //                                     connection::ConnectionSource::Udp(port) => {
-            //                                         format!("UDP:{}", port)
-            //                                     }
-            //                                 }
-            //                             } else {
-            //                                 "Unknown source".to_string()
-            //                             };
-            //                             state
-            //                                 .can_to_ui_tx
-            //                                 .send(can::can_messages::CanMessage::ConnectionFailed(
-            //                                     error_msg,
-            //                                 ))
-            //                                 .expect("Failed to send connection failed message");
-            //                             driver = None;
-            //                         }
-            //                     }
-            //                 } else {
-            //                     log::error!(
-            //                         "Cannot send CAN frame: data length {} exceeds 8 bytes",
-            //                         msg_bytes.len()
-            //                     );
-            //                     continue;
-            //                 }
-            //             } else {
-            //                 log::warn!("Cannot send CAN frame, no active connection");
-            //             }
-            //         }
-            //     }
-            // }
+            let msgs_to_send = state.send_this_tick();
+            for msg in msgs_to_send {
+                if let Some(ref mut active_driver) = driver {
+                    let id = if msg.is_msg_id_extended {
+                        slcan::Id::Extended(slcan::ExtendedId::new(msg.msg_id).unwrap())
+                    } else {
+                        slcan::Id::Standard(slcan::StandardId::new(msg.msg_id as u16).unwrap())
+                    };
+                    if let Some(can2_frame) = slcan::Can2Frame::new_data(id, &msg.msg_bytes) {
+                        let frame = CanFrame::Can2(can2_frame);
+                        match active_driver.write_frame(frame) {
+                            Ok(_) => {
+                                log::info!(
+                                    "Sent CAN frame with ID 0x{:X} ({}), data: {:02X?}",
+                                    msg.msg_id,
+                                    msg.msg_id,
+                                    msg.msg_bytes
+                                );
+                                state
+                                    .can_to_ui_tx
+                                    .send(messages::MsgFromCan::MessageSent {
+                                        msg_id: msg.msg_id,
+                                        timestamp: Local::now(),
+                                        amount_left: state
+                                            .send_msgs
+                                            .get(&msg.msg_id)
+                                            .map(|info| info.amount),
+                                        // If the message is removed after the send, this
+                                        // will return None, which is what we want to indicate
+                                        // no more sends left
+                                    })
+                                    .expect("Failed to send message sent confirmation");
+                            }
+                            Err(e) => {
+                                log::error!("Failed to send CAN frame: {:?}", e);
+                                state.is_connected = false;
+                                if let Some(ref source) = current_source {
+                                    let error_msg = match source {
+                                        connection::ConnectionSource::Serial(path) => path.clone(),
+                                        connection::ConnectionSource::Udp(port) => {
+                                            format!("UDP:{}", port)
+                                        }
+                                    };
+                                    state
+                                        .can_to_ui_tx
+                                        .send(messages::MsgFromCan::ConnectionFailed(error_msg))
+                                        .expect("Failed to send connection failed message");
+                                }
+                                driver = None;
+                            }
+                        }
+                    } else {
+                        log::error!(
+                            "Cannot send CAN frame: data length {} exceeds 8 bytes",
+                            msg.msg_bytes.len()
+                        );
+                        continue;
+                    }
+                } else {
+                    log::warn!("Cannot send CAN frame, no active connection");
+                }
+            }
 
             // Attempt to connect if we don't have a driver but have a source
             if driver.is_none() {

@@ -15,10 +15,11 @@ pub enum MsgFromCan {
     MessageSent {
         msg_id: u32,
         timestamp: chrono::DateTime<chrono::Local>,
-        amount_left: SendAmount,
+        amount_left: Option<SendAmount>,
     },
 }
 
+#[derive(Clone, Copy)]
 pub enum SendAmount {
     Infinite { period: usize },
     Once,
