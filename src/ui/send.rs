@@ -330,7 +330,7 @@ impl MessageCard<'_> {
                     .color(ui.visuals().text_color()),
             );
             ui.label(
-                egui::RichText::new(self.send_amount.to_string()).color(ui.visuals().text_color()),
+                egui::RichText::new(self.send_amount.display()).color(ui.visuals().text_color()),
             );
             ui.label(
                 egui::RichText::new(format!("~{} ms ago", self.sent_ago_ms))
