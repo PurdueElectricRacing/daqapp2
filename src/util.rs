@@ -17,3 +17,10 @@ pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
         }
     }
 }
+
+pub fn msg_id_as_u32(msg_id: &can_dbc::MessageId) -> u32 {
+    match msg_id {
+        can_dbc::MessageId::Standard(id) => *id as u32,
+        can_dbc::MessageId::Extended(id) => *id,
+    }
+}

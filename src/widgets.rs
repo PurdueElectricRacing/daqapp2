@@ -1,4 +1,4 @@
-use crate::{action, app, can, ui};
+use crate::{action, app, messages, ui};
 use eframe::egui;
 
 pub enum Widget {
@@ -7,6 +7,7 @@ pub enum Widget {
     Bootloader(ui::bootloader::Bootloader),
     Scope(ui::scope::Scope),
     LogParser(ui::log_parser::LogParser),
+    SendUi(ui::send::SendUi),
 }
 
 impl Widget {
@@ -17,15 +18,17 @@ impl Widget {
             Widget::Bootloader(w) => &w.title,
             Widget::Scope(w) => &w.title,
             Widget::LogParser(w) => &w.title,
+            Widget::SendUi(w) => &w.title,
         }
     }
 
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        can_messages: &[can::message::ParsedMessage],
+        can_messages: &[messages::MsgFromCan],
         action_queue: &mut Vec<action::AppAction>,
         parser: Option<&app::ParserInfo>,
+        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     ) -> egui_tiles::UiResponse {
         let mut received_new_data = false;
 
@@ -45,14 +48,16 @@ impl Widget {
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, parser),
+            Widget::SendUi(w) => w.show(ui, ui_to_can_tx, parser),
         }
     }
 
-    fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
+    fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
         match self {
             Widget::ViewerTable(w) => w.handle_can_message(msg),
             Widget::ViewerList(w) => w.handle_can_message(msg),
             Widget::Scope(w) => w.handle_can_message(msg),
+            Widget::SendUi(w) => w.handle_can_message(msg),
             _ => {}
         }
     }

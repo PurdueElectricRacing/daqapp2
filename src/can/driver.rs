@@ -1,5 +1,4 @@
 use crate::connection::ConnectionSource;
-use serde::de::value::Error;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode};
@@ -27,6 +26,8 @@ pub enum DriverError {
 
 pub trait Driver {
     fn read_frame(&mut self) -> DriverResult<CanFrame>;
+
+    fn write_frame(&mut self, frame: CanFrame) -> DriverResult<()>;
 
     fn is_connected(&self) -> bool;
 
@@ -88,6 +89,13 @@ impl Driver for SerialDriver {
                 self.connected = false;
                 DriverError::ReadError(DriverReadError::Other(format!("Read error: {:?}", other)))
             }
+        })
+    }
+
+    fn write_frame(&mut self, frame: CanFrame) -> DriverResult<()> {
+        self.socket.send(frame).map_err(|e| {
+            self.connected = false;
+            DriverError::WriteError(format!("Failed to write frame: {}", e))
         })
     }
 
@@ -170,6 +178,11 @@ impl Driver for UdpDriver {
                 }
             }
         }
+    }
+
+    fn write_frame(&mut self, _frame: CanFrame) -> DriverResult<()> {
+        log::error!("UDP write requested but not implemented; ignoring frame.");
+        Ok(())
     }
 
     fn is_connected(&self) -> bool {

@@ -1,4 +1,6 @@
-use crate::{action, can, connection, settings, shortcuts, theme, ui, util, widgets, workspace};
+use crate::{
+    action, connection, messages, settings, shortcuts, theme, ui, util, widgets, workspace,
+};
 use eframe::egui;
 
 const UI_SCALE_STEP: f32 = 0.2;
@@ -40,8 +42,9 @@ pub struct DAQApp {
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
-    pub can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-    pub ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+    pub next_send_ui_num: usize,
+    pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
+    pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
@@ -50,7 +53,7 @@ pub struct DAQApp {
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
-    pub can_messages: Vec<can::message::ParsedMessage>,
+    pub can_messages: Vec<messages::MsgFromCan>,
 }
 
 impl DAQApp {
@@ -66,8 +69,8 @@ impl DAQApp {
     }
 
     pub fn new(
-        can_receiver: std::sync::mpsc::Receiver<can::can_messages::CanMessage>,
-        ui_sender: std::sync::mpsc::Sender<ui::ui_messages::UiMessage>,
+        can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
+        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
         settings: settings::Settings,
         _cc: &eframe::CreationContext,
     ) -> Self {
@@ -84,8 +87,9 @@ impl DAQApp {
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
-            can_receiver,
-            ui_sender,
+            next_send_ui_num: 1,
+            can_to_ui_rx,
+            ui_to_can_tx,
             action_queue: Vec::new(),
             selected_source: settings.selected_source,
             theme: theme_style,
@@ -133,8 +137,8 @@ impl DAQApp {
         self.connection_status = ConnectionStatus::Disconnected;
 
         let _ = self
-            .ui_sender
-            .send(ui::ui_messages::UiMessage::Connect(source.clone()));
+            .ui_to_can_tx
+            .send(messages::MsgFromUi::Connect(source.clone()));
     }
 
     pub fn handle_action(&mut self, action: action::AppAction, ctx: &egui::Context) {
@@ -163,6 +167,9 @@ impl DAQApp {
                     action::WidgetType::LogParser => widgets::Widget::LogParser(
                         ui::log_parser::LogParser::new(self.next_log_parser_num),
                     ),
+                    action::WidgetType::SendUi => {
+                        widgets::Widget::SendUi(ui::send::SendUi::new(self.next_send_ui_num))
+                    }
                 };
                 self.add_widget_to_tree(widget);
 
@@ -182,6 +189,9 @@ impl DAQApp {
                     }
                     action::WidgetType::LogParser => {
                         self.next_log_parser_num += 1;
+                    }
+                    action::WidgetType::SendUi => {
+                        self.next_send_ui_num += 1;
                     }
                 }
             }
@@ -232,22 +242,25 @@ impl DAQApp {
 impl eframe::App for DAQApp {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         self.can_messages.clear();
-        while let Ok(msg) = self.can_receiver.try_recv() {
+        while let Ok(msg) = self.can_to_ui_rx.try_recv() {
             match &msg {
-                can::can_messages::CanMessage::ConnectionFailed(port) => {
+                messages::MsgFromCan::ConnectionFailed(port) => {
                     self.connection_status =
                         ConnectionStatus::Error(format!("Failed to connect to {port}"));
                 }
-                can::can_messages::CanMessage::ConnectionSuccessful => {
+                messages::MsgFromCan::ConnectionSuccessful => {
                     self.connection_status = ConnectionStatus::Connected;
                 }
-                can::can_messages::CanMessage::Disconnection => {
+                messages::MsgFromCan::Disconnection => {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
-                can::can_messages::CanMessage::ParsedMessage(parsed) => {
-                    self.can_messages.push(parsed.clone());
+                messages::MsgFromCan::ParsedMessage(_)
+                | messages::MsgFromCan::MessageSent { .. } => {
+                    // Nothing special to do here, the message will be handled
+                    // in the individual widgets
                 }
             }
+            self.can_messages.push(msg);
         }
         if let Some(ppp) = self.pixels_per_point {
             ctx.set_pixels_per_point(ppp);

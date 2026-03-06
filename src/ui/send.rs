@@ -1,0 +1,420 @@
+use crate::{app, messages, util};
+use eframe::egui;
+
+pub struct SendUi {
+    pub title: String,
+
+    search_text: String,
+    search_results: Vec<can_dbc::Message>,
+
+    selected_msg: Option<can_dbc::Message>,
+    signal_values: Vec<(String, f64)>,
+
+    sending_messages: Vec<SendingMessage>,
+
+    send_mode: SendMode,
+    period_ms: usize,
+    finite_amount: usize,
+
+    error: Option<String>,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum SendMode {
+    Infinite,
+    Once,
+    Finite,
+}
+
+struct SendingMessage {
+    pub amount: messages::SendAmount,
+    pub msg_name: String,
+    pub msg_id: u32,
+    pub msg_bytes: Vec<u8>,
+    pub signal_values: Vec<(String, String)>,
+    pub last_sent: chrono::DateTime<chrono::Local>,
+}
+
+enum SendUiActions {
+    DeleteMessage { msg_id: u32 },
+}
+
+impl SendUi {
+    pub fn new(num: usize) -> Self {
+        Self {
+            title: format!("Send UI {}", num),
+
+            search_text: String::new(),
+            search_results: Vec::new(),
+
+            selected_msg: None,
+            signal_values: Vec::new(),
+
+            sending_messages: Vec::new(),
+
+            send_mode: SendMode::Infinite,
+            period_ms: 1000,
+            finite_amount: 10,
+
+            error: None,
+        }
+    }
+
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+        parser: Option<&app::ParserInfo>,
+    ) -> egui_tiles::UiResponse {
+        let Some(parser) = parser else {
+            ui.vertical_centered(|ui| {
+                ui.label("No DBC selected yet.");
+                ui.label("CMD+S to toggle the sidebar.");
+                ui.label("Use the sidebar to select a DBC file");
+            });
+
+            return egui_tiles::UiResponse::None;
+        };
+
+        egui::Frame::group(ui.style())
+            .inner_margin(egui::Margin::symmetric(8, 6))
+            .stroke(egui::Stroke::NONE)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Search:");
+                        if ui
+                            .add(
+                                egui::TextEdit::singleline(&mut self.search_text)
+                                    .hint_text("Message name..."),
+                            )
+                            .changed()
+                        {
+                            if self.search_text.is_empty() {
+                                self.search_results.clear();
+                            } else {
+                                self.search_results = parser
+                                    .parser
+                                    .msg_defs()
+                                    .iter()
+                                    .filter(|msg| msg.name.contains(&self.search_text))
+                                    .cloned()
+                                    .collect();
+                            }
+                        }
+                    });
+
+                    ui.add_space(8.0);
+
+                    if self.search_results.is_empty() && !self.search_text.is_empty() {
+                        ui.label(egui::RichText::new("No messages found.").italics().weak());
+                    } else if self.search_text.is_empty() && self.selected_msg.is_none() {
+                        ui.label(
+                            egui::RichText::new("Start typing to search for messages...")
+                                .italics()
+                                .weak(),
+                        );
+                    } else {
+                        let mut should_clear_search = false;
+                        for msg in &self.search_results {
+                            if ui
+                                .button(format!(
+                                    "{} (0x{:03X})",
+                                    msg.name,
+                                    util::msg_id_as_u32(&msg.id)
+                                ))
+                                .clicked()
+                            {
+                                self.selected_msg = Some(msg.clone());
+                                self.signal_values = msg
+                                    .signals
+                                    .iter()
+                                    .map(|sig| (sig.name.clone(), 0.0))
+                                    .collect();
+                                self.error = None;
+
+                                should_clear_search = true;
+                            }
+                        }
+                        if should_clear_search {
+                            self.search_text.clear();
+                            self.search_results.clear();
+                        }
+                    }
+
+                    if let Some(selected_msg) = &self.selected_msg {
+                        ui.separator();
+
+                        if let Some(error) = &self.error {
+                            ui.label(egui::RichText::new(error).color(ui.visuals().error_fg_color));
+                        }
+
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Selected Message: {} (0x{:03X})",
+                                selected_msg.name,
+                                util::msg_id_as_u32(&selected_msg.id)
+                            ))
+                            .strong()
+                            .size(16.0),
+                        );
+
+                        // Send Amount selector
+                        ui.label(egui::RichText::new("Send Options").strong());
+
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut self.send_mode, SendMode::Once, "Once");
+                            ui.selectable_value(
+                                &mut self.send_mode,
+                                SendMode::Infinite,
+                                "Infinite",
+                            );
+                            ui.selectable_value(&mut self.send_mode, SendMode::Finite, "Finite");
+                        });
+
+                        match self.send_mode {
+                            SendMode::Once => {}
+                            SendMode::Infinite => {
+                                ui.horizontal(|ui| {
+                                    ui.label("Period (ms)");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.period_ms)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                            }
+                            SendMode::Finite => {
+                                ui.horizontal(|ui| {
+                                    ui.label("Amount");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.finite_amount)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label("Period (ms)");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.period_ms)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                            }
+                        }
+                        for i in 0..self.signal_values.len() {
+                            ui.horizontal(|ui| {
+                                let (sig_name, value) = &mut self.signal_values[i];
+                                ui.label(sig_name.as_str());
+                                if ui.add(egui::DragValue::new(value).speed(0.1)).changed() {
+                                    self.signal_values[i].1 = *value;
+                                }
+                            });
+                        }
+
+                        if ui.button("Send Message").clicked() {
+                            let values_hashmap = self.signal_values.iter().cloned().collect();
+
+                            let encoded = parser
+                                .parser
+                                .encode_msg(util::msg_id_as_u32(&selected_msg.id), &values_hashmap);
+
+                            let Some(msg_bytes) = encoded else {
+                                self.error = Some(
+                                    "Failed to encode message. Check signal values.".to_string(),
+                                );
+
+                                return;
+                            };
+
+                            self.error = None;
+
+                            let send_amount = match self.send_mode {
+                                SendMode::Once => messages::SendAmount::Once,
+
+                                SendMode::Infinite => messages::SendAmount::Infinite {
+                                    period: self.period_ms,
+                                },
+
+                                SendMode::Finite => messages::SendAmount::Finite {
+                                    amount: self.finite_amount,
+                                    period: self.period_ms,
+                                },
+                            };
+
+                            let msg_id_u32 = util::msg_id_as_u32(&selected_msg.id);
+
+                            self.sending_messages.push(SendingMessage {
+                                amount: send_amount,
+                                msg_name: selected_msg.name.clone(),
+                                msg_id: msg_id_u32,
+                                msg_bytes: msg_bytes.clone(),
+                                signal_values: self
+                                    .signal_values
+                                    .iter()
+                                    .map(|(name, value)| (name.clone(), format!("{:.2}", value)))
+                                    .collect(),
+                                last_sent: chrono::Local::now(),
+                            });
+
+                            let add_send_msg = messages::AddSendMessage {
+                                amount: send_amount,
+                                msg_id: msg_id_u32,
+                                is_msg_id_extended: matches!(
+                                    selected_msg.id,
+                                    can_dbc::MessageId::Extended(_)
+                                ),
+                                msg_bytes,
+                            };
+
+                            self.selected_msg = None;
+                            self.signal_values.clear();
+
+                            ui_to_can_tx
+                                .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
+                                .expect("Failed to send AddSendMessage");
+                        }
+                    }
+
+                    ui.separator();
+
+                    let mut all_actions = Vec::new();
+                    for msg in self.sending_messages.iter().rev() {
+                        let signals = msg
+                            .signal_values
+                            .iter()
+                            .map(|(name, value)| (name.as_str(), value.as_str()))
+                            .collect();
+                        let raw_bytes_str = msg
+                            .msg_bytes
+                            .iter()
+                            .map(|b| format!("{:02X}", b))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let card = MessageCard {
+                            msg_name: &msg.msg_name,
+                            msg_id: msg.msg_id,
+                            send_amount: &msg.amount,
+                            sent_ago_ms: (chrono::Local::now() - msg.last_sent).num_milliseconds(),
+                            raw_bytes: raw_bytes_str.as_str(),
+                            signals,
+                        };
+                        let actions = card.ui(ui);
+                        all_actions.extend(actions);
+                        ui.add_space(8.0);
+                    }
+
+                    for action in all_actions {
+                        match action {
+                            SendUiActions::DeleteMessage { msg_id } => {
+                                self.sending_messages.retain(|msg| msg.msg_id != msg_id);
+                                ui_to_can_tx
+                                    .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
+                                    .expect("Failed to send DeleteSendMessage");
+                            }
+                        }
+                    }
+                });
+            });
+
+        egui_tiles::UiResponse::None
+    }
+
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
+        if let messages::MsgFromCan::MessageSent {
+            msg_id,
+            timestamp,
+            amount_left,
+        } = msg
+        {
+            for sending_msg in &mut self.sending_messages {
+                if sending_msg.msg_id == *msg_id {
+                    sending_msg.last_sent = *timestamp;
+                    if let Some(amount_left) = amount_left {
+                        sending_msg.amount = *amount_left;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+struct MessageCard<'a> {
+    msg_name: &'a str,
+    msg_id: u32,
+    send_amount: &'a messages::SendAmount,
+    sent_ago_ms: i64,
+    raw_bytes: &'a str,
+    signals: Vec<(&'a str, &'a str)>,
+}
+
+impl MessageCard<'_> {
+    fn ui(&self, ui: &mut egui::Ui) -> Vec<SendUiActions> {
+        let mut action_queue = Vec::new();
+        // Header (outside card)
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(format!("{}  (0x{:03X})", self.msg_name, self.msg_id))
+                    .strong()
+                    .size(16.0)
+                    .color(ui.visuals().text_color()),
+            );
+            ui.label(
+                egui::RichText::new(self.send_amount.display()).color(ui.visuals().text_color()),
+            );
+            ui.label(
+                egui::RichText::new(format!("~{} ms ago", self.sent_ago_ms))
+                    .italics()
+                    .color(ui.visuals().weak_text_color()),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("🗑").on_hover_text("Delete message").clicked() {
+                    action_queue.push(SendUiActions::DeleteMessage {
+                        msg_id: self.msg_id,
+                    });
+                }
+                ui.label(
+                    egui::RichText::new(self.raw_bytes)
+                        .monospace()
+                        .color(ui.visuals().text_color()),
+                );
+
+                ui.add_space(2.0);
+            });
+        });
+
+        ui.add_space(4.0);
+
+        // Card container
+        egui::Frame::group(ui.style())
+            .fill(ui.visuals().faint_bg_color)
+            .corner_radius(egui::CornerRadius::same(8))
+            .inner_margin(egui::Margin::symmetric(8, 6))
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    for (i, (sig_name, value)) in self.signals.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(*sig_name)
+                                    .monospace()
+                                    .color(ui.visuals().text_color()),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(egui::RichText::new(*value).monospace());
+                                },
+                            );
+                        });
+                        if i < self.signals.len() - 1 {
+                            ui.separator();
+                        }
+                    }
+                });
+            });
+
+        action_queue
+    }
+}

@@ -1,4 +1,4 @@
-use crate::{action, app, can, widgets};
+use crate::{action, app, messages, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
@@ -14,6 +14,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 can_messages: &app.can_messages,
                 action_queue: &mut app.action_queue,
                 parser: app.parser.as_ref(),
+                ui_to_can_tx: app.ui_to_can_tx.clone(),
             };
             app.tile_tree.ui(&mut behavior, ui);
         }
@@ -21,9 +22,10 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 }
 
 struct WorkspaceTileBehavior<'a> {
-    can_messages: &'a [can::message::ParsedMessage],
+    can_messages: &'a [messages::MsgFromCan],
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
+    ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -33,7 +35,13 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.can_messages, self.action_queue, self.parser)
+        widget.show(
+            ui,
+            self.can_messages,
+            self.action_queue,
+            self.parser,
+            self.ui_to_can_tx.clone(),
+        )
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {

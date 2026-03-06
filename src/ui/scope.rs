@@ -1,4 +1,4 @@
-use crate::can;
+use crate::messages;
 use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use std::collections::VecDeque;
@@ -153,15 +153,17 @@ impl Scope {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &can::message::ParsedMessage) {
-        if msg.decoded.msg_id != self.msg_id {
-            return;
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
+        if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
+            if parsed_msg.decoded.msg_id != self.msg_id {
+                return;
+            }
+
+            let Some(signal) = parsed_msg.decoded.signals.get(&self.signal_name) else {
+                return;
+            };
+
+            self.add_point(parsed_msg.timestamp, signal.value);
         }
-
-        let Some(signal) = msg.decoded.signals.get(&self.signal_name) else {
-            return;
-        };
-
-        self.add_point(msg.timestamp, signal.value);
     }
 }
