@@ -1,7 +1,7 @@
 use crate::{can, connection, messages};
 use chrono::Local;
 use slcan::CanFrame;
-use std::{thread, time::Duration};
+use std::{f64::consts::E, thread, time::Duration};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
@@ -107,8 +107,14 @@ pub fn start_can_thread(
                 if let Some(ref mut active_driver) = driver {
                     let id = if msg.is_msg_id_extended {
                         slcan::ExtendedId::new(msg.msg_id).map(slcan::Id::Extended)
-                    } else {
+                    } else if msg.msg_id <= 0x7FF {
                         slcan::StandardId::new(msg.msg_id as u16).map(slcan::Id::Standard)
+                    } else {
+                        log::warn!(
+                            "Invalid message ID {} for sending CAN frame (exceeds 11 bits for standard)",
+                            msg.msg_id
+                        );
+                        None
                     };
                     if let Some(id) = id {
                         if let Some(can2_frame) = slcan::Can2Frame::new_data(id, &msg.msg_bytes) {
