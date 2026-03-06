@@ -260,6 +260,7 @@ impl eframe::App for DAQApp {
                     // in the individual widgets
                 }
             }
+            self.can_messages.push(msg);
         }
         if let Some(ppp) = self.pixels_per_point {
             ctx.set_pixels_per_point(ppp);
