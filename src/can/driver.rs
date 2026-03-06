@@ -308,8 +308,10 @@ pub fn parse_udp_buffer(
 
     let mut frames = Vec::new();
     let mask_id = (1u32 << 29) - 1;
+
     // TODO: use the daq_parse way with bytemuck?
-    for chunk in buf[..num_bytes].chunks_exact(UDP_RAW_FRAME_SIZE) {
+    let mut chunks = buf[..num_bytes].chunks_exact(UDP_RAW_FRAME_SIZE);
+    for chunk in &mut chunks {
         let identity = u32::from_le_bytes(chunk[4..8].try_into().unwrap());
         let payload = &chunk[8..16];
 
@@ -338,6 +340,14 @@ pub fn parse_udp_buffer(
         };
 
         frames.push(frame);
+    }
+
+    let remainder = chunks.remainder();
+    if !remainder.is_empty() {
+        log::warn!(
+            "UDP packet had {} extra bytes (not a full CAN frame)",
+            remainder.len()
+        );
     }
 
     Ok(frames)
