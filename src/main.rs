@@ -22,13 +22,12 @@ fn main() -> eframe::Result<()> {
     let settings = settings::Settings::load();
     if let Some(ref selected_source) = settings.selected_source {
         ui_to_can_tx
-            .send(ui::ui_messages::UiMessage::Connect(selected_source.clone()))
+            .send(messages::MsgFromUi::Connect(selected_source.clone()))
             .expect("Failed to send connect message to CAN thread");
     }
 
     let _can_thread =
         can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, settings.selected_source.clone());
-
 
     eframe::run_native(
         "DaqApp2",

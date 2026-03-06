@@ -14,6 +14,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 can_messages: &app.can_messages,
                 action_queue: &mut app.action_queue,
                 parser: app.parser.as_ref(),
+                ui_to_can_tx: app.ui_to_can_tx.clone(),
             };
             app.tile_tree.ui(&mut behavior, ui);
         }
