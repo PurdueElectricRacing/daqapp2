@@ -149,8 +149,6 @@ impl UdpDriver {
             .map_err(|e| {
                 DriverError::ConnectionFailed(format!("Failed to set read timeout: {}", e))
             })?;
-        log::info!("Socket local addr: {:?}", socket.local_addr());
-        log::info!("Socket read timeout: {:?}", socket.read_timeout());
 
         Ok(Self {
             port,
@@ -162,13 +160,10 @@ impl UdpDriver {
 
 impl Driver for UdpDriver {
     fn read_frames(&mut self) -> DriverResult<Vec<CanFrame>> {
-        log::info!("Trying to read UDP frame...");
-        // and the data is in PER DAQ log format, not raw CAN frames
         let mut buf = [0; UDP_MAX_PACKET_SIZE];
         match self.socket.recv_from(&mut buf) {
             Ok((num_bytes, _src_port)) => {
                 // TODO: parse buffer into one or more CanFrame(s) per your protocol.
-                log::info!("Recieved byte buf");
                 parse_udp_buffer(&buf, num_bytes)
             }
             Err(e) => {
@@ -312,6 +307,10 @@ pub fn parse_udp_buffer(
     // TODO: use the daq_parse way with bytemuck?
     let mut chunks = buf[..num_bytes].chunks_exact(UDP_RAW_FRAME_SIZE);
     for chunk in &mut chunks {
+        // Parse can frame from UDP packet according to new timestamped frame format
+        // Format: [4 bytes ticks_ms] [4 bytes identity] [8 bytes payload]
+        // Identity format: [1 bit bus ID] [1 bit isExtID] [1 bit reserved] [29 bits CAN ID]
+        // (definitions from spmc.h)
         let identity = u32::from_le_bytes(chunk[4..8].try_into().unwrap());
         let payload = &chunk[8..16];
 
