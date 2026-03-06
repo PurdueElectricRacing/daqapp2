@@ -53,7 +53,7 @@ pub struct DAQApp {
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
     pub udp_port: u16,
-    pub can_messages: Vec<messages::ParsedMessage>,
+    pub can_messages: Vec<messages::MsgFromCan>,
 }
 
 impl DAQApp {
@@ -254,15 +254,10 @@ impl eframe::App for DAQApp {
                 messages::MsgFromCan::Disconnection => {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
-                messages::MsgFromCan::ParsedMessage(parsed) => {
-                    self.can_messages.push(parsed.clone());
-                }
-                messages::MsgFromCan::MessageSent {
-                    msg_id,
-                    timestamp,
-                    amount_left,
-                } => {
-                    todo!("Next commit");
+                messages::MsgFromCan::ParsedMessage(_)
+                | messages::MsgFromCan::MessageSent { .. } => {
+                    // Nothing special to do here, the message will be handled
+                    // in the individual widgets
                 }
             }
         }

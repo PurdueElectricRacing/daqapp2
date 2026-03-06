@@ -25,7 +25,7 @@ impl Widget {
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        can_messages: &[messages::ParsedMessage],
+        can_messages: &[messages::MsgFromCan],
         action_queue: &mut Vec<action::AppAction>,
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
@@ -51,12 +51,12 @@ impl Widget {
         }
     }
 
-    fn handle_can_message(&mut self, msg: &messages::ParsedMessage) {
+    fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
         match self {
             Widget::ViewerTable(w) => w.handle_can_message(msg),
             Widget::ViewerList(w) => w.handle_can_message(msg),
             Widget::Scope(w) => w.handle_can_message(msg),
-            Widget::SendUi(w) => todo!(),
+            Widget::SendUi(w) => w.handle_can_message(msg),
             _ => {}
         }
     }
