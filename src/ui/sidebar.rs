@@ -59,6 +59,11 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 ));
             }
 
+            if ui.button("Add Message Sender").clicked() {
+                app.action_queue
+                    .push(action::AppAction::SpawnWidget(action::WidgetType::SendUi));
+            }
+
             ui.separator();
             ui.heading("Connection Settings");
 
