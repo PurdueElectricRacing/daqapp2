@@ -43,6 +43,16 @@ impl SendAmount {
             }
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            SendAmount::Infinite { period } => format!("∞ ({} ms period)", period),
+            SendAmount::Once => "Once".to_string(),
+            SendAmount::Finite { amount, period } => {
+                format!("{} times ({} ms period)", amount, period)
+            }
+        }
+    }
 }
 
 pub struct AddSendMessage {

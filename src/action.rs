@@ -18,6 +18,7 @@ pub enum WidgetType {
         signal_name: String,
     },
     LogParser,
+    SendUi,
 }
 
 impl AppAction {
@@ -27,6 +28,7 @@ impl AppAction {
             ("Spawn CAN List", WidgetType::ViewerList),
             ("Spawn Bootloader", WidgetType::Bootloader),
             ("Spawn Log Parser", WidgetType::LogParser),
+            ("Spawn Send UI", WidgetType::SendUi),
         ]
     }
 }

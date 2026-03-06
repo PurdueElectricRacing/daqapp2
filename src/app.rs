@@ -42,6 +42,7 @@ pub struct DAQApp {
     pub next_bootloader_num: usize,
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
+    pub next_send_ui_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
@@ -86,6 +87,7 @@ impl DAQApp {
             next_bootloader_num: 1,
             next_scope_num: 1,
             next_log_parser_num: 1,
+            next_send_ui_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
             action_queue: Vec::new(),
@@ -165,6 +167,9 @@ impl DAQApp {
                     action::WidgetType::LogParser => widgets::Widget::LogParser(
                         ui::log_parser::LogParser::new(self.next_log_parser_num),
                     ),
+                    action::WidgetType::SendUi => {
+                        widgets::Widget::SendUi(ui::send::SendUi::new(self.next_send_ui_num))
+                    }
                 };
                 self.add_widget_to_tree(widget);
 
@@ -184,6 +189,9 @@ impl DAQApp {
                     }
                     action::WidgetType::LogParser => {
                         self.next_log_parser_num += 1;
+                    }
+                    action::WidgetType::SendUi => {
+                        self.next_send_ui_num += 1;
                     }
                 }
             }
