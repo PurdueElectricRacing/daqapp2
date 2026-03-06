@@ -1,14 +1,11 @@
 use crate::{can, connection, messages};
-use chrono::Local;
-use slcan::CanFrame;
-use std::{thread, time::Duration};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
 
-fn process_can_frame(frame: CanFrame, state: &can::state::State) {
+fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) {
     match frame {
-        CanFrame::Can2(frame2) => {
+        slcan::CanFrame::Can2(frame2) => {
             let id = match frame2.id() {
                 slcan::Id::Standard(sid) => sid.as_raw() as u32,
                 slcan::Id::Extended(eid) => eid.as_raw(),
@@ -19,7 +16,7 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
             if let Some(parser) = state.parser.as_ref() {
                 if let Some(decoded) = parser.decode_msg(id, data) {
                     let parsed_msg = messages::ParsedMessage {
-                        timestamp: Local::now(),
+                        timestamp: chrono::Local::now(),
                         raw_bytes: data.to_vec(),
                         decoded,
                     };
@@ -44,7 +41,7 @@ fn process_can_frame(frame: CanFrame, state: &can::state::State) {
                 );
             }
         }
-        CanFrame::CanFd(frame_fd) => {
+        slcan::CanFrame::CanFd(frame_fd) => {
             let id = match frame_fd.id() {
                 slcan::Id::Standard(sid) => sid.as_raw() as u32,
                 slcan::Id::Extended(eid) => eid.as_raw(),
@@ -62,8 +59,8 @@ pub fn start_can_thread(
     can_to_ui_tx: std::sync::mpsc::Sender<messages::MsgFromCan>,
     ui_to_can_rx: std::sync::mpsc::Receiver<messages::MsgFromUi>,
     selected_source: Option<connection::ConnectionSource>,
-) -> thread::JoinHandle<()> {
-    thread::spawn(move || {
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
         let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
@@ -118,7 +115,7 @@ pub fn start_can_thread(
                     };
                     if let Some(id) = id {
                         if let Some(can2_frame) = slcan::Can2Frame::new_data(id, &msg.msg_bytes) {
-                            let frame = CanFrame::Can2(can2_frame);
+                            let frame = slcan::CanFrame::Can2(can2_frame);
                             match active_driver.write_frame(frame) {
                                 Ok(_) => {
                                     log::info!(
@@ -131,7 +128,7 @@ pub fn start_can_thread(
                                         .can_to_ui_tx
                                         .send(messages::MsgFromCan::MessageSent {
                                             msg_id: msg.msg_id,
-                                            timestamp: Local::now(),
+                                            timestamp: chrono::Local::now(),
                                             amount_left: state
                                                 .send_msgs
                                                 .get(&msg.msg_id)
@@ -200,20 +197,22 @@ pub fn start_can_thread(
                                 .can_to_ui_tx
                                 .send(messages::MsgFromCan::ConnectionFailed(error_msg))
                                 .expect("Failed to send connection failed message");
-                            thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
+                            std::thread::sleep(std::time::Duration::from_millis(
+                                NO_CONNECTION_SLEEP_MS,
+                            ));
                             continue;
                         }
                     }
                 } else {
                     // No source configured, just sleep
-                    thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
+                    std::thread::sleep(std::time::Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                     continue;
                 }
             }
 
             // Try to read a frame from the driver
             let Some(ref mut active_driver) = driver else {
-                thread::sleep(Duration::from_millis(NO_CONNECTION_SLEEP_MS));
+                std::thread::sleep(std::time::Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                 continue;
             };
 
@@ -225,7 +224,9 @@ pub fn start_can_thread(
                     match error_type {
                         can::driver::DriverReadError::Timeout => {
                             // Normal timeout, just retry
-                            thread::sleep(Duration::from_millis(READ_RETRY_SLEEP_MS));
+                            std::thread::sleep(std::time::Duration::from_millis(
+                                READ_RETRY_SLEEP_MS,
+                            ));
                         }
                         other => {
                             // Actual error, disconnect
