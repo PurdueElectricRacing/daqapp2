@@ -1,5 +1,4 @@
 use crate::connection::ConnectionSource;
-use serde::de::value::Error;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode};
