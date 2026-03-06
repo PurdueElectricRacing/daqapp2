@@ -82,35 +82,41 @@ impl SendUi {
             .inner_margin(egui::Margin::symmetric(8, 6))
             .stroke(egui::Stroke::NONE)
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label("Search:");
-                    if ui
-                        .add(
-                            egui::TextEdit::singleline(&mut self.search_text)
-                                .hint_text("Message name..."),
-                        )
-                        .changed()
-                    {
-                        if self.search_text.is_empty() {
-                            self.search_results.clear();
-                        } else {
-                            self.search_results = parser
-                                .parser
-                                .msg_defs()
-                                .iter()
-                                .filter(|msg| msg.name.contains(&self.search_text))
-                                .cloned()
-                                .collect();
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Search:");
+                        if ui
+                            .add(
+                                egui::TextEdit::singleline(&mut self.search_text)
+                                    .hint_text("Message name..."),
+                            )
+                            .changed()
+                        {
+                            if self.search_text.is_empty() {
+                                self.search_results.clear();
+                            } else {
+                                self.search_results = parser
+                                    .parser
+                                    .msg_defs()
+                                    .iter()
+                                    .filter(|msg| msg.name.contains(&self.search_text))
+                                    .cloned()
+                                    .collect();
+                            }
                         }
-                    }
-                });
-
-                if self.search_results.is_empty() && !self.search_text.is_empty() {
-                    ui.centered_and_justified(|ui| {
-                        ui.label(egui::RichText::new("No messages found.").italics().weak());
                     });
-                } else {
-                    egui::ScrollArea::vertical().show(ui, |ui| {
+
+                    ui.add_space(8.0);
+
+                    if self.search_results.is_empty() && !self.search_text.is_empty() {
+                        ui.label(egui::RichText::new("No messages found.").italics().weak());
+                    } else if self.search_text.is_empty() && self.selected_msg.is_none() {
+                        ui.label(
+                            egui::RichText::new("Start typing to search for messages...")
+                                .italics()
+                                .weak(),
+                        );
+                    } else {
                         let mut should_clear_search = false;
                         for msg in &self.search_results {
                             if ui
@@ -136,142 +142,145 @@ impl SendUi {
                             self.search_text.clear();
                             self.search_results.clear();
                         }
-                    });
-                }
+                    }
 
-                if let Some(selected_msg) = &self.selected_msg {
+                    if let Some(selected_msg) = &self.selected_msg {
+                        ui.separator();
+
+                        if let Some(error) = &self.error {
+                            ui.label(egui::RichText::new(error).color(ui.visuals().error_fg_color));
+                        }
+
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Selected Message: {} (0x{:03X})",
+                                selected_msg.name,
+                                util::msg_id_as_u32(&selected_msg.id)
+                            ))
+                            .strong()
+                            .size(16.0),
+                        );
+
+                        // Send Amount selector
+                        ui.label(egui::RichText::new("Send Options").strong());
+
+                        ui.horizontal(|ui| {
+                            ui.selectable_value(&mut self.send_mode, SendMode::Once, "Once");
+                            ui.selectable_value(
+                                &mut self.send_mode,
+                                SendMode::Infinite,
+                                "Infinite",
+                            );
+                            ui.selectable_value(&mut self.send_mode, SendMode::Finite, "Finite");
+                        });
+
+                        match self.send_mode {
+                            SendMode::Once => {}
+                            SendMode::Infinite => {
+                                ui.horizontal(|ui| {
+                                    ui.label("Period (ms)");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.period_ms)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                            }
+                            SendMode::Finite => {
+                                ui.horizontal(|ui| {
+                                    ui.label("Amount");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.finite_amount)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label("Period (ms)");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.period_ms)
+                                            .speed(1)
+                                            .range(1..=10_000),
+                                    );
+                                });
+                            }
+                        }
+                        for i in 0..self.signal_values.len() {
+                            ui.horizontal(|ui| {
+                                let (sig_name, value) = &mut self.signal_values[i];
+                                ui.label(sig_name.as_str());
+                                if ui.add(egui::DragValue::new(value).speed(0.1)).changed() {
+                                    self.signal_values[i].1 = *value;
+                                }
+                            });
+                        }
+
+                        if ui.button("Send Message").clicked() {
+                            let values_hashmap = self.signal_values.iter().cloned().collect();
+
+                            let encoded = parser
+                                .parser
+                                .encode_msg(util::msg_id_as_u32(&selected_msg.id), &values_hashmap);
+
+                            let Some(msg_bytes) = encoded else {
+                                self.error = Some(
+                                    "Failed to encode message. Check signal values.".to_string(),
+                                );
+
+                                return;
+                            };
+
+                            self.error = None;
+
+                            let send_amount = match self.send_mode {
+                                SendMode::Once => messages::SendAmount::Once,
+
+                                SendMode::Infinite => messages::SendAmount::Infinite {
+                                    period: self.period_ms,
+                                },
+
+                                SendMode::Finite => messages::SendAmount::Finite {
+                                    amount: self.finite_amount,
+                                    period: self.period_ms,
+                                },
+                            };
+
+                            let msg_id_u32 = util::msg_id_as_u32(&selected_msg.id);
+
+                            self.sending_messages.push(SendingMessage {
+                                amount: send_amount,
+                                msg_name: selected_msg.name.clone(),
+                                msg_id: msg_id_u32,
+                                msg_bytes: msg_bytes.clone(),
+                                signal_values: self
+                                    .signal_values
+                                    .iter()
+                                    .map(|(name, value)| (name.clone(), format!("{:.2}", value)))
+                                    .collect(),
+                                last_sent: chrono::Local::now(),
+                            });
+
+                            let add_send_msg = messages::AddSendMessage {
+                                amount: send_amount,
+                                msg_id: msg_id_u32,
+                                is_msg_id_extended: matches!(
+                                    selected_msg.id,
+                                    can_dbc::MessageId::Extended(_)
+                                ),
+                                msg_bytes,
+                            };
+
+                            self.selected_msg = None;
+                            self.signal_values.clear();
+
+                            ui_to_can_tx
+                                .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
+                                .expect("Failed to send AddSendMessage");
+                        }
+                    }
+
                     ui.separator();
 
-                    if let Some(error) = &self.error {
-                        ui.label(egui::RichText::new(error).color(ui.visuals().error_fg_color));
-                    }
-
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "Selected Message: {} (0x{:03X})",
-                            selected_msg.name,
-                            util::msg_id_as_u32(&selected_msg.id)
-                        ))
-                        .strong()
-                        .size(16.0),
-                    );
-
-                    // Send Amount selector
-                    ui.label(egui::RichText::new("Send Options").strong());
-
-                    ui.horizontal(|ui| {
-                        ui.selectable_value(&mut self.send_mode, SendMode::Once, "Once");
-                        ui.selectable_value(&mut self.send_mode, SendMode::Infinite, "Infinite");
-                        ui.selectable_value(&mut self.send_mode, SendMode::Finite, "Finite");
-                    });
-
-                    match self.send_mode {
-                        SendMode::Once => {}
-                        SendMode::Infinite => {
-                            ui.horizontal(|ui| {
-                                ui.label("Period (ms)");
-                                ui.add(
-                                    egui::DragValue::new(&mut self.period_ms)
-                                        .speed(1)
-                                        .range(1..=10_000),
-                                );
-                            });
-                        }
-                        SendMode::Finite => {
-                            ui.horizontal(|ui| {
-                                ui.label("Amount");
-                                ui.add(
-                                    egui::DragValue::new(&mut self.finite_amount)
-                                        .speed(1)
-                                        .range(1..=10_000),
-                                );
-                            });
-                            ui.horizontal(|ui| {
-                                ui.label("Period (ms)");
-                                ui.add(
-                                    egui::DragValue::new(&mut self.period_ms)
-                                        .speed(1)
-                                        .range(1..=10_000),
-                                );
-                            });
-                        }
-                    }
-                    for i in 0..self.signal_values.len() {
-                        ui.horizontal(|ui| {
-                            let (sig_name, value) = &mut self.signal_values[i];
-                            ui.label(sig_name.as_str());
-                            if ui.add(egui::DragValue::new(value).speed(0.1)).changed() {
-                                self.signal_values[i].1 = *value;
-                            }
-                        });
-                    }
-
-                    if ui.button("Send Message").clicked() {
-                        let values_hashmap = self.signal_values.iter().cloned().collect();
-
-                        let encoded = parser
-                            .parser
-                            .encode_msg(util::msg_id_as_u32(&selected_msg.id), &values_hashmap);
-
-                        let Some(msg_bytes) = encoded else {
-                            self.error =
-                                Some("Failed to encode message. Check signal values.".to_string());
-
-                            return;
-                        };
-
-                        self.error = None;
-
-                        let send_amount = match self.send_mode {
-                            SendMode::Once => messages::SendAmount::Once,
-
-                            SendMode::Infinite => messages::SendAmount::Infinite {
-                                period: self.period_ms,
-                            },
-
-                            SendMode::Finite => messages::SendAmount::Finite {
-                                amount: self.finite_amount,
-                                period: self.period_ms,
-                            },
-                        };
-
-                        let msg_id_u32 = util::msg_id_as_u32(&selected_msg.id);
-
-                        self.sending_messages.push(SendingMessage {
-                            amount: send_amount,
-                            msg_name: selected_msg.name.clone(),
-                            msg_id: msg_id_u32,
-                            msg_bytes: msg_bytes.clone(),
-                            signal_values: self
-                                .signal_values
-                                .iter()
-                                .map(|(name, value)| (name.clone(), format!("{:.2}", value)))
-                                .collect(),
-                            last_sent: chrono::Local::now(),
-                        });
-
-                        let add_send_msg = messages::AddSendMessage {
-                            amount: send_amount,
-                            msg_id: msg_id_u32,
-                            is_msg_id_extended: matches!(
-                                selected_msg.id,
-                                can_dbc::MessageId::Extended(_)
-                            ),
-                            msg_bytes,
-                        };
-
-                        self.selected_msg = None;
-                        self.signal_values.clear();
-
-                        ui_to_can_tx
-                            .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
-                            .expect("Failed to send AddSendMessage");
-                    }
-                }
-
-                ui.separator();
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
                     let mut all_actions = Vec::new();
                     for msg in self.sending_messages.iter().rev() {
                         let signals = msg
@@ -279,12 +288,18 @@ impl SendUi {
                             .iter()
                             .map(|(name, value)| (name.as_str(), value.as_str()))
                             .collect();
+                        let raw_bytes_str = msg
+                            .msg_bytes
+                            .iter()
+                            .map(|b| format!("{:02X}", b))
+                            .collect::<Vec<_>>()
+                            .join(" ");
                         let card = MessageCard {
                             msg_name: &msg.msg_name,
                             msg_id: msg.msg_id,
                             send_amount: &msg.amount,
                             sent_ago_ms: (chrono::Local::now() - msg.last_sent).num_milliseconds(),
-                            raw_bytes: &format!("{:02X?}", msg.msg_bytes),
+                            raw_bytes: raw_bytes_str.as_str(),
                             signals,
                         };
                         let actions = card.ui(ui);
@@ -357,16 +372,16 @@ impl MessageCard<'_> {
                     .color(ui.visuals().weak_text_color()),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.label(
-                    egui::RichText::new(self.raw_bytes)
-                        .monospace()
-                        .color(ui.visuals().text_color()),
-                );
                 if ui.button("🗑").on_hover_text("Delete message").clicked() {
                     action_queue.push(SendUiActions::DeleteMessage {
                         msg_id: self.msg_id,
                     });
                 }
+                ui.label(
+                    egui::RichText::new(self.raw_bytes)
+                        .monospace()
+                        .color(ui.visuals().text_color()),
+                );
 
                 ui.add_space(2.0);
             });
