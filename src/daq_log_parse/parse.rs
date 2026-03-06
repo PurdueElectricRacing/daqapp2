@@ -1,7 +1,6 @@
 use crate::daq_log_parse::consts;
 use bytemuck::{Pod, Zeroable};
 
-
 #[derive(Debug)]
 pub struct ParsedMessage {
     pub timestamp: u32,
@@ -44,7 +43,8 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
     let content = std::fs::read(in_file).unwrap();
 
     // TODO: handle case here where log format might be outdated, don't assume cast_slice will work
-    let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content).expect("Failed to parse log file - possibly due to outdated log format");
+    let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content)
+        .expect("Failed to parse log file - possibly due to outdated log format");
     let mut parsed = Vec::with_capacity(frames.len());
 
     for frame in frames {

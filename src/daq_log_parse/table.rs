@@ -91,7 +91,10 @@ impl TableBuilder {
             for msg in chunk {
                 let decoded = &msg.decoded;
                 for (sig_name, sig_value) in &decoded.signals {
-                if let Some(&col_idx) = self.indexer.get(&(decoded.name.to_string(), sig_name.to_string())) {
+                    if let Some(&col_idx) = self
+                        .indexer
+                        .get(&(decoded.name.to_string(), sig_name.to_string()))
+                    {
                         let row_idx = (msg.timestamp - first_row_time) / consts::BIN_WIDTH_MS;
                         if let Some(row) = csv_table.get_mut(row_idx as usize + 4)
                             && let Some(cell) = row.get_mut(col_idx)
