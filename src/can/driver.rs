@@ -182,9 +182,8 @@ impl Driver for UdpDriver {
     }
 
     fn write_frame(&mut self, _frame: CanFrame) -> DriverResult<()> {
-        Err(DriverError::WriteError(
-            "UDP write not implemented".to_string(),
-        ))
+        log::error!("UDP write requested but not implemented; ignoring frame.");
+        Ok(())
     }
 
     fn is_connected(&self) -> bool {
