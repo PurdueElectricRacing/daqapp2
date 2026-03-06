@@ -1,7 +1,7 @@
 use crate::{can, connection, messages};
 use chrono::Local;
 use slcan::CanFrame;
-use std::{f64::consts::E, thread, time::Duration};
+use std::{thread, time::Duration};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;

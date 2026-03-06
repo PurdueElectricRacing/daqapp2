@@ -1,5 +1,5 @@
 use crate::{
-    action, can, connection, messages, settings, shortcuts, theme, ui, util, widgets, workspace,
+    action, connection, messages, settings, shortcuts, theme, ui, util, widgets, workspace,
 };
 use eframe::egui;
 
