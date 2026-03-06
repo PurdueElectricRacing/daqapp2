@@ -307,6 +307,25 @@ impl SendUi {
 
         egui_tiles::UiResponse::None
     }
+
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
+        if let messages::MsgFromCan::MessageSent {
+            msg_id,
+            timestamp,
+            amount_left,
+        } = msg
+        {
+            for sending_msg in &mut self.sending_messages {
+                if sending_msg.msg_id == *msg_id {
+                    sending_msg.last_sent = *timestamp;
+                    if let Some(amount_left) = amount_left {
+                        sending_msg.amount = *amount_left;
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }
 
 struct MessageCard<'a> {
