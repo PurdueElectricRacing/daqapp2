@@ -1,12 +1,37 @@
 use crate::{can, connection, ui};
-use chrono::Local;
-use slcan::CanFrame;
+use chrono::{DateTime, Local};
+use log::logger;
+use slcan::{Can2Frame, CanFrame};
+use core::time;
+use std::io::Write;
+use std::os::linux::raw;
 use std::{thread, time::Duration};
+use std::fs::{File, OpenOptions, create_dir_all, exists, write};
+use bytemuck::{Pod, Zeroable};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
 
-fn process_can_frame(frame: CanFrame, state: &can::state::State) {
+#[repr(C)]
+#[derive(Pod, Zeroable, Copy, Clone)]
+struct RawFrame {
+    ticks_ms: u32,
+    identity: u32,
+    data: [u8; 8],
+}
+
+pub struct Logger {
+    file: Option<File>,
+    time: DateTime<Local>,
+}
+
+impl Logger {
+    pub fn new(file: Option<File>) -> Logger{
+        Logger {file: file, time: Local::now()}
+    }
+}
+
+fn process_can_frame(frame: &CanFrame, state: &can::state::State) {
     match frame {
         CanFrame::Can2(frame2) => {
             let id = match frame2.id() {
@@ -67,6 +92,8 @@ pub fn start_can_thread(
         let mut state = can::state::State::new(can_sender, ui_receiver);
         let mut driver: Option<Box<dyn can::driver::Driver>> = None;
         let mut current_source: Option<connection::ConnectionSource> = selected_source;
+
+        let mut last_log = Logger::new(None);
 
         // MAIN LOOP
         loop {
@@ -139,7 +166,8 @@ pub fn start_can_thread(
 
             match active_driver.read_frame() {
                 Ok(frame) => {
-                    process_can_frame(frame, &state);
+                    process_can_frame(&frame, &state);
+                    log_frame(&frame, &mut last_log);
                 }
                 Err(can::driver::DriverError::ReadError(error_type)) => {
                     match error_type {
@@ -178,4 +206,60 @@ pub fn start_can_thread(
         }
         unreachable!("CAN thread should never exit on its own");
     })
+}
+
+// Log every CAN frame within a certain amount of time
+pub fn log_frame(frame: &CanFrame, last_log: &mut Logger) {
+    match create_dir_all("./logs/") {
+        Ok(_) => {}
+        Err(e) => {log::error!("Error with logs directory: {}", e)}
+    }
+
+    let now = Local::now();
+    let difference = now - last_log.time;
+
+    if last_log.file.is_none() || difference.num_minutes() > 3 {
+        let filename = format!("./logs/{}.log", now.format("%Y-%m-%d_%H-%M-%S"));
+        match OpenOptions::new().write(true).append(true).create(true).open(&filename) {
+            Ok(f) => {
+                last_log.file = Some(f);
+                last_log.time = now;
+            }
+            Err(e) => {
+                log::error!("Error creating file: {}", e);
+                return;
+            }
+        }
+    }
+
+    if let Some(file) = &mut last_log.file {
+        let ticks = now.timestamp_millis() as u32;
+        let raw_message = match frame {
+            CanFrame::Can2(frame2) => {
+                let id = match frame2.id() {
+                    slcan::Id::Standard(sid) => sid.as_raw() as u32,
+                    slcan::Id::Extended(eid) => eid.as_raw(),
+                };
+                let mut raw_data = [0u8; 8];
+                if let Some(data_slice) = frame2.data() {
+                    raw_data[..data_slice.len().min(8)].copy_from_slice(&data_slice[..data_slice.len().min(8)]);
+                }
+                RawFrame { ticks_ms: ticks, identity: id, data: raw_data }
+            }
+            CanFrame::CanFd(frame_fd) => {
+                let id = match frame_fd.id() {
+                    slcan::Id::Standard(sid) => sid.as_raw() as u32,
+                    slcan::Id::Extended(eid) => eid.as_raw(),
+                };
+                let mut raw_data = [0u8; 8];
+                let data_slice = frame_fd.data();
+                raw_data[..data_slice.len().min(8)].copy_from_slice(&data_slice[..data_slice.len().min(8)]);
+                RawFrame { ticks_ms: ticks, identity: id, data: raw_data }
+            }
+        };
+
+        if let Err(e) = file.write_all(bytemuck::bytes_of(&raw_message)) {
+            log::error!("Error writing to file: {}", e);
+        }
+    }
 }
