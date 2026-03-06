@@ -30,22 +30,16 @@ impl LogParser {
     }
 
     fn parse_logs(&mut self, parser: Option<&app::ParserInfo>) {
-        let logs_dir = match &self.logs_dir {
-            Some(p) => p,
-            None => {
-                // TODO: make persistent log directories
-                log::error!("Error: Logs directory not selected");
-                return;
-            }
+        let logs_dir = if let Some(p) = &self.logs_dir { p } else {
+            // TODO: make persistent log directories
+            log::error!("Error: Logs directory not selected");
+            return;
         };
 
-        let output_dir = match &self.output_dir {
-            Some(p) => p,
-            None => {
-                log::error!("Error: Output directory not selected");
-                return;
-            }
-        };
+        let output_dir = if let Some(p) = &self.output_dir { p } else {
+             log::error!("Error: Output directory not selected");
+             return;
+         };
 
         match parser {
             Some(p) => {
@@ -55,11 +49,11 @@ impl LogParser {
                 log::info!("Parsing logs from: {}", logs_dir.display());
                 log::info!("Output to: {}", output_dir.display());
                 let parsed = daq_log_parse::parse::parse_log_files(logs_dir, &p.parser);
-                let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
+                let chunked_parsed =  daq_log_parse::parse::chunk_parsed(parsed);
 
                 let mut table_builder = daq_log_parse::table::TableBuilder::new();
                 table_builder.create_header(&p.parser);
-                table_builder.create_and_write_tables(&output_dir, chunked_parsed);
+                table_builder.create_and_write_tables(output_dir, chunked_parsed);
             }
             // TODO: make proper UI indication that parse has failed / not occured
             None => log::warn!("No DBC selected, not parsing"),
