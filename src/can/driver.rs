@@ -195,7 +195,7 @@ pub fn parse_udp_buffer(
         ))));
     }
 
-    let mut frames = Vec::new();
+    let mut frames = Vec::with_capacity(num_bytes / UDP_RAW_FRAME_SIZE);
     let mask_id = (1u32 << 29) - 1;
 
     let mut chunks = buf[..num_bytes].chunks_exact(UDP_RAW_FRAME_SIZE);
