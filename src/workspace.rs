@@ -24,6 +24,7 @@ struct WorkspaceTileBehavior<'a> {
     can_messages: &'a [messages::MsgFromCan],
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
+    ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -33,7 +34,13 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tile_id: egui_tiles::TileId,
         widget: &mut widgets::Widget,
     ) -> egui_tiles::UiResponse {
-        widget.show(ui, self.can_messages, self.action_queue, self.parser)
+        widget.show(
+            ui,
+            self.can_messages,
+            self.action_queue,
+            self.parser,
+            self.ui_to_can_tx.clone(),
+        )
     }
 
     fn tab_title_for_pane(&mut self, widget: &widgets::Widget) -> egui::WidgetText {
