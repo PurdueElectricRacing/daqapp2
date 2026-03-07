@@ -216,9 +216,11 @@ pub fn start_can_thread(
                 continue;
             };
 
-            match active_driver.read_frame() {
-                Ok(frame) => {
-                    process_can_frame(frame, &state);
+            match active_driver.read_frames() {
+                Ok(frames) => {
+                    for frame in frames {
+                        process_can_frame(frame, &state);
+                    }
                 }
                 Err(can::driver::DriverError::ReadError(error_type)) => {
                     match error_type {
