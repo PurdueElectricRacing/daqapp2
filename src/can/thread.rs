@@ -4,7 +4,8 @@ const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
 const BUS_LOAD_UPDATE_MS: u128 = 200;
 
-fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) {
+// Returns the number of payload data bytes in the CAN frame if it was a Can2 frame
+fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize {
     match frame {
         slcan::CanFrame::Can2(frame2) => {
             let id = match frame2.id() {
@@ -41,6 +42,8 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) {
                     data
                 );
             }
+
+            data.len()
         }
         slcan::CanFrame::CanFd(frame_fd) => {
             let id = match frame_fd.id() {
@@ -52,6 +55,9 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) {
                 id,
                 frame_fd.data().len()
             );
+
+            let data = frame_fd.data();
+            data.len()
         }
     }
 }
@@ -217,8 +223,8 @@ pub fn start_can_thread(
 
             match active_driver.read_frame() {
                 Ok(frame) => {
-                    process_can_frame(frame, &state);
-                    state.bus_load_tracker.record_frame();
+                    let data_bytes = process_can_frame(frame, &state);
+                    state.bus_load_tracker.record_frame(data_bytes);
 
                     // Send bus load updates periodically
                     if state.last_bus_load_update.elapsed().as_millis() >= BUS_LOAD_UPDATE_MS {

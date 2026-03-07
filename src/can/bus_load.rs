@@ -6,31 +6,31 @@ const CAN_BUS_SPEED: f32 = 500_000.0; // 500 kbps
 // IDE	1
 // r0	1
 // DLC	4
-// Data	64
 // CRC	15
 // CRC delim	1
 // ACK	2
 // EOF	7
 // IFS	3
-// Subtotal: 111
+// Subtotal: 47
 // But with bit stuffing: +~20%
-const CAN_FRAME_BITS: usize = 130;
+const CAN_FRAME_BASE_BITS: usize = 66;
 
 const CLEAN_UP_INTERVAL_SECS: i64 = 30;
 
 pub struct BusLoadTracker {
-    timestamps: std::collections::VecDeque<chrono::DateTime<chrono::Local>>,
+    timestamp_bits: std::collections::VecDeque<(chrono::DateTime<chrono::Local>, usize)>,
 }
 
 impl BusLoadTracker {
     pub fn new() -> Self {
         Self {
-            timestamps: std::collections::VecDeque::new(),
+            timestamp_bits: std::collections::VecDeque::new(),
         }
     }
 
-    pub fn record_frame(&mut self) {
-        self.timestamps.push_back(chrono::Local::now());
+    pub fn record_frame(&mut self, data_bytes: usize) {
+        self.timestamp_bits
+            .push_back((chrono::Local::now(), data_bytes * 8 + CAN_FRAME_BASE_BITS));
     }
 
     // Returns bus load percentage for the given window in seconds
@@ -39,12 +39,12 @@ impl BusLoadTracker {
         let window_duration = chrono::Duration::seconds(window_secs as i64);
         let cutoff_time = now - window_duration;
 
-        let total_bits = self
-            .timestamps
+        let total_bits: usize = self
+            .timestamp_bits
             .iter()
-            .filter(|&&ts| ts > cutoff_time)
-            .count()
-            * CAN_FRAME_BITS;
+            .filter(|&&(ts, _)| ts > cutoff_time)
+            .map(|&(_, bits)| bits)
+            .sum();
 
         let max_bits_in_window = CAN_BUS_SPEED * window_secs as f32;
         (total_bits as f32 / max_bits_in_window) * 100.0
@@ -53,9 +53,9 @@ impl BusLoadTracker {
     // Clean up old entries
     pub fn cleanup(&mut self) {
         let cutoff_time = chrono::Local::now() - chrono::Duration::seconds(CLEAN_UP_INTERVAL_SECS);
-        while let Some(&ts) = self.timestamps.front() {
+        while let Some(&(ts, _)) = self.timestamp_bits.front() {
             if ts <= cutoff_time {
-                self.timestamps.pop_front();
+                self.timestamp_bits.pop_front();
             } else {
                 break;
             }

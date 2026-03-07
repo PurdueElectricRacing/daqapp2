@@ -5,16 +5,16 @@ const PLOT_TIME_WINDOW_SECS: f64 = 30.0;
 
 pub struct BusLoad {
     pub title: String,
-    
-	pub load_1s: f32,
+
+    pub load_1s: f32,
     pub load_5s: f32,
     pub load_10s: f32,
     pub load_30s: f32,
 
-	pub max_1s: f32,
-	pub max_5s: f32,
-	pub max_10s: f32,
-	pub max_30s: f32,
+    pub max_1s: f32,
+    pub max_5s: f32,
+    pub max_10s: f32,
+    pub max_30s: f32,
 
     pub window: std::collections::VecDeque<(f64, f64)>, // (time, load)
 }
@@ -28,10 +28,10 @@ impl BusLoad {
             load_10s: 0.0,
             load_30s: 0.0,
 
-			max_1s: 0.0,
-			max_5s: 0.0,
-			max_10s: 0.0,
-			max_30s: 0.0,
+            max_1s: 0.0,
+            max_5s: 0.0,
+            max_10s: 0.0,
+            max_30s: 0.0,
 
             window: std::collections::VecDeque::new(),
         }
@@ -90,7 +90,7 @@ impl BusLoad {
                         .strong()
                         .color(ui.style().visuals.text_color()),
                 );
-				ui.label(
+                ui.label(
                     egui::RichText::new("Max Load %")
                         .strong()
                         .color(ui.style().visuals.text_color()),
@@ -100,33 +100,33 @@ impl BusLoad {
                 // 1 second
                 ui.label("1 second");
                 let color_1s = self.get_color(self.load_1s);
-				let max_color_1s = self.get_color(self.max_1s);
+                let max_color_1s = self.get_color(self.max_1s);
                 ui.colored_label(color_1s, format!("{:.2}%", self.load_1s));
-				ui.colored_label(max_color_1s, format!("{:.2}%", self.max_1s));
+                ui.colored_label(max_color_1s, format!("{:.2}%", self.max_1s));
                 ui.end_row();
 
                 // 5 seconds
                 ui.label("5 seconds");
                 let color_5s = self.get_color(self.load_5s);
-				let max_color_5s = self.get_color(self.max_5s);
+                let max_color_5s = self.get_color(self.max_5s);
                 ui.colored_label(color_5s, format!("{:.2}%", self.load_5s));
-				ui.colored_label(max_color_5s, format!("{:.2}%", self.max_5s));
+                ui.colored_label(max_color_5s, format!("{:.2}%", self.max_5s));
                 ui.end_row();
 
                 // 10 seconds
                 ui.label("10 seconds");
                 let color_10s = self.get_color(self.load_10s);
-				let max_color_10s = self.get_color(self.max_10s);
+                let max_color_10s = self.get_color(self.max_10s);
                 ui.colored_label(color_10s, format!("{:.2}%", self.load_10s));
-				ui.colored_label(max_color_10s, format!("{:.2}%", self.max_10s));
+                ui.colored_label(max_color_10s, format!("{:.2}%", self.max_10s));
                 ui.end_row();
 
                 // 30 seconds
                 ui.label("30 seconds");
                 let color_30s = self.get_color(self.load_30s);
-				let max_color_30s = self.get_color(self.max_30s);
+                let max_color_30s = self.get_color(self.max_30s);
                 ui.colored_label(color_30s, format!("{:.2}%", self.load_30s));
-				ui.colored_label(max_color_30s, format!("{:.2}%", self.max_30s));
+                ui.colored_label(max_color_30s, format!("{:.2}%", self.max_30s));
                 ui.end_row();
             });
 
@@ -146,10 +146,10 @@ impl BusLoad {
             self.load_10s = *load_10s;
             self.load_30s = *load_30s;
 
-			self.max_1s = self.max_1s.max(*load_1s);
-			self.max_5s = self.max_5s.max(*load_5s);
-			self.max_10s = self.max_10s.max(*load_10s);
-			self.max_30s = self.max_30s.max(*load_30s);
+            self.max_1s = self.max_1s.max(*load_1s);
+            self.max_5s = self.max_5s.max(*load_5s);
+            self.max_10s = self.max_10s.max(*load_10s);
+            self.max_30s = self.max_30s.max(*load_30s);
 
             let current_time = chrono::Local::now().timestamp_millis() as f64 / 1000.0;
             self.window.push_back((current_time, *load_1s as f64));
