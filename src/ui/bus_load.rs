@@ -1,12 +1,15 @@
 use crate::messages;
 use eframe::egui;
 
+const PLOT_TIME_WINDOW_SECS: f64 = 30.0;
+
 pub struct BusLoad {
     pub title: String,
     pub load_1s: f32,
     pub load_5s: f32,
     pub load_10s: f32,
     pub load_30s: f32,
+    pub window: std::collections::VecDeque<(f64, f64)>, // (time, load)
 }
 
 impl BusLoad {
@@ -17,6 +20,7 @@ impl BusLoad {
             load_5s: 0.0,
             load_10s: 0.0,
             load_30s: 0.0,
+            window: std::collections::VecDeque::new(),
         }
     }
 
@@ -31,6 +35,33 @@ impl BusLoad {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+        egui_plot::Plot::new(&self.title)
+            .view_aspect(2.0)
+            .auto_bounds(egui::Vec2b::TRUE)
+            // .x_axis_label("Time (seconds)")
+            .y_axis_label("Bus Load (%)")
+            .allow_axis_zoom_drag(false)
+            .show(ui, |plot_ui| {
+                if self.window.is_empty() {
+                    return;
+                }
+
+                let points: egui_plot::PlotPoints = self
+                    .window
+                    .iter()
+                    .map(|(time, value)| [*time, *value])
+                    .collect();
+
+                let line = egui_plot::Line::new("Bus Load (%)", points)
+                    .color(egui::Color32::from_rgb(100, 200, 100))
+                    .stroke(egui::Stroke::new(
+                        2.0,
+                        egui::Color32::from_rgb(100, 200, 100),
+                    ));
+
+                plot_ui.line(line);
+            });
+
         egui::Grid::new(format!("bus_load_grid_{}", self.title))
             .striped(true)
             .spacing([20.0, 10.0])
@@ -88,6 +119,16 @@ impl BusLoad {
             self.load_5s = *load_5s;
             self.load_10s = *load_10s;
             self.load_30s = *load_30s;
+
+            let current_time = chrono::Local::now().timestamp_millis() as f64 / 1000.0;
+            self.window.push_back((current_time, *load_1s as f64));
+            while let Some(&(time, _)) = self.window.front() {
+                if current_time - time > PLOT_TIME_WINDOW_SECS {
+                    self.window.pop_front();
+                } else {
+                    break;
+                }
+            }
         }
     }
 }
