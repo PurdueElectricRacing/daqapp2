@@ -61,9 +61,7 @@ pub fn start_can_thread(
     selected_source: Option<connection::ConnectionSource>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
-        let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx);
-        let mut driver: Option<Box<dyn can::driver::Driver>> = None;
-        let mut current_source: Option<connection::ConnectionSource> = selected_source;
+        let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx, selected_source);
 
         // MAIN LOOP
         loop {
@@ -81,7 +79,7 @@ pub fn start_can_thread(
                     }
                     messages::MsgFromUi::Connect(source) => {
                         // Close existing connection if any
-                        if let Some(mut old_driver) = driver.take() {
+                        if let Some(mut old_driver) = state.driver.take() {
                             let _ = old_driver.close();
                         }
                         state.is_connected = false;
@@ -89,7 +87,7 @@ pub fn start_can_thread(
                             .can_to_ui_tx
                             .send(messages::MsgFromCan::Disconnection)
                             .expect("Failed to send disconnected message");
-                        current_source = Some(source);
+                        state.current_source = Some(source);
                     }
                     messages::MsgFromUi::AddSendMessage(add_send_msg) => {
                         state.add_send_message(add_send_msg);
@@ -101,7 +99,7 @@ pub fn start_can_thread(
             }
             let msgs_to_send = state.send_this_tick();
             for msg in msgs_to_send {
-                if let Some(ref mut active_driver) = driver {
+                if let Some(ref mut active_driver) = state.driver {
                     let id = if msg.is_msg_id_extended {
                         slcan::ExtendedId::new(msg.msg_id).map(slcan::Id::Extended)
                     } else if msg.msg_id <= 0x7FF {
@@ -142,7 +140,7 @@ pub fn start_can_thread(
                                 Err(e) => {
                                     log::error!("Failed to send CAN frame: {:?}", e);
                                     state.is_connected = false;
-                                    if let Some(ref source) = current_source {
+                                    if let Some(ref source) = state.current_source {
                                         let error_msg = match source {
                                             connection::ConnectionSource::Serial(path) => {
                                                 path.clone()
@@ -156,7 +154,7 @@ pub fn start_can_thread(
                                             .send(messages::MsgFromCan::ConnectionFailed(error_msg))
                                             .expect("Failed to send connection failed message");
                                     }
-                                    driver = None;
+                                    state.driver = None;
                                 }
                             }
                         } else {
@@ -175,11 +173,11 @@ pub fn start_can_thread(
             }
 
             // Attempt to connect if we don't have a driver but have a source
-            if driver.is_none() {
-                if let Some(ref source) = current_source {
+            if state.driver.is_none() {
+                if let Some(ref source) = state.current_source {
                     match can::driver::create_driver(source) {
                         Ok(new_driver) => {
-                            driver = Some(new_driver);
+                            state.driver = Some(new_driver);
                             state.is_connected = true;
                             state
                                 .can_to_ui_tx
@@ -211,7 +209,7 @@ pub fn start_can_thread(
             }
 
             // Try to read a frame from the driver
-            let Some(ref mut active_driver) = driver else {
+            let Some(ref mut active_driver) = state.driver else {
                 std::thread::sleep(std::time::Duration::from_millis(NO_CONNECTION_SLEEP_MS));
                 continue;
             };
@@ -232,7 +230,7 @@ pub fn start_can_thread(
                             // Actual error, disconnect
                             log::error!("Driver read error: {:?}", other);
                             state.is_connected = false;
-                            if let Some(ref source) = current_source {
+                            if let Some(ref source) = state.current_source {
                                 let error_msg = match source {
                                     connection::ConnectionSource::Serial(path) => path.clone(),
                                     connection::ConnectionSource::Udp(port) => {
@@ -244,14 +242,14 @@ pub fn start_can_thread(
                                     .send(messages::MsgFromCan::ConnectionFailed(error_msg))
                                     .expect("Failed to send connection failed message");
                             }
-                            driver = None;
+                            state.driver = None;
                         }
                     }
                 }
                 Err(e) => {
                     log::error!("Unexpected driver error: {:?}", e);
                     state.is_connected = false;
-                    driver = None;
+                    state.driver = None;
                 }
             }
         }

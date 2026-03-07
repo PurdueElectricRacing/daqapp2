@@ -1,8 +1,10 @@
-use crate::messages;
+use crate::{can, connection, messages};
 
 pub struct State {
     pub can_to_ui_tx: std::sync::mpsc::Sender<messages::MsgFromCan>,
     pub ui_to_can_rx: std::sync::mpsc::Receiver<messages::MsgFromUi>,
+    pub driver: Option<Box<dyn can::driver::Driver>>,
+    pub current_source: Option<connection::ConnectionSource>,
     pub is_connected: bool,
     pub parser: Option<can_decode::Parser>,
     pub send_msgs: std::collections::HashMap<u32, SendMsgInfo>, // msg_id -> SendMsg
@@ -25,10 +27,13 @@ impl State {
     pub fn new(
         can_to_ui_tx: std::sync::mpsc::Sender<messages::MsgFromCan>,
         ui_to_can_rx: std::sync::mpsc::Receiver<messages::MsgFromUi>,
+        current_source: Option<connection::ConnectionSource>,
     ) -> Self {
         Self {
             can_to_ui_tx,
             ui_to_can_rx,
+            driver: None,
+            current_source,
             is_connected: false,
             parser: None,
             send_msgs: std::collections::HashMap::new(),
