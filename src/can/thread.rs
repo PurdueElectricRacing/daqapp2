@@ -2,6 +2,7 @@ use crate::{can, connection, messages};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
+const BUS_LOAD_UPDATE_MS: u128 = 200;
 
 fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) {
     match frame {
@@ -217,6 +218,30 @@ pub fn start_can_thread(
             match active_driver.read_frame() {
                 Ok(frame) => {
                     process_can_frame(frame, &state);
+                    state.bus_load_tracker.record_frame();
+
+                    // Send bus load updates periodically
+                    if state.last_bus_load_update.elapsed().as_millis()
+                        >= BUS_LOAD_UPDATE_MS
+                    {
+                        state.bus_load_tracker.cleanup();
+                        let load_1s = state.bus_load_tracker.get_load(1);
+                        let load_5s = state.bus_load_tracker.get_load(5);
+                        let load_10s = state.bus_load_tracker.get_load(10);
+                        let load_30s = state.bus_load_tracker.get_load(30);
+
+                        state
+                            .can_to_ui_tx
+                            .send(messages::MsgFromCan::BusLoad {
+                                load_1s,
+                                load_5s,
+                                load_10s,
+                                load_30s,
+                            })
+                            .expect("Failed to send bus load message");
+
+                        state.last_bus_load_update = std::time::Instant::now();
+                    }
                 }
                 Err(can::driver::DriverError::ReadError(error_type)) => {
                     match error_type {
