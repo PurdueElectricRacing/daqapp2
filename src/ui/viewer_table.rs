@@ -104,15 +104,18 @@ impl ViewerTable {
                             .decoded
                             .signals
                             .iter()
-                            .map(|(sig_name, signal)| {
-                                if signal.unit.is_empty() {
-                                    (sig_name.as_str(), format!("{:.2}", signal.value))
-                                } else {
-                                    (
-                                        sig_name.as_str(),
-                                        format!("{:.2} {}", signal.value, signal.unit),
-                                    )
+                            .map(|(sig_name, signal)| match signal.value {
+                                can_decode::DecodedSignalValue::Numeric(f) => {
+                                    if signal.unit.is_empty() {
+                                        (sig_name.as_str(), format!("{:.2}", f))
+                                    } else {
+                                        (sig_name.as_str(), format!("{:.2} {}", f, signal.unit))
+                                    }
                                 }
+                                can_decode::DecodedSignalValue::Enum(raw_value, ref enum_str) => (
+                                    sig_name.as_str(),
+                                    format!("{} ({})", enum_str.clone(), raw_value),
+                                ),
                             })
                             .collect();
                         let raw_bytes_str = msg
