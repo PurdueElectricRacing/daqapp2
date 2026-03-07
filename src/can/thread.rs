@@ -218,6 +218,7 @@ pub fn log_frame(frame: &CanFrame, last_log: &mut Logger) {
     let now = Local::now();
     let difference = now - last_log.time;
 
+    // Create file if necessary
     if last_log.file.is_none() || difference.num_minutes() > 3 {
         let filename = format!("./logs/{}.log", now.format("%Y-%m-%d_%H-%M-%S"));
         match OpenOptions::new().write(true).append(true).create(true).open(&filename) {
@@ -232,6 +233,7 @@ pub fn log_frame(frame: &CanFrame, last_log: &mut Logger) {
         }
     }
 
+    // Write into File
     if let Some(file) = &mut last_log.file {
         let ticks = now.timestamp_millis() as u32;
         let raw_message = match frame {
