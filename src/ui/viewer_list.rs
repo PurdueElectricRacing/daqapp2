@@ -85,8 +85,8 @@ impl ViewerList {
                                         ui.label(format!("{:.2} {}", f, signal.unit));
                                     }
                                 }
-                                can_decode::DecodedSignalValue::Enum(_, ref enum_str) => {
-                                    ui.label(enum_str);
+                                can_decode::DecodedSignalValue::Enum(raw_value, ref enum_str) => {
+                                    ui.label(format!("{} ({})", enum_str, raw_value));
                                 }
                             });
                         });

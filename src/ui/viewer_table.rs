@@ -112,9 +112,10 @@ impl ViewerTable {
                                         (sig_name.as_str(), format!("{:.2} {}", f, signal.unit))
                                     }
                                 }
-                                can_decode::DecodedSignalValue::Enum(_, ref enum_str) => {
-                                    (sig_name.as_str(), enum_str.clone())
-                                }
+                                can_decode::DecodedSignalValue::Enum(raw_value, ref enum_str) => (
+                                    sig_name.as_str(),
+                                    format!("{} ({})", enum_str.clone(), raw_value),
+                                ),
                             })
                             .collect();
                         let raw_bytes_str = msg
