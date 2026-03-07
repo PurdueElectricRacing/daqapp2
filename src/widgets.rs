@@ -8,6 +8,7 @@ pub enum Widget {
     Scope(ui::scope::Scope),
     LogParser(ui::log_parser::LogParser),
     SendUi(ui::send::SendUi),
+    BusLoad(ui::bus_load::BusLoad),
 }
 
 impl Widget {
@@ -19,6 +20,7 @@ impl Widget {
             Widget::Scope(w) => &w.title,
             Widget::LogParser(w) => &w.title,
             Widget::SendUi(w) => &w.title,
+            Widget::BusLoad(w) => &w.title,
         }
     }
 
@@ -49,6 +51,7 @@ impl Widget {
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, parser),
             Widget::SendUi(w) => w.show(ui, ui_to_can_tx, parser),
+            Widget::BusLoad(w) => w.show(ui),
         }
     }
 
@@ -58,6 +61,7 @@ impl Widget {
             Widget::ViewerList(w) => w.handle_can_message(msg),
             Widget::Scope(w) => w.handle_can_message(msg),
             Widget::SendUi(w) => w.handle_can_message(msg),
+            Widget::BusLoad(w) => w.handle_can_message(msg),
             _ => {}
         }
     }

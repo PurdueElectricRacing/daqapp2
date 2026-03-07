@@ -64,6 +64,11 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     .push(action::AppAction::SpawnWidget(action::WidgetType::SendUi));
             }
 
+            if ui.button("Add Bus Load").clicked() {
+                app.action_queue
+                    .push(action::AppAction::SpawnWidget(action::WidgetType::BusLoad));
+            }
+
             ui.separator();
             ui.heading("Connection Settings");
 

@@ -43,6 +43,7 @@ pub struct DAQApp {
     pub next_scope_num: usize,
     pub next_log_parser_num: usize,
     pub next_send_ui_num: usize,
+    pub next_bus_load_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
@@ -88,6 +89,7 @@ impl DAQApp {
             next_scope_num: 1,
             next_log_parser_num: 1,
             next_send_ui_num: 1,
+            next_bus_load_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
             action_queue: Vec::new(),
@@ -170,6 +172,9 @@ impl DAQApp {
                     action::WidgetType::SendUi => {
                         widgets::Widget::SendUi(ui::send::SendUi::new(self.next_send_ui_num))
                     }
+                    action::WidgetType::BusLoad => {
+                        widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
+                    }
                 };
                 self.add_widget_to_tree(widget);
 
@@ -192,6 +197,9 @@ impl DAQApp {
                     }
                     action::WidgetType::SendUi => {
                         self.next_send_ui_num += 1;
+                    }
+                    action::WidgetType::BusLoad => {
+                        self.next_bus_load_num += 1;
                     }
                 }
             }
@@ -255,7 +263,8 @@ impl eframe::App for DAQApp {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
                 messages::MsgFromCan::ParsedMessage(_)
-                | messages::MsgFromCan::MessageSent { .. } => {
+                | messages::MsgFromCan::MessageSent { .. }
+                | messages::MsgFromCan::BusLoad { .. } => {
                     // Nothing special to do here, the message will be handled
                     // in the individual widgets
                 }
