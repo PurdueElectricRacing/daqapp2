@@ -163,7 +163,12 @@ impl Scope {
                 return;
             };
 
-            self.add_point(parsed_msg.timestamp, signal.value);
+            let value = match signal.value {
+                can_decode::DecodedSignalValue::Numeric(f) => f,
+                can_decode::DecodedSignalValue::Enum(i, _) => i as f64,
+            };
+
+            self.add_point(parsed_msg.timestamp, value);
         }
     }
 }

@@ -104,14 +104,16 @@ impl ViewerTable {
                             .decoded
                             .signals
                             .iter()
-                            .map(|(sig_name, signal)| {
-                                if signal.unit.is_empty() {
-                                    (sig_name.as_str(), format!("{:.2}", signal.value))
-                                } else {
-                                    (
-                                        sig_name.as_str(),
-                                        format!("{:.2} {}", signal.value, signal.unit),
-                                    )
+                            .map(|(sig_name, signal)| match signal.value {
+                                can_decode::DecodedSignalValue::Numeric(f) => {
+                                    if signal.unit.is_empty() {
+                                        (sig_name.as_str(), format!("{:.2}", f))
+                                    } else {
+                                        (sig_name.as_str(), format!("{:.2} {}", f, signal.unit))
+                                    }
+                                }
+                                can_decode::DecodedSignalValue::Enum(_, ref enum_str) => {
+                                    (sig_name.as_str(), enum_str.clone())
                                 }
                             })
                             .collect();
