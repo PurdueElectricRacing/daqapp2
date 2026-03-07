@@ -221,9 +221,7 @@ pub fn start_can_thread(
                     state.bus_load_tracker.record_frame();
 
                     // Send bus load updates periodically
-                    if state.last_bus_load_update.elapsed().as_millis()
-                        >= BUS_LOAD_UPDATE_MS
-                    {
+                    if state.last_bus_load_update.elapsed().as_millis() >= BUS_LOAD_UPDATE_MS {
                         state.bus_load_tracker.cleanup();
                         let load_1s = state.bus_load_tracker.get_load(1);
                         let load_5s = state.bus_load_tracker.get_load(5);

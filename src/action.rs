@@ -19,6 +19,7 @@ pub enum WidgetType {
     },
     LogParser,
     SendUi,
+    BusLoad,
 }
 
 impl AppAction {
@@ -29,6 +30,7 @@ impl AppAction {
             ("Spawn Bootloader", WidgetType::Bootloader),
             ("Spawn Log Parser", WidgetType::LogParser),
             ("Spawn Send UI", WidgetType::SendUi),
+            ("Spawn Bus Load", WidgetType::BusLoad),
         ]
     }
 }
