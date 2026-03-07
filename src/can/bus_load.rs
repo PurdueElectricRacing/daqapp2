@@ -1,5 +1,21 @@
 const CAN_BUS_SPEED: f32 = 500_000.0; // 500 kbps
+
+// SOF	1
+// ID	11
+// RTR	1
+// IDE	1
+// r0	1
+// DLC	4
+// Data	64
+// CRC	15
+// CRC delim	1
+// ACK	2
+// EOF	7
+// IFS	3
+// Subtotal: 111
+// But with bit stuffing: +~20%
 const CAN_FRAME_BITS: usize = 130;
+
 const CLEAN_UP_INTERVAL_SECS: i64 = 30;
 
 pub struct BusLoadTracker {
