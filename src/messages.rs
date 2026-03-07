@@ -17,6 +17,12 @@ pub enum MsgFromCan {
         timestamp: chrono::DateTime<chrono::Local>,
         amount_left: Option<SendAmount>,
     },
+    BusLoad {
+        load_1s: f32,
+        load_5s: f32,
+        load_10s: f32,
+        load_30s: f32,
+    },
 }
 
 #[derive(Clone, Copy)]
