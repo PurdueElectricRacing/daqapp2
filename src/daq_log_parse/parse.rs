@@ -40,11 +40,16 @@ pub fn parse_log_files(
 }
 
 fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec<ParsedMessage> {
-    let content = std::fs::read(in_file).unwrap();
+    let mut content = std::fs::read(in_file).unwrap();
 
-    // TODO: handle case here where log format might be outdated, don't assume cast_slice will work
+    // add padding zeroes if content length is not multiple of raw frame size
+    if !content.len().is_multiple_of(std::mem::size_of::<RawFrame>()) {
+        log::warn!(
+            "Failed to parse log file - possibly due to outdated log format");
+        content.extend(vec![0; std::mem::size_of::<RawFrame>() - (content.len() % std::mem::size_of::<RawFrame>())]);
+    }
     let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content)
-        .expect("Failed to parse log file - possibly due to outdated log format");
+        .expect("Failed to parse log file - possibly due to outdated log format (shouldn't reach here if padding is added correctly");
     let mut parsed = Vec::with_capacity(frames.len());
 
     for frame in frames {
