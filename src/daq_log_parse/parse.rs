@@ -1,5 +1,7 @@
 use crate::daq_log_parse::consts;
 use bytemuck::{Pod, Zeroable};
+
+#[derive(Debug)]
 pub struct ParsedMessage {
     pub timestamp: u32,
     pub decoded: can_decode::DecodedMessage,
@@ -39,24 +41,18 @@ pub fn parse_log_files(
 
 fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec<ParsedMessage> {
     let content = std::fs::read(in_file).unwrap();
-    let frames: &[RawFrame] = bytemuck::cast_slice(&content);
+
+    // TODO: handle case here where log format might be outdated, don't assume cast_slice will work
+    let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content)
+        .expect("Failed to parse log file - possibly due to outdated log format");
     let mut parsed = Vec::with_capacity(frames.len());
 
-    // should be 16 bytes
-    let frame_size = size_of::<RawFrame>();
-
-    assert!(
-        content.len() % frame_size == 0,
-        "File size is not a multiple of frame size"
-    );
     for frame in frames {
-        let arb_id: u32;
-
-        if (frame.identity & consts::IS_EID_MASK) != 0 {
-            arb_id = frame.identity & consts::CAN_EID_MASK;
+        let arb_id = if (frame.identity & consts::IS_EID_MASK) != 0 {
+            frame.identity & consts::CAN_EID_MASK
         } else {
-            arb_id = frame.identity & consts::CAN_STD_ID_MASK;
-        }
+            frame.identity & consts::CAN_STD_ID_MASK
+        };
 
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
             parsed.push(ParsedMessage {
