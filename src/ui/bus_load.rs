@@ -51,7 +51,6 @@ impl BusLoad {
         egui_plot::Plot::new(&self.title)
             .view_aspect(2.0)
             .auto_bounds(egui::Vec2b::TRUE)
-            // .x_axis_label("Time (seconds)")
             .y_axis_label("Bus Load (%)")
             .allow_axis_zoom_drag(false)
             .show(ui, |plot_ui| {
