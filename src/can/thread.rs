@@ -148,14 +148,7 @@ pub fn start_can_thread(
                                     log::error!("Failed to send CAN frame: {:?}", e);
                                     state.is_connected = false;
                                     if let Some(ref source) = state.current_source {
-                                        let error_msg = match source {
-                                            connection::ConnectionSource::Serial(path) => {
-                                                path.clone()
-                                            }
-                                            connection::ConnectionSource::Udp(port) => {
-                                                format!("UDP:{}", port)
-                                            }
-                                        };
+                                        let error_msg = source.display_name();
                                         state
                                             .can_to_ui_tx
                                             .send(messages::MsgFromCan::ConnectionFailed(error_msg))
@@ -194,10 +187,7 @@ pub fn start_can_thread(
                         }
                         Err(e) => {
                             log::error!("Failed to create driver for {:?}: {:?}", source, e);
-                            let error_msg = match source {
-                                connection::ConnectionSource::Serial(path) => path.clone(),
-                                connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
-                            };
+                            let error_msg = source.display_name();
                             state
                                 .can_to_ui_tx
                                 .send(messages::MsgFromCan::ConnectionFailed(error_msg))
@@ -260,12 +250,7 @@ pub fn start_can_thread(
                             log::error!("Driver read error: {:?}", other);
                             state.is_connected = false;
                             if let Some(ref source) = state.current_source {
-                                let error_msg = match source {
-                                    connection::ConnectionSource::Serial(path) => path.clone(),
-                                    connection::ConnectionSource::Udp(port) => {
-                                        format!("UDP:{}", port)
-                                    }
-                                };
+                                let error_msg = source.display_name();
                                 state
                                     .can_to_ui_tx
                                     .send(messages::MsgFromCan::ConnectionFailed(error_msg))

@@ -1,4 +1,5 @@
 use crate::connection::ConnectionSource;
+use rand::prelude::*;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode};
@@ -195,6 +196,91 @@ impl Driver for UdpDriver {
     }
 }
 
+struct SimulatedDriver {
+    connected: bool,
+    pub parser: Option<can_decode::Parser>,
+}
+
+impl SimulatedDriver {
+    fn new(connected: bool, dbc_path: Option<std::path::PathBuf>) -> DriverResult<Self> {
+        if connected {
+            Ok(Self {
+                connected,
+                parser: dbc_path.and_then(|path| can_decode::Parser::from_dbc_file(&path).ok()),
+            })
+        } else {
+            Err(DriverError::ConnectionFailed(
+                "Simulated driver initialized as disconnected".into(),
+            ))
+        }
+    }
+}
+
+impl Driver for SimulatedDriver {
+    fn read_frame(&mut self) -> DriverResult<CanFrame> {
+        if self.connected {
+            let mut rng = rand::rng();
+
+            let random_msg = self.parser.as_ref().and_then(|p| {
+                let msgs = p.msg_defs();
+                if msgs.is_empty() {
+                    None
+                } else {
+                    Some(msgs.choose(&mut rng).expect("msgs is not empty").clone())
+                }
+            });
+
+            if let Some(msg) = random_msg {
+                let mut data = vec![0u8; msg.size as usize];
+                rng.fill_bytes(&mut data);
+                let id = match msg.id {
+                    can_dbc::MessageId::Extended(id) => slcan::Id::Extended(
+                        slcan::ExtendedId::new(id).expect("invalid extended id"),
+                    ),
+                    can_dbc::MessageId::Standard(id) => slcan::Id::Standard(
+                        slcan::StandardId::new(id).expect("invalid standard id"),
+                    ),
+                };
+                let can_frame = slcan::Can2Frame::new_data(id, &data)
+                    .expect("failed to create CAN frame from random data");
+                Ok(can_frame.into())
+            } else {
+                // If no DBC is loaded, just return random frames with random IDs and data
+                let id = rng.random_range(0..0x7FF);
+                let sid = slcan::StandardId::new(id).expect("invalid standard id");
+                let mut data = [0u8; 8];
+                rng.fill_bytes(&mut data);
+                let can2 = slcan::Can2Frame::new_data(sid, &data)
+                    .expect("failed to create CAN frame from random data");
+                Ok(can2.into())
+            }
+        } else {
+            Err(DriverError::ReadError(DriverReadError::Other(
+                "Simulated driver is disconnected".into(),
+            )))
+        }
+    }
+
+    fn write_frame(&mut self, _frame: CanFrame) -> DriverResult<()> {
+        if self.connected {
+            Ok(())
+        } else {
+            Err(DriverError::WriteError(
+                "Simulated driver is disconnected".into(),
+            ))
+        }
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    fn close(&mut self) -> DriverResult<()> {
+        self.connected = false;
+        Ok(())
+    }
+}
+
 pub fn parse_udp_buffer(buf: &[u8; 2048], num_bytes: usize) -> DriverResult<CanFrame> {
     if num_bytes < 5 {
         return Err(DriverError::ReadError(DriverReadError::Other(format!(
@@ -236,5 +322,9 @@ pub fn create_driver(source: &ConnectionSource) -> DriverResult<Box<dyn Driver>>
     match source {
         ConnectionSource::Serial(path) => Ok(Box::new(SerialDriver::new(path)?)),
         ConnectionSource::Udp(port) => Ok(Box::new(UdpDriver::new(*port)?)),
+        ConnectionSource::Simulated(connected, dbc_path) => Ok(Box::new(SimulatedDriver::new(
+            *connected,
+            dbc_path.clone(),
+        )?)),
     }
 }
