@@ -25,7 +25,7 @@ pub enum MsgFromCan {
     },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum SendAmount {
     Infinite { period: usize },
     Once,

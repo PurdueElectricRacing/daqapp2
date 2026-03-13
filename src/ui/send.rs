@@ -328,14 +328,18 @@ impl SendUi {
             amount_left,
         } = msg
         {
-            for sending_msg in &mut self.sending_messages {
-                if sending_msg.msg_id == *msg_id {
-                    sending_msg.last_sent = *timestamp;
-                    if let Some(amount_left) = amount_left {
-                        sending_msg.amount = *amount_left;
+            if let Some(rx_amount_left) = amount_left {
+                for sending_msg in &mut self.sending_messages {
+                    if sending_msg.msg_id == *msg_id {
+                        sending_msg.last_sent = *timestamp;
+                        sending_msg.amount = *rx_amount_left;
+                        break;
                     }
-                    break;
                 }
+            } else {
+                // If amount_left is None, it means the message is done sending,
+                // so we remove it from the list
+                self.sending_messages.retain(|msg| msg.msg_id != *msg_id);
             }
         }
     }
