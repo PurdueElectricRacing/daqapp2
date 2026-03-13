@@ -43,22 +43,37 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
     let mut content = std::fs::read(in_file).unwrap();
 
     // add padding zeroes if content length is not multiple of raw frame size
+    let mut added_padding = false;
     if !content
         .len()
         .is_multiple_of(std::mem::size_of::<RawFrame>())
     {
-        log::warn!("Failed to parse log file - possibly due to outdated log format");
+        log::warn!(
+            "Log file {} has length {} which is not a multiple of frame size {}. Possibly due to outdated log format.",
+            in_file.display(),
+            content.len(),
+            std::mem::size_of::<RawFrame>()
+        );
         content.extend(vec![
             0;
             std::mem::size_of::<RawFrame>()
                 - (content.len() % std::mem::size_of::<RawFrame>())
         ]);
+        added_padding = true;
     }
     let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content)
-        .expect("Failed to parse log file - possibly due to outdated log format (shouldn't reach here if padding is added correctly");
+        .expect("Padding should ensure this does not fail.");
     let mut parsed = Vec::with_capacity(frames.len());
 
-    for frame in frames {
+    for (i, frame) in frames.iter().enumerate() {
+        if added_padding && i == frames.len() - 1 {
+            log::info!(
+                "Skipping last frame in {} due to padding",
+                in_file.display()
+            );
+            break;
+        }
+
         let arb_id = if (frame.identity & consts::IS_EID_MASK) != 0 {
             frame.identity & consts::CAN_EID_MASK
         } else {
