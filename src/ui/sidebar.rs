@@ -84,15 +84,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 
             ui.horizontal(|ui| {
                 let selected_text = match &app.selected_source {
-                    Some(connection::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
-                    Some(connection::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
-                    Some(connection::ConnectionSource::Simulated(connected, _)) => {
-                        if *connected {
-                            "Simulated (connected)".into()
-                        } else {
-                            "Simulated (disconnected)".into()
-                        }
-                    }
+                    Some(connection_source) => connection_source.display_name(),
                     None => "Select Source".to_string(),
                 };
 
