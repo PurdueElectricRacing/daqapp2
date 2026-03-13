@@ -152,7 +152,11 @@ impl LogParser {
         ui.separator();
 
         // Parse button
-        if ui.button("▶ Parse Logs").clicked() {
+        let currently_parsing = self.parse_to_ui_rx.is_some();
+        if ui
+            .add_enabled(!currently_parsing, egui::Button::new("▶ Parse Logs"))
+            .clicked()
+        {
             self.parse_logs(parser);
         }
 
