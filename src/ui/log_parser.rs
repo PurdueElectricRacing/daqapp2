@@ -6,6 +6,15 @@ pub struct LogParser {
     pub title: String,
     pub logs_dir: Option<std::path::PathBuf>,
     pub output_dir: Option<std::path::PathBuf>,
+
+    pub parse_to_ui_rx: Option<std::sync::mpsc::Receiver<MsgFromParserThread>>,
+    pub parse_text: String,
+}
+
+enum MsgFromParserThread {
+    FatalExit(String),
+    SuccessExit(String),
+    Update(String),
 }
 
 impl LogParser {
@@ -14,6 +23,8 @@ impl LogParser {
             title: format!("Log Parser #{}", instance_num),
             logs_dir: None,
             output_dir: None,
+            parse_to_ui_rx: None,
+            parse_text: String::new(),
         }
     }
 
@@ -55,6 +66,10 @@ impl LogParser {
                 let logs_dir = logs_dir.clone();
                 let output_dir = output_dir.clone();
 
+                let (parse_to_ui_tx, parse_to_ui_rx) =
+                    std::sync::mpsc::channel::<MsgFromParserThread>();
+                self.parse_to_ui_rx = Some(parse_to_ui_rx);
+
                 std::thread::spawn(move || {
                     log::info!("Using DBC: {:?}", dbc_path);
                     log::info!("Parsing logs from: {}", logs_dir.display());
@@ -62,8 +77,21 @@ impl LogParser {
 
                     let Ok(parser) = can_decode::Parser::from_dbc_file(&dbc_path) else {
                         log::error!("Failed to create CAN parser from DBC file: {:?}", dbc_path);
+                        parse_to_ui_tx
+                            .send(MsgFromParserThread::FatalExit(
+                                "Failed to create CAN parser from DBC file".to_string(),
+                            ))
+                            .unwrap_or_else(|e| {
+                                log::error!("Failed to send fatal error message to UI: {}", e)
+                            });
                         return;
                     };
+
+                    parse_to_ui_tx
+                        .send(MsgFromParserThread::Update("Parsing logs...".to_string()))
+                        .unwrap_or_else(|e| {
+                            log::error!("Failed to send update message to UI: {}", e)
+                        });
 
                     let parsed = daq_log_parse::parse::parse_log_files(&logs_dir, &parser);
                     let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
@@ -73,6 +101,14 @@ impl LogParser {
                     table_builder.create_and_write_tables(&output_dir, chunked_parsed);
 
                     log::info!("Parsing completed successfully");
+                    parse_to_ui_tx
+                        .send(MsgFromParserThread::SuccessExit(format!(
+                            "Parsing completed successfully. Output at: {}",
+                            output_dir.display()
+                        )))
+                        .unwrap_or_else(|e| {
+                            log::error!("Failed to send success message to UI: {}", e)
+                        });
                 });
             }
             // TODO: make proper UI indication that parse has failed / not occured
@@ -120,6 +156,30 @@ impl LogParser {
         if ui.button("▶ Parse Logs").clicked() {
             self.parse_logs(parser);
         }
+
+        // Parser thread messages
+        if let Some(rx) = &self.parse_to_ui_rx {
+            match rx.try_recv() {
+                Ok(msg) => match msg {
+                    MsgFromParserThread::FatalExit(text) => {
+                        self.parse_text = format!("Error: {}", text);
+                    }
+                    MsgFromParserThread::SuccessExit(text) => {
+                        self.parse_text = text;
+                    }
+                    MsgFromParserThread::Update(text) => {
+                        self.parse_text = text;
+                    }
+                },
+                Err(std::sync::mpsc::TryRecvError::Empty) => {} // No message, do nothing
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.parse_to_ui_rx = None;
+                }
+            }
+        }
+
+        ui.separator();
+        ui.label(&self.parse_text);
 
         egui_tiles::UiResponse::None
     }
