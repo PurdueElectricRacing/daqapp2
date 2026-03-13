@@ -46,6 +46,7 @@ impl LogParser {
             None => {
                 // TODO: make persistent log directories
                 log::error!("Error: Logs directory not selected");
+                self.parse_text = "Error: Logs directory not selected".to_string();
                 return;
             }
         };
@@ -54,6 +55,7 @@ impl LogParser {
             Some(p) => p,
             None => {
                 log::error!("Error: Output directory not selected");
+                self.parse_text = "Error: Output directory not selected".to_string();
                 return;
             }
         };
@@ -112,7 +114,10 @@ impl LogParser {
                 });
             }
             // TODO: make proper UI indication that parse has failed / not occured
-            None => log::warn!("No DBC selected, not parsing"),
+            None => {
+                log::warn!("No DBC selected, not parsing");
+                self.parse_text = "Error: No DBC selected, not parsing".to_string();
+            }
         }
     }
 
