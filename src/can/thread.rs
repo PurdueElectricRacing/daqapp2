@@ -155,6 +155,16 @@ pub fn start_can_thread(
                                             connection::ConnectionSource::Udp(port) => {
                                                 format!("UDP:{}", port)
                                             }
+                                            connection::ConnectionSource::Simulated(
+                                                connected,
+                                                _,
+                                            ) => {
+                                                if *connected {
+                                                    "Simulated (connected)".into()
+                                                } else {
+                                                    "Simulated (disconnected)".into()
+                                                }
+                                            }
                                         };
                                         state
                                             .can_to_ui_tx
@@ -197,6 +207,13 @@ pub fn start_can_thread(
                             let error_msg = match source {
                                 connection::ConnectionSource::Serial(path) => path.clone(),
                                 connection::ConnectionSource::Udp(port) => format!("UDP:{}", port),
+                                connection::ConnectionSource::Simulated(connected, _) => {
+                                    if *connected {
+                                        "Simulated (connected)".into()
+                                    } else {
+                                        "Simulated (disconnected)".into()
+                                    }
+                                }
                             };
                             state
                                 .can_to_ui_tx
@@ -264,6 +281,13 @@ pub fn start_can_thread(
                                     connection::ConnectionSource::Serial(path) => path.clone(),
                                     connection::ConnectionSource::Udp(port) => {
                                         format!("UDP:{}", port)
+                                    }
+                                    connection::ConnectionSource::Simulated(connected, _) => {
+                                        if *connected {
+                                            "Simulated (connected)".into()
+                                        } else {
+                                            "Simulated (disconnected)".into()
+                                        }
                                     }
                                 };
                                 state

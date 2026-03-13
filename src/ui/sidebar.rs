@@ -86,6 +86,13 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 let selected_text = match &app.selected_source {
                     Some(connection::ConnectionSource::Serial(p)) => format!("Serial: {}", p),
                     Some(connection::ConnectionSource::Udp(p)) => format!("UDP: {}", p),
+                    Some(connection::ConnectionSource::Simulated(connected, _)) => {
+                        if *connected {
+                            "Simulated (connected)".into()
+                        } else {
+                            "Simulated (disconnected)".into()
+                        }
+                    }
                     None => "Select Source".to_string(),
                 };
 
@@ -125,6 +132,35 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                         {
                             app.connect_can();
                             app.save_settings();
+                        }
+                        ui.separator();
+                        ui.label("Simulated");
+                        let dbc_path = app.parser.as_ref().map(|p| p.dbc_path.clone());
+                        let sim_sources = [
+                            connection::ConnectionSource::Simulated(true, dbc_path.clone()),
+                            connection::ConnectionSource::Simulated(false, dbc_path.clone()),
+                        ];
+                        for sim_source in sim_sources {
+                            let label = match sim_source {
+                                connection::ConnectionSource::Simulated(true, _) => {
+                                    "Simulated (connected)"
+                                }
+                                connection::ConnectionSource::Simulated(false, _) => {
+                                    "Simulated (disconnected)"
+                                }
+                                _ => unreachable!(),
+                            };
+                            if ui
+                                .selectable_value(
+                                    &mut app.selected_source,
+                                    Some(sim_source.clone()),
+                                    label,
+                                )
+                                .changed()
+                            {
+                                app.connect_can();
+                                app.save_settings();
+                            }
                         }
                     });
 
