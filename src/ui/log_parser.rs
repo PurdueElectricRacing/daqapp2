@@ -7,8 +7,8 @@ pub struct LogParser {
     pub logs_dir: Option<std::path::PathBuf>,
     pub output_dir: Option<std::path::PathBuf>,
 
-    pub parse_to_ui_rx: Option<std::sync::mpsc::Receiver<MsgFromParserThread>>,
-    pub parse_text: String,
+    parse_to_ui_rx: Option<std::sync::mpsc::Receiver<MsgFromParserThread>>,
+    parse_text: String,
 }
 
 enum MsgFromParserThread {
