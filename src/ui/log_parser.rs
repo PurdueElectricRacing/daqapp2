@@ -51,15 +51,29 @@ impl LogParser {
             Some(p) => {
                 // TODO: make proper UI indication that parse has been completed/successful
 
-                log::info!("Using DBC: {:?}", p.dbc_path);
-                log::info!("Parsing logs from: {}", logs_dir.display());
-                log::info!("Output to: {}", output_dir.display());
-                let parsed = daq_log_parse::parse::parse_log_files(logs_dir, &p.parser);
-                let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
+                let dbc_path = p.dbc_path.clone();
+                let logs_dir = logs_dir.clone();
+                let output_dir = output_dir.clone();
 
-                let mut table_builder = daq_log_parse::table::TableBuilder::new();
-                table_builder.create_header(&p.parser);
-                table_builder.create_and_write_tables(&output_dir, chunked_parsed);
+                std::thread::spawn(move || {
+                    log::info!("Using DBC: {:?}", dbc_path);
+                    log::info!("Parsing logs from: {}", logs_dir.display());
+                    log::info!("Output to: {}", output_dir.display());
+
+                    let Ok(parser) = can_decode::Parser::from_dbc_file(&dbc_path) else {
+                        log::error!("Failed to create CAN parser from DBC file: {:?}", dbc_path);
+                        return;
+                    };
+
+                    let parsed = daq_log_parse::parse::parse_log_files(&logs_dir, &parser);
+                    let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
+
+                    let mut table_builder = daq_log_parse::table::TableBuilder::new();
+                    table_builder.create_header(&parser);
+                    table_builder.create_and_write_tables(&output_dir, chunked_parsed);
+
+                    log::info!("Parsing completed successfully");
+                });
             }
             // TODO: make proper UI indication that parse has failed / not occured
             None => log::warn!("No DBC selected, not parsing"),
