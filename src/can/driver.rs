@@ -221,12 +221,19 @@ impl Driver for SimulatedDriver {
         if self.connected {
             let mut rng = rand::rng();
 
-            if let Some(parser) = &self.parser {
-                let all_msgs = parser.msg_defs();
-                let random_msg = all_msgs.choose(&mut rng).unwrap();
-                let mut data = vec![0u8; random_msg.size as usize];
+            let random_msg = self.parser.as_ref().and_then(|p| {
+                let msgs = p.msg_defs();
+                if msgs.is_empty() {
+                    None
+                } else {
+                    Some(msgs.choose(&mut rng).expect("msgs is not empty").clone())
+                }
+            });
+
+            if let Some(msg) = random_msg {
+                let mut data = vec![0u8; msg.size as usize];
                 rng.fill_bytes(&mut data);
-                let id = match random_msg.id {
+                let id = match msg.id {
                     can_dbc::MessageId::Extended(id) => slcan::Id::Extended(
                         slcan::ExtendedId::new(id).expect("invalid extended id"),
                     ),
