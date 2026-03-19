@@ -15,6 +15,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 action_queue: &mut app.action_queue,
                 parser: app.parser.as_ref(),
                 ui_to_can_tx: app.ui_to_can_tx.clone(),
+                is_charge_controller_open: &mut app.is_charge_controller_open,
             };
             app.tile_tree.ui(&mut behavior, ui);
         }
@@ -26,6 +27,7 @@ struct WorkspaceTileBehavior<'a> {
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
     ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+    is_charge_controller_open: &'a mut bool,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -64,6 +66,19 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
         _tiles: &egui_tiles::Tiles<widgets::Widget>,
         _tile_id: egui_tiles::TileId,
     ) -> bool {
+        true
+    }
+
+    fn on_tab_close(
+        &mut self,
+        tiles: &mut egui_tiles::Tiles<widgets::Widget>,
+        tile_id: egui_tiles::TileId,
+    ) -> bool {
+        if let Some(egui_tiles::Tile::Pane(widgets::Widget::ChargeController(_))) =
+            tiles.get(tile_id)
+        {
+            *self.is_charge_controller_open = false;
+        }
         true
     }
 }

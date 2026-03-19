@@ -44,6 +44,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub next_send_ui_num: usize,
     pub next_bus_load_num: usize,
+    pub is_charge_controller_open: bool,
     pub next_battery_viewer_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
@@ -91,6 +92,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             next_send_ui_num: 1,
             next_bus_load_num: 1,
+            is_charge_controller_open: false,
             next_battery_viewer_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
@@ -178,6 +180,16 @@ impl DAQApp {
                     action::WidgetType::BusLoad => {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }
+                    action::WidgetType::ChargeController => {
+                        if !self.is_charge_controller_open {
+                            widgets::Widget::ChargeController(
+                                ui::charge_controller::ChargeController::new(),
+                            )
+                        } else {
+                            // avoid making duplicate charge controller
+                            return;
+                        }
+                    }
                     action::WidgetType::BatteryViewer => widgets::Widget::BatteryViewer(
                         ui::battery::BatteryViewer::new(self.next_battery_viewer_num),
                     ),
@@ -206,6 +218,10 @@ impl DAQApp {
                     }
                     action::WidgetType::BusLoad => {
                         self.next_bus_load_num += 1;
+                    }
+                    action::WidgetType::ChargeController => {
+                        // no counter, we should only ever have one charge controller widget
+                        self.is_charge_controller_open = true;
                     }
                     action::WidgetType::BatteryViewer => {
                         self.next_battery_viewer_num += 1;
@@ -283,7 +299,9 @@ impl eframe::App for DAQApp {
         if let Some(ppp) = self.pixels_per_point {
             ctx.set_pixels_per_point(ppp);
         }
-        ctx.set_style(self.theme.clone());
+        let colors = self.theme_selection.get_colors();
+        ctx.set_style(colors.to_egui_style());
+        theme::store_theme(ctx, colors); // globally accessible theme colors
 
         // Handle keyboard shortcuts
         self.action_queue
