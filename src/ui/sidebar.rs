@@ -1,4 +1,4 @@
-use crate::{action, app, connection, messages, util, theme};
+use crate::{action, app, connection, messages, theme, util};
 use eframe::egui::{self};
 
 pub fn select_dbc(

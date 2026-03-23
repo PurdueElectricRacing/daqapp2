@@ -58,7 +58,8 @@ impl ChargeController {
         // Pull theme colors from global ctx storage
         let theme = theme::get_theme(ui.ctx());
 
-        self.is_data_stale = self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
+        self.is_data_stale =
+            self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
         let stale = self.is_data_stale;
         let elapsed = self.last_update.elapsed().as_secs_f32();
 
@@ -281,7 +282,10 @@ impl ChargeController {
                 };
 
                 let pill_bg = Color32::from_rgba_unmultiplied(
-                    pill_color.r(), pill_color.g(), pill_color.b(), 40,
+                    pill_color.r(),
+                    pill_color.g(),
+                    pill_color.b(),
+                    40,
                 );
 
                 Frame::NONE
@@ -324,11 +328,7 @@ impl ChargeController {
                                 .size(11.0)
                                 .color(theme.text_color().linear_multiply(0.4)),
                         );
-                        ui.add(
-                            egui::DragValue::new(value)
-                                .range(range)
-                                .speed(1.0),
-                        );
+                        ui.add(egui::DragValue::new(value).range(range).speed(1.0));
                     });
                 });
             });
@@ -393,7 +393,10 @@ impl ChargeController {
 
         if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
             if parsed_msg.decoded.msg_id != self.status_msg_id {
-                log::info!("Ignoring message with ID: 0x{:X}", parsed_msg.decoded.msg_id);
+                log::info!(
+                    "Ignoring message with ID: 0x{:X}",
+                    parsed_msg.decoded.msg_id
+                );
                 return;
             }
 
@@ -478,10 +481,11 @@ impl ChargeController {
         let _ = ui_to_can_tx.send(cmd);
     }
 
-    fn stop_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) { 
+    fn stop_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
         ui_to_can_tx
-            .send(messages::MsgFromUi::DeleteSendMessage { msg_id: self.command_msg_id })
+            .send(messages::MsgFromUi::DeleteSendMessage {
+                msg_id: self.command_msg_id,
+            })
             .expect("Failed to send DeleteSendMessage");
-
     }
 }
