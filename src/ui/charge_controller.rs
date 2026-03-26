@@ -4,12 +4,13 @@ use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
 pub struct ChargeController {
     pub title: String,
 
-    pub max_charge_voltage: u16,
-    pub max_charge_current: u16,
+    pub max_charge_voltage: f32,
+    pub max_charge_current: f32,
     pub charge_enable: bool,
 
-    pub charge_voltage: u16,
-    pub charge_current: u16,
+    // values directly from can msg, is 10x the actual value
+    pub charge_voltage_raw: u16,
+    pub charge_current_raw: u16,
 
     pub hardware_fault: bool,
     pub temperature_fail: bool,
@@ -31,11 +32,11 @@ impl ChargeController {
     pub fn new() -> Self {
         Self {
             title: "Charge Controller".to_string(),
-            max_charge_voltage: 0,
-            max_charge_current: 0,
+            max_charge_voltage: 0.0,
+            max_charge_current: 0.0,
             charge_enable: false,
-            charge_voltage: 0,
-            charge_current: 0,
+            charge_voltage_raw: 0,
+            charge_current_raw: 0,
             hardware_fault: false,
             temperature_fail: false,
             input_voltage_fault: false,
@@ -159,9 +160,9 @@ impl ChargeController {
                     );
                     ui.add_space(4.0);
 
-                    Self::input_row(ui, &theme, "Max Voltage", &mut self.max_charge_voltage, "V", 0..=1000);
+                    Self::input_row(ui, &theme, "Max Voltage", &mut self.max_charge_voltage, "V", 0.0..=1000.0);
                     ui.add_space(4.0);
-                    Self::input_row(ui, &theme, "Max Current", &mut self.max_charge_current, "A", 0..=500);
+                    Self::input_row(ui, &theme, "Max Current", &mut self.max_charge_current, "A", 0.0..=500.0);
                     ui.add_space(8.0);
 
                     // charge enable toggle button (full width)
@@ -222,7 +223,7 @@ impl ChargeController {
                             &mut rcols[0],
                             &theme,
                             "OUTPUT V",
-                            self.charge_voltage as f32 / 10.0,
+                            self.charge_voltage_raw as f32 / 10.0,
                             "V",
                             stale,
                         );
@@ -230,7 +231,7 @@ impl ChargeController {
                             &mut rcols[1],
                             &theme,
                             "OUTPUT A",
-                            self.charge_current as f32 / 10.0,
+                            self.charge_current_raw as f32 / 10.0,
                             "A",
                             stale,
                         );
@@ -305,9 +306,9 @@ impl ChargeController {
         ui: &mut egui::Ui,
         theme: &theme::ThemeColors,
         label: &str,
-        value: &mut u16,
+        value: &mut f32,
         unit: &str,
-        range: std::ops::RangeInclusive<u16>,
+        range: std::ops::RangeInclusive<f32>,
     ) {
         Frame::NONE
             .fill(theme.panel_color())
@@ -328,7 +329,12 @@ impl ChargeController {
                                 .size(11.0)
                                 .color(theme.text_color().linear_multiply(0.4)),
                         );
-                        ui.add(egui::DragValue::new(value).range(range).speed(1.0));
+                        ui.add(
+                            egui::DragValue::new(value)
+                                .range(range)
+                                .speed(0.1) // drag in 0.1 steps
+                                .fixed_decimals(1), // always show one decimal place
+                        );
                     });
                 });
             });
@@ -403,13 +409,13 @@ impl ChargeController {
             for (_, signal) in parsed_msg.decoded.signals.iter() {
                 match signal.name.as_str() {
                     "charge_voltage" => {
-                        self.charge_voltage = match &signal.value {
+                        self.charge_voltage_raw = match &signal.value {
                             can_decode::DecodedSignalValue::Numeric(v) => *v as u16,
                             can_decode::DecodedSignalValue::Enum(v, _) => *v as u16,
                         };
                     }
                     "charge_current" => {
-                        self.charge_current = match &signal.value {
+                        self.charge_current_raw = match &signal.value {
                             can_decode::DecodedSignalValue::Numeric(v) => *v as u16,
                             can_decode::DecodedSignalValue::Enum(v, _) => *v as u16,
                         };
@@ -454,9 +460,9 @@ impl ChargeController {
     }
 
     fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
-        let voltage_raw = (self.max_charge_voltage as u32 * 10) as u16;
-        let current_raw = (self.max_charge_current as u32 * 10) as u16;
-        let control: u8 = if self.charge_enable { 0x00 } else { 0x01 };
+        let voltage_raw = (self.max_charge_voltage * 10.0) as u16;
+        let current_raw = (self.max_charge_current * 10.0) as u16;
+        let control: u8 = if self.charge_enable { 0x01 } else { 0x00 };
 
         let msg_bytes = vec![
             (voltage_raw >> 8) as u8,
