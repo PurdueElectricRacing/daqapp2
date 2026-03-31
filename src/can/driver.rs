@@ -136,11 +136,9 @@ impl UdpDriver {
         let socket = UdpSocket::bind(udp_addr).map_err(|e| {
             DriverError::ConnectionFailed(format!("Failed to bind to port {}: {}", port, e))
         })?;
-        // use a short read timeout instead of nonblocking so recv_from returns from timeout??
-        // i think it should also work in nonblocking mode i just put it like this for testing
-        socket
-            .set_nonblocking(true)
-            .expect("Unable to set nonblocking mode");
+        socket.set_nonblocking(true).map_err(|e| {
+            DriverError::ConnectionFailed(format!("Unable to set nonblocking mode: {}", e))
+        })?;
         socket.set_broadcast(true).map_err(|e| {
             DriverError::ConnectionFailed(format!("Failed to set broadcast: {}", e))
         })?;

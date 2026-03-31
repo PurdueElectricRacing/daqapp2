@@ -30,7 +30,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             let theme_label = format!("🎨 Theme: {}", app.theme_selection.get_name());
 
             if ui.button(theme_label).clicked() {
-                app.toggle_theme();
+                app.toggle_theme(ctx);
                 app.save_settings();
             }
 

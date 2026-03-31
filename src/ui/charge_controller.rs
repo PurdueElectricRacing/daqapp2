@@ -104,7 +104,7 @@ impl ChargeController {
                     .fill(banner_color)
                     .stroke(Stroke::new(1.0, dot_color.linear_multiply(0.5)))
                     .inner_margin(egui::Margin::symmetric(10, 6))
-                    .corner_radius(4.0)
+                    .corner_radius(egui::CornerRadius::same(4))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
                             // Dot indicator
@@ -134,10 +134,10 @@ impl ChargeController {
                         .fill(theme.panel_color())
                         .stroke(Stroke::new(1.0, theme.accent_color()))
                         .inner_margin(egui::Margin::same(10))
-                        .corner_radius(4.0)
+                        .corner_radius(egui::CornerRadius::same(4))
                         .show(ui, |ui| {
                             ui.label(
-                                RichText::new("FAULT STATES  (0x18FF50E5 · Byte 5)")
+                                RichText::new("FAULT STATES  (RAW ID 0x18FF50E5 · Byte 5)")
                                     .size(10.0)
                                     .color(theme.text_color().linear_multiply(0.5)),
                             );
@@ -154,7 +154,7 @@ impl ChargeController {
 
                     // charge command inputs
                     ui.label(
-                        RichText::new(format!("CHARGE COMMAND  (0x{:X})", self.command_msg_id))
+                        RichText::new(format!("CHARGE COMMAND  (RAW ID 0x{:X})", self.command_msg_id))
                             .size(10.0)
                             .color(theme.text_color().linear_multiply(0.5)),
                     );
@@ -187,7 +187,7 @@ impl ChargeController {
                         .fill(toggle_bg)
                         .stroke(Stroke::new(1.0, toggle_color))
                         .inner_margin(egui::Margin::symmetric(10, 7))
-                        .corner_radius(4.0)
+                        .corner_radius(egui::CornerRadius::same(4))
                         .show(ui, |ui| {
                             ui.set_min_width(ui.available_width());
                             ui.centered_and_justified(|ui| {
@@ -243,7 +243,7 @@ impl ChargeController {
                         .fill(theme.panel_color())
                         .stroke(Stroke::new(1.0, theme.accent_color()))
                         .inner_margin(egui::Margin::same(10))
-                        .corner_radius(4.0)
+                        .corner_radius(egui::CornerRadius::same(4))
                         .show(ui, |ui| {
                             ui.set_min_height(120.0);
                             ui.set_min_width(ui.available_width());
@@ -293,7 +293,7 @@ impl ChargeController {
                     .fill(pill_bg)
                     .stroke(Stroke::new(1.0, pill_color.linear_multiply(0.6)))
                     .inner_margin(egui::Margin::symmetric(8, 2))
-                    .corner_radius(10.0)
+                    .corner_radius(egui::CornerRadius::same(10))
                     .show(ui, |ui| {
                         ui.label(RichText::new(pill_text).size(10.0).color(pill_color));
                     });
@@ -314,7 +314,7 @@ impl ChargeController {
             .fill(theme.panel_color())
             .stroke(Stroke::new(1.0, theme.accent_color()))
             .inner_margin(egui::Margin::symmetric(10, 6))
-            .corner_radius(4.0)
+            .corner_radius(egui::CornerRadius::same(4))
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
                 ui.horizontal(|ui| {
@@ -353,7 +353,7 @@ impl ChargeController {
             .fill(theme.panel_color())
             .stroke(Stroke::new(1.0, theme.accent_color()))
             .inner_margin(egui::Margin::same(10))
-            .corner_radius(4.0)
+            .corner_radius(egui::CornerRadius::same(4))
             .show(ui, |ui| {
                 ui.set_min_width(ui.available_width());
                 ui.vertical(|ui| {
@@ -399,7 +399,7 @@ impl ChargeController {
 
         if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
             if parsed_msg.decoded.msg_id != self.status_msg_id {
-                log::info!(
+                log::debug!(
                     "Ignoring message with ID: 0x{:X}",
                     parsed_msg.decoded.msg_id
                 );
