@@ -1,4 +1,5 @@
 use crate::{messages, theme};
+use crate::util;
 use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
 
 pub struct ChargeController {
@@ -413,46 +414,39 @@ impl ChargeController {
             for (_, signal) in parsed_msg.decoded.signals.iter() {
                 match signal.name.as_str() {
                     "charge_voltage" => {
-                        self.charge_voltage_raw = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v as u16,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v as u16,
-                        };
+                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value{
+                            self.charge_voltage_raw = *v as u16;
+                        }
                     }
                     "charge_current" => {
-                        self.charge_current_raw = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v as u16,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v as u16,
-                        };
+                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value{
+                            self.charge_current_raw = *v as u16;
+                        }
                     }
                     "hw_fail" => {
-                        self.hardware_fault = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v != 0.0,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v != 0,
-                        };
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                            self.hardware_fault = *v != 0;
+                        }
                     }
                     "temp_fail" => {
-                        self.temperature_fail = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v != 0.0,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v != 0,
-                        };
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                            self.temperature_fail = *v != 0;
+                        }
                     }
                     "input_v_fail" => {
-                        self.input_voltage_fault = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v != 0.0,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v != 0,
-                        };
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                            self.input_voltage_fault = *v != 0;
+                        }
                     }
                     "startup_fail" => {
-                        self.start_fail = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v != 0.0,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v != 0,
-                        };
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                            self.start_fail = *v != 0;
+                        }
                     }
                     "communication_fail" => {
-                        self.communication_fault = match &signal.value {
-                            can_decode::DecodedSignalValue::Numeric(v) => *v != 0.0,
-                            can_decode::DecodedSignalValue::Enum(v, _) => *v != 0,
-                        };
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                            self.communication_fault = *v != 0;
+                        }
                     }
                     _ => {}
                 }
@@ -469,8 +463,6 @@ impl ChargeController {
     }
 
     fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
-        let voltage_raw = (self.max_charge_voltage * 10.0) as u16;
-        let current_raw = (self.max_charge_current * 10.0) as u16;
         let control: u8 = if self.charge_enable { 0x00 } else { 0x01 };
 
         let msg_bytes = vec![
@@ -483,6 +475,22 @@ impl ChargeController {
             0x00,
             0x00,
         ];
+        let signal_values = vec![
+            ("charge_voltage", can_decode::DecodedSignalValue::Numeric(voltage_raw as f64)),
+            ("charge_current", can_decode::DecodedSignalValue::Numeric(current_raw as f64)),
+            ("control", can_decode::DecodedSignalValue::Numeric(if self.charge_enable { 0.0 } else { 1.0 })),
+        ];
+
+        let encoded = parser
+            .parser
+            .encode_msg(self.command_msg_id, &signal_values);
+
+        let Some(msg_bytes) = encoded else {
+            self.error = Some(
+                "Failed to encode message. Check signal values.".to_string(),
+            );
+            return;
+        };
 
         let cmd = messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
             amount: messages::SendAmount::Infinite {
@@ -493,7 +501,7 @@ impl ChargeController {
             msg_bytes,
         });
 
-        let _ = ui_to_can_tx.send(cmd);
+        ui_to_can_tx.send(cmd).expect("Failed to send charge command");
     }
 
     fn stop_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
