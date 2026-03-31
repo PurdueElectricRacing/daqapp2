@@ -161,11 +161,13 @@ impl ChargeController {
                             .color(theme.text_color().linear_multiply(0.5)),
                     );
                     ui.add_space(4.0);
+                    ui.add_enabled_ui(!self.charge_enable, |ui| {
+                        Self::input_row(ui, &theme, "Max Voltage", &mut self.max_charge_voltage, "V", 0.0..=1000.0);
+                        ui.add_space(4.0);
+                        Self::input_row(ui, &theme, "Max Current", &mut self.max_charge_current, "A", 0.0..=500.0);
+                        ui.add_space(8.0);
 
-                    Self::input_row(ui, &theme, "Max Voltage", &mut self.max_charge_voltage, "V", 0.0..=1000.0);
-                    ui.add_space(4.0);
-                    Self::input_row(ui, &theme, "Max Current", &mut self.max_charge_current, "A", 0.0..=500.0);
-                    ui.add_space(8.0);
+                    });
 
                     // charge enable toggle button (full width)
                     let (toggle_text, toggle_color) = if self.charge_enable {
