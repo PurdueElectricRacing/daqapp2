@@ -11,6 +11,7 @@ pub struct ChargeController {
     // values directly from can msg, is 10x the actual value
     pub charge_voltage_raw: u16,
     pub charge_current_raw: u16,
+    pub is_discharging: bool,
 
     pub hardware_fault: bool,
     pub temperature_fail: bool,
@@ -37,6 +38,7 @@ impl ChargeController {
             charge_enable: false,
             charge_voltage_raw: 0,
             charge_current_raw: 0,
+            is_discharging: false,
             hardware_fault: false,
             temperature_fail: false,
             input_voltage_fault: false,
@@ -454,6 +456,11 @@ impl ChargeController {
                 }
             }
 
+            // highest bit indicates discharge or charge
+            // highest bit 1 = discharing, 0 = charging
+            self.is_discharging = self.charge_current_raw & 0x8000 != 0; 
+            self.charge_current_raw = self.charge_current_raw & 0x7FFF; // clear highest bit to get actual current value
+
             self.last_update = std::time::Instant::now();
             self.is_data_stale = false;
         }
@@ -462,7 +469,7 @@ impl ChargeController {
     fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
         let voltage_raw = (self.max_charge_voltage * 10.0) as u16;
         let current_raw = (self.max_charge_current * 10.0) as u16;
-        let control: u8 = if self.charge_enable { 0x01 } else { 0x00 };
+        let control: u8 = if self.charge_enable { 0x00 } else { 0x01 };
 
         let msg_bytes = vec![
             (voltage_raw >> 8) as u8,
