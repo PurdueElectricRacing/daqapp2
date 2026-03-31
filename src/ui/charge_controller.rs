@@ -460,7 +460,7 @@ impl ChargeController {
 
             // highest bit indicates discharge or charge
             // highest bit 1 = discharing, 0 = charging
-            self.is_discharging = self.charge_current_raw & 0x8000 != 0; 
+            self.is_discharging = self.charge_current_raw & 0x8000 != 0;
             self.charge_current_raw = self.charge_current_raw & 0x7FFF; // clear highest bit to get actual current value
 
             self.last_update = std::time::Instant::now();
