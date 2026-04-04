@@ -121,7 +121,7 @@ impl SendUi {
                                 .button(format!(
                                     "{} (0x{:03X})",
                                     msg.name,
-                                    util::msg_id_as_u32(&msg.id)
+                                    util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id)
                                 ))
                                 .clicked()
                             {
@@ -153,7 +153,7 @@ impl SendUi {
                             egui::RichText::new(format!(
                                 "Selected Message: {} (0x{:03X})",
                                 selected_msg.name,
-                                util::msg_id_as_u32(&selected_msg.id)
+                                util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id)
                             ))
                             .strong()
                             .size(16.0),
@@ -216,9 +216,10 @@ impl SendUi {
                         if ui.button("Send Message").clicked() {
                             let values_hashmap = self.signal_values.iter().cloned().collect();
 
-                            let encoded = parser
-                                .parser
-                                .encode_msg(util::msg_id_as_u32(&selected_msg.id), &values_hashmap);
+                            let encoded = parser.parser.encode_msg(
+                                util::msg_id::can_dbc_to_u32_with_extid_flag(&selected_msg.id),
+                                &values_hashmap,
+                            );
 
                             let Some(msg_bytes) = encoded else {
                                 self.error = Some(
@@ -243,7 +244,7 @@ impl SendUi {
                                 },
                             };
 
-                            let msg_id_u32 = util::msg_id_as_u32(&selected_msg.id);
+                            let msg_id_u32 = util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id);
 
                             self.sending_messages.push(SendingMessage {
                                 amount: send_amount,

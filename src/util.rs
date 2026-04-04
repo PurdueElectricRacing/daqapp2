@@ -18,9 +18,18 @@ pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
     }
 }
 
-pub fn msg_id_as_u32(msg_id: &can_dbc::MessageId) -> u32 {
-    match msg_id {
-        can_dbc::MessageId::Standard(id) => *id as u32,
-        can_dbc::MessageId::Extended(id) => *id,
+pub mod msg_id {
+    pub fn can_dbc_to_u32_with_extid_flag(msg_id: &can_dbc::MessageId) -> u32 {
+        match msg_id {
+            can_dbc::MessageId::Standard(id) => *id as u32,
+            can_dbc::MessageId::Extended(id) => *id | 0x80000000,
+        }
+    }
+
+    pub fn can_dbc_to_u32_without_extid_flag(msg_id: &can_dbc::MessageId) -> u32 {
+        match msg_id {
+            can_dbc::MessageId::Standard(id) => *id as u32,
+            can_dbc::MessageId::Extended(id) => *id & 0x7FFFFFFF,
+        }
     }
 }
