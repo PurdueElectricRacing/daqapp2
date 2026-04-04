@@ -103,9 +103,10 @@ pub fn start_can_thread(
             for msg in msgs_to_send {
                 if let Some(ref mut active_driver) = state.driver {
                     let id = if msg.is_msg_id_extended {
-                        slcan::ExtendedId::new(msg.msg_id & 0x7FFFFFFF).map(slcan::Id::Extended)
-                    } else if msg.msg_id <= 0x7FF {
-                        slcan::StandardId::new(msg.msg_id as u16 & 0x7FF).map(slcan::Id::Standard)
+                        slcan::ExtendedId::new(msg.msg_id & util::msg_id::EXTENDED_ID_MASK)
+                            .map(slcan::Id::Extended)
+                    } else if msg.msg_id <= util::msg_id::STANDARD_ID_MASK {
+                        slcan::StandardId::new(msg.msg_id as u16).map(slcan::Id::Standard)
                     } else {
                         log::warn!(
                             "Invalid message ID {} for sending CAN frame (exceeds 11 bits for standard)",
