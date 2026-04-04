@@ -1,4 +1,4 @@
-use crate::{util, daq_log_parse::consts};
+use crate::{daq_log_parse::consts, util};
 use bytemuck::{Pod, Zeroable};
 
 #[derive(Debug)]
