@@ -39,4 +39,24 @@ pub mod msg_id {
             can_dbc::MessageId::Extended(id) => *id & 0x7FFFFFFF,
         }
     }
+
+    // Converts a slcan::Id to a u32, setting the extended ID flag if it's an extended ID.
+    // Similar to the can_dbc version, but for slcan::Id.
+    // Likewise, generally use this version when interfacing with `can_decode`.
+    pub fn slcan_to_u32_with_extid_flag(id: &slcan::Id) -> u32 {
+        match id {
+            slcan::Id::Standard(sid) => sid.as_raw() as u32,
+            slcan::Id::Extended(eid) => eid.as_raw() | 0x80000000,
+        }
+    }
+
+    // Converts a slcan::Id to a u32 without setting the extended ID flag.
+    // Similar to the can_dbc version, but for slcan::Id.
+    // Likewise, generally use this version when showing output to the user or logging.
+    pub fn slcan_to_u32_without_extid_flag(id: &slcan::Id) -> u32 {
+        match id {
+            slcan::Id::Standard(sid) => sid.as_raw() as u32 & 0x7FF,
+            slcan::Id::Extended(eid) => eid.as_raw() & 0x7FFFFFFF,
+        }
+    }
 }
