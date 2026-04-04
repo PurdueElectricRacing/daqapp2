@@ -1,4 +1,4 @@
-use crate::{can, connection, util, messages};
+use crate::{can, connection, messages, util};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;

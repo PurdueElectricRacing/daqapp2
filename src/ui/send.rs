@@ -244,7 +244,8 @@ impl SendUi {
                                 },
                             };
 
-                            let msg_id_u32 = util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id);
+                            let msg_id_u32 =
+                                util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id);
 
                             self.sending_messages.push(SendingMessage {
                                 amount: send_amount,
