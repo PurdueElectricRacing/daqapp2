@@ -21,7 +21,7 @@ pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
 pub mod msg_id {
     const EXTENDED_ID_FLAG: u32 = 0x80000000;
     pub const STANDARD_ID_MASK: u32 = 0x7FF;
-    pub const EXTENDED_ID_MASK: u32 = 0x7FFFFFFF;
+    pub const EXTENDED_ID_MASK: u32 = 0x1FFFFFFF;
 
     // Converts a can_dbc::MessageId to a u32, setting the extended ID flag if it's an extended ID.
     // The extended ID flag is the highest bit (32nd bit) of the u32.
