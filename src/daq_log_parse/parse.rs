@@ -61,8 +61,10 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
         ]);
         added_padding = true;
     }
-    let frames = bytemuck::try_cast_slice::<u8, RawFrame>(&content)
-        .expect("Padding should ensure this does not fail.");
+    let frames: Vec<RawFrame> = content
+        .chunks_exact(std::mem::size_of::<RawFrame>())
+        .map(bytemuck::pod_read_unaligned)
+        .collect();
     let mut parsed = Vec::with_capacity(frames.len());
 
     for (i, frame) in frames.iter().enumerate() {
