@@ -1,4 +1,4 @@
-use crate::{messages, theme};
+use crate::{app, messages, theme};
 use crate::util;
 use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
 
@@ -58,7 +58,17 @@ impl ChargeController {
         &mut self,
         ui: &mut egui::Ui,
         ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+        parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
+        let Some(parser) = parser else {
+            ui.vertical_centered(|ui| {
+                ui.label("No DBC selected yet.");
+                ui.label("CMD+S to toggle the sidebar.");
+                ui.label("Use the sidebar to select a DBC file");
+            });
+
+            return egui_tiles::UiResponse::None;
+        };
         // Pull theme colors from global ctx storage
         let theme = theme::get_theme(ui.ctx());
 
@@ -204,7 +214,7 @@ impl ChargeController {
                     if toggle_btn.response.interact(egui::Sense::click()).clicked() {
                         self.charge_enable = !self.charge_enable;
                         if (self.charge_enable) {
-                            self.send_charge_command(&ui_to_can_tx);
+                            self.send_charge_command(&ui_to_can_tx, parser);
                         }
                         else {
                             self.stop_charge_command(&ui_to_can_tx);
@@ -462,33 +472,20 @@ impl ChargeController {
         }
     }
 
-    fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
-        let control: u8 = if self.charge_enable { 0x00 } else { 0x01 };
-
-        let msg_bytes = vec![
-            (voltage_raw >> 8) as u8,
-            (voltage_raw & 0xFF) as u8,
-            (current_raw >> 8) as u8,
-            (current_raw & 0xFF) as u8,
-            control,
-            0x00,
-            0x00,
-            0x00,
-        ];
+    fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>, parser: &app::ParserInfo) {
         let signal_values = vec![
-            ("charge_voltage", can_decode::DecodedSignalValue::Numeric(voltage_raw as f64)),
-            ("charge_current", can_decode::DecodedSignalValue::Numeric(current_raw as f64)),
-            ("control", can_decode::DecodedSignalValue::Numeric(if self.charge_enable { 0.0 } else { 1.0 })),
+            ("charge_voltage".to_string(), self.max_charge_voltage as f64),
+            ("charge_current".to_string(), self.max_charge_current as f64),
+            ("control".to_string(), if self.charge_enable { 0.0 } else { 1.0 }),
         ];
+        let values_hashmap = signal_values.iter().cloned().collect();
 
         let encoded = parser
             .parser
-            .encode_msg(self.command_msg_id, &signal_values);
+            .encode_msg(self.command_msg_id, &values_hashmap);
 
         let Some(msg_bytes) = encoded else {
-            self.error = Some(
-                "Failed to encode message. Check signal values.".to_string(),
-            );
+            log::error!("Failed to encode message. Check signal values.");
             return;
         };
 

@@ -35,7 +35,7 @@ impl Widget {
         action_queue: &mut Vec<action::AppAction>,
         parser: Option<&app::ParserInfo>,
         ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
-    ) -> egui_tiles::UiResponse {
+    ) ->egui_tiles::UiResponse {
         let mut received_new_data = false;
 
         for msg in can_messages {
@@ -56,7 +56,7 @@ impl Widget {
             Widget::LogParser(w) => w.show(ui, parser),
             Widget::SendUi(w) => w.show(ui, parser),
             Widget::BusLoad(w) => w.show(ui),
-            Widget::ChargeController(w) => w.show(ui, ui_to_can_tx),
+            Widget::ChargeController(w) => w.show(ui, ui_to_can_tx, parser),
             Widget::BatteryViewer(w) => w.show(ui),
         }
     }
