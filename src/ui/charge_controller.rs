@@ -24,8 +24,9 @@ pub struct ChargeController {
     pub is_data_stale: bool,
     pub timeout_seconds: u64,
 
-    pub command_msg_id: u32,
     pub status_msg_id: u32,
+    pub charge_request_msg: Option<can_dbc::Message>,
+    pub charge_request_msg_id: u32,
 
     pub command_msg_period: usize, // default 1 second, from elcon datasheet
 }
@@ -48,9 +49,10 @@ impl ChargeController {
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10), // start as stale
             is_data_stale: true,
             timeout_seconds: 2,
-            command_msg_id: 0x1806E5F4,
             status_msg_id: 0x98FF50E5, // for some reason definition in dbc is eid? override has correct number but idk
             command_msg_period: 1000,
+            charge_request_msg: None,
+            charge_request_msg_id: 0,
         }
     }
 
@@ -60,7 +62,11 @@ impl ChargeController {
         ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
+        // Pull theme colors from global ctx storage
+        let theme = theme::get_theme(ui.ctx());
+
         let Some(parser) = parser else {
+            ui.add_space(8.0);
             ui.vertical_centered(|ui| {
                 ui.label("No DBC selected yet.");
                 ui.label("CMD+S to toggle the sidebar.");
@@ -69,8 +75,20 @@ impl ChargeController {
 
             return egui_tiles::UiResponse::None;
         };
-        // Pull theme colors from global ctx storage
-        let theme = theme::get_theme(ui.ctx());
+
+        let Some(charge_request_msg) = parser.parser.msg_defs().into_iter().find(|m| m.name == "charge_request") else {
+            log::error!("charge request message not found in dbc");
+            ui.add_space(8.0);
+            ui.vertical_centered(|ui| {
+                ui.label("DBC does not contain charge request message definition.");
+                ui.label("CMD+S to toggle the sidebar.");
+                ui.label("Use the sidebar to select a different DBC file");
+            });
+            return egui_tiles::UiResponse::None;
+        };
+
+        self.charge_request_msg = Some(charge_request_msg.clone());
+        self.charge_request_msg_id = util::msg_id_as_u32(&charge_request_msg.id);
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -167,7 +185,7 @@ impl ChargeController {
 
                     // charge command inputs
                     ui.label(
-                        RichText::new(format!("CHARGE COMMAND  (RAW ID 0x{:X})", self.command_msg_id))
+                        RichText::new("CHARGE REQUEST")
                             .size(10.0)
                             .color(theme.text_color().linear_multiply(0.5)),
                     );
@@ -214,10 +232,10 @@ impl ChargeController {
                     if toggle_btn.response.interact(egui::Sense::click()).clicked() {
                         self.charge_enable = !self.charge_enable;
                         if (self.charge_enable) {
-                            self.send_charge_command(&ui_to_can_tx, parser);
+                            self.send_charge_request(&ui_to_can_tx, parser);
                         }
                         else {
-                            self.stop_charge_command(&ui_to_can_tx);
+                            self.stop_charge_request(&ui_to_can_tx);
                         }
                     }
 
@@ -472,39 +490,36 @@ impl ChargeController {
         }
     }
 
-    fn send_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>, parser: &app::ParserInfo) {
-        let signal_values = vec![
+    fn send_charge_request(
+        &self,
+        ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
+        parser: &app::ParserInfo,
+    ) {
+        let is_extended = matches!(self.charge_request_msg.as_ref().expect("Charge request message not found").id, can_dbc::MessageId::Extended(_));
+
+        let signal_values: std::collections::HashMap<String, f64> = vec![
+            ("charge_enable".to_string(),  self.charge_enable as u8 as f64),
             ("charge_voltage".to_string(), self.max_charge_voltage as f64),
             ("charge_current".to_string(), self.max_charge_current as f64),
-            ("control".to_string(), if self.charge_enable { 0.0 } else { 1.0 }),
-        ];
-        let values_hashmap = signal_values.iter().cloned().collect();
+        ].into_iter().collect();
 
-        let encoded = parser
-            .parser
-            .encode_msg(self.command_msg_id, &values_hashmap);
-
-        let Some(msg_bytes) = encoded else {
-            log::error!("Failed to encode message. Check signal values.");
+        let Some(msg_bytes) = parser.parser.encode_msg(self.charge_request_msg_id, &signal_values) else {
+            log::error!("Failed to encode charge_request");
             return;
         };
 
-        let cmd = messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
-            amount: messages::SendAmount::Infinite {
-                period: self.command_msg_period,
-            },
-            msg_id: self.command_msg_id,
-            is_msg_id_extended: true,
+        ui_to_can_tx.send(messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
+            amount: messages::SendAmount::Infinite { period: self.command_msg_period },
+            msg_id: self.charge_request_msg_id,
+            is_msg_id_extended: is_extended,
             msg_bytes,
-        });
-
-        ui_to_can_tx.send(cmd).expect("Failed to send charge command");
+        })).expect("Failed to send charge_request");
     }
 
-    fn stop_charge_command(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
+    fn stop_charge_request(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
         ui_to_can_tx
             .send(messages::MsgFromUi::DeleteSendMessage {
-                msg_id: self.command_msg_id,
+                msg_id: self.charge_request_msg_id,
             })
             .expect("Failed to send DeleteSendMessage");
     }
