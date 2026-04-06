@@ -90,7 +90,7 @@ impl ChargeController {
         };
 
         self.charge_request_msg = Some(charge_request_msg.clone());
-        self.charge_request_msg_id = util::msg_id_as_u32(&charge_request_msg.id);
+        self.charge_request_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
