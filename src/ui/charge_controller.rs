@@ -1,5 +1,5 @@
-use crate::{app, messages, theme};
 use crate::util;
+use crate::{app, messages, theme};
 use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
 
 pub struct ChargeController {
@@ -12,7 +12,7 @@ pub struct ChargeController {
     // values directly from can msg, is 10x the actual value
     pub charge_voltage_raw: u16, // charge voltage from elcon in decivolts
     pub charge_current_raw: u16, // charge current with discharge bit still in it
-    pub charge_current: u16, // charge current from elcon in deciamps
+    pub charge_current: u16,     // charge current from elcon in deciamps
     pub is_discharging: bool,
 
     pub hardware_fault: bool,
@@ -29,7 +29,7 @@ pub struct ChargeController {
     pub charge_request_msg: Option<can_dbc::Message>,
     pub charge_request_msg_id: u32,
 
-    pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX 
+    pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
 }
 
 impl ChargeController {
@@ -78,7 +78,12 @@ impl ChargeController {
             return egui_tiles::UiResponse::None;
         };
 
-        let Some(charge_request_msg) = parser.parser.msg_defs().into_iter().find(|m| m.name == "charge_request") else {
+        let Some(charge_request_msg) = parser
+            .parser
+            .msg_defs()
+            .into_iter()
+            .find(|m| m.name == "charge_request")
+        else {
             log::error!("charge request message not found in dbc");
             ui.add_space(8.0);
             ui.vertical_centered(|ui| {
@@ -90,7 +95,8 @@ impl ChargeController {
         };
 
         self.charge_request_msg = Some(charge_request_msg.clone());
-        self.charge_request_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
+        self.charge_request_msg_id =
+            util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -444,37 +450,37 @@ impl ChargeController {
             for (_, signal) in parsed_msg.decoded.signals.iter() {
                 match signal.name.as_str() {
                     "charge_voltage" => {
-                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
                             self.charge_voltage_raw = *v as u16;
                         }
                     }
                     "charge_current" => {
-                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
                             self.charge_current_raw = *v as u16;
                         }
                     }
                     "hw_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
                             self.hardware_fault = *v != 0;
                         }
                     }
                     "temp_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
                             self.temperature_fail = *v != 0;
                         }
                     }
                     "input_v_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
                             self.input_voltage_fault = *v != 0;
                         }
                     }
                     "startup_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
                             self.start_fail = *v != 0;
                         }
                     }
                     "communication_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value{
+                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
                             self.communication_fault = *v != 0;
                         }
                     }
@@ -497,27 +503,57 @@ impl ChargeController {
         ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: &app::ParserInfo,
     ) {
-        let is_extended = matches!(self.charge_request_msg.as_ref().expect("Charge request message not found").id, can_dbc::MessageId::Extended(_));
+        let is_extended = matches!(
+            self.charge_request_msg
+                .as_ref()
+                .expect("Charge request message not found")
+                .id,
+            can_dbc::MessageId::Extended(_)
+        );
 
         let signal_values: std::collections::HashMap<String, f64> = vec![
-            ("charge_enable".to_string(),  self.charge_enable as u8 as f64),
-            ("charge_voltage".to_string(), (self.max_charge_voltage * 10.0) as f64),
-            ("charge_current".to_string(), (self.max_charge_current * 10.0) as f64),
-        ].into_iter().collect();
+            ("charge_enable".to_string(), self.charge_enable as u8 as f64),
+            (
+                "charge_voltage".to_string(),
+                (self.max_charge_voltage * 10.0) as f64,
+            ),
+            (
+                "charge_current".to_string(),
+                (self.max_charge_current * 10.0) as f64,
+            ),
+        ]
+        .into_iter()
+        .collect();
 
-        let Some(msg_bytes) = parser.parser.encode_msg(self.charge_request_msg_id, &signal_values) else {
+        let Some(msg_bytes) = parser
+            .parser
+            .encode_msg(self.charge_request_msg_id, &signal_values)
+        else {
             log::error!("Failed to encode charge_request");
-            log::error!("Attempting encode with msg_id: {} (0x{:X})", self.charge_request_msg_id, self.charge_request_msg_id);
-            log::error!("Charge request message definition: {:?}", self.charge_request_msg);
+            log::error!(
+                "Attempting encode with msg_id: {} (0x{:X})",
+                self.charge_request_msg_id,
+                self.charge_request_msg_id
+            );
+            log::error!(
+                "Charge request message definition: {:?}",
+                self.charge_request_msg
+            );
             return;
         };
 
-        ui_to_can_tx.send(messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
-            amount: messages::SendAmount::Infinite { period: self.request_msg_period },
-            msg_id: self.charge_request_msg_id,
-            is_msg_id_extended: is_extended,
-            msg_bytes,
-        })).expect("Failed to send charge_request");
+        ui_to_can_tx
+            .send(messages::MsgFromUi::AddSendMessage(
+                messages::AddSendMessage {
+                    amount: messages::SendAmount::Infinite {
+                        period: self.request_msg_period,
+                    },
+                    msg_id: self.charge_request_msg_id,
+                    is_msg_id_extended: is_extended,
+                    msg_bytes,
+                },
+            ))
+            .expect("Failed to send charge_request");
     }
 
     fn stop_charge_request(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
