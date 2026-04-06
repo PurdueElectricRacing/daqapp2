@@ -1,4 +1,5 @@
 use crate::connection::ConnectionSource;
+use crate::util;
 use rand::prelude::*;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
@@ -246,7 +247,7 @@ impl Driver for SimulatedDriver {
                 Ok(can_frame.into())
             } else {
                 // If no DBC is loaded, just return random frames with random IDs and data
-                let id = rng.random_range(0..0x7FF);
+                let id = rng.random_range(0..=util::msg_id::STANDARD_ID_MASK) as u16;
                 let sid = slcan::StandardId::new(id).expect("invalid standard id");
                 let mut data = [0u8; 8];
                 rng.fill_bytes(&mut data);
@@ -298,7 +299,7 @@ pub fn parse_udp_buffer(buf: &[u8; 2048], num_bytes: usize) -> DriverResult<CanF
     let payload = &buf[8..16];
     let mask_id = (1u32 << 29) - 1;
     let id = identity & mask_id;
-    if id <= 0x7FF {
+    if id <= util::msg_id::STANDARD_ID_MASK {
         let sid = slcan::StandardId::new(id as u16).ok_or_else(|| {
             DriverError::ReadError(DriverReadError::Other("invalid standard id".into()))
         })?;

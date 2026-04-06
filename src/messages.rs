@@ -63,7 +63,7 @@ impl SendAmount {
 
 pub struct AddSendMessage {
     pub amount: SendAmount,
-    pub msg_id: u32,
+    pub msg_id: u32, // without the extended ID flag
     pub is_msg_id_extended: bool,
     pub msg_bytes: Vec<u8>,
 }

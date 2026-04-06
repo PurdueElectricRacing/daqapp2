@@ -1,4 +1,4 @@
-use crate::daq_log_parse::consts;
+use crate::{daq_log_parse::consts, util};
 use bytemuck::{Pod, Zeroable};
 
 #[derive(Debug)]
@@ -75,9 +75,9 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
         }
 
         let arb_id = if (frame.identity & consts::IS_EID_MASK) != 0 {
-            frame.identity & consts::CAN_EID_MASK
+            frame.identity & util::msg_id::EXTENDED_ID_MASK
         } else {
-            frame.identity & consts::CAN_STD_ID_MASK
+            frame.identity & util::msg_id::STANDARD_ID_MASK
         };
 
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {

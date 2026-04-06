@@ -1,4 +1,4 @@
-use crate::{can, connection, messages};
+use crate::{can, connection, messages, util};
 
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
@@ -8,15 +8,13 @@ const BUS_LOAD_UPDATE_MS: u128 = 200;
 fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize {
     match frame {
         slcan::CanFrame::Can2(frame2) => {
-            let id = match frame2.id() {
-                slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                slcan::Id::Extended(eid) => eid.as_raw(),
-            };
+            let decode_msg_id = util::msg_id::slcan_to_u32_with_extid_flag(&frame2.id());
+            let raw_msg_id = util::msg_id::slcan_to_u32_without_extid_flag(&frame2.id());
 
             let data = frame2.data().unwrap_or(&[]);
 
             if let Some(parser) = state.parser.as_ref() {
-                if let Some(decoded) = parser.decode_msg(id, data) {
+                if let Some(decoded) = parser.decode_msg(decode_msg_id, data) {
                     let parsed_msg = messages::ParsedMessage {
                         timestamp: chrono::Local::now(),
                         raw_bytes: data.to_vec(),
@@ -29,16 +27,16 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
                 } else {
                     log::error!(
                         "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
-                        id,
-                        id,
+                        raw_msg_id,
+                        raw_msg_id,
                         data
                     );
                 }
             } else {
                 log::warn!(
                     "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
-                    id,
-                    id,
+                    raw_msg_id,
+                    raw_msg_id,
                     data
                 );
             }
@@ -46,13 +44,10 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
             data.len()
         }
         slcan::CanFrame::CanFd(frame_fd) => {
-            let id = match frame_fd.id() {
-                slcan::Id::Standard(sid) => sid.as_raw() as u32,
-                slcan::Id::Extended(eid) => eid.as_raw(),
-            };
+            let msg_id_raw = util::msg_id::slcan_to_u32_without_extid_flag(&frame_fd.id());
             log::warn!(
                 "Received CAN FD frame id=0x{:X} len={}",
-                id,
+                msg_id_raw,
                 frame_fd.data().len()
             );
 
@@ -108,8 +103,9 @@ pub fn start_can_thread(
             for msg in msgs_to_send {
                 if let Some(ref mut active_driver) = state.driver {
                     let id = if msg.is_msg_id_extended {
-                        slcan::ExtendedId::new(msg.msg_id).map(slcan::Id::Extended)
-                    } else if msg.msg_id <= 0x7FF {
+                        slcan::ExtendedId::new(msg.msg_id & util::msg_id::EXTENDED_ID_MASK)
+                            .map(slcan::Id::Extended)
+                    } else if msg.msg_id <= util::msg_id::STANDARD_ID_MASK {
                         slcan::StandardId::new(msg.msg_id as u16).map(slcan::Id::Standard)
                     } else {
                         log::warn!(
