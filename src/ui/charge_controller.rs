@@ -1,6 +1,7 @@
 use crate::util;
 use crate::{app, messages, theme};
 use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
+use egui_plot::{Line, Plot, PlotPoints};
 
 pub struct ChargeController {
     pub title: String,
@@ -30,6 +31,20 @@ pub struct ChargeController {
     pub charge_request_msg_id: u32,
 
     pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
+
+    // abox reported telemetry
+    pub charging_telemetry_msg: Option<can_dbc::Message>,
+    pub charging_telemetry_msg_id: u32,
+    pub pack_voltage: f32,
+    pub min_cell_voltage: f32,
+    pub max_cell_voltage: f32,
+    pub charging_state: u8,
+
+    pub voltage_history: std::collections::VecDeque<[f64; 2]>, // [time, value]
+    pub current_history: std::collections::VecDeque<[f64; 2]>,
+    pub start_time: std::time::Instant,
+
+    pub max_history: usize, // ~5 min at 1hz
 }
 
 impl ChargeController {
@@ -55,6 +70,16 @@ impl ChargeController {
             request_msg_period: 1000,
             charge_request_msg: None,
             charge_request_msg_id: 0,
+            charging_telemetry_msg: None,
+            charging_telemetry_msg_id: 0,
+            pack_voltage: 0.0,
+            min_cell_voltage: 0.0,
+            max_cell_voltage: 0.0,
+            charging_state: 0,
+            voltage_history: std::collections::VecDeque::new(),
+            current_history: std::collections::VecDeque::new(),
+            start_time: std::time::Instant::now(),
+            max_history: 300, // ~5 min at 1hz
         }
     }
 
@@ -94,9 +119,29 @@ impl ChargeController {
             return egui_tiles::UiResponse::None;
         };
 
+        let Some(charging_telemetry_msg) = parser
+            .parser
+            .msg_defs()
+            .into_iter()
+            .find(|m| m.name == "charging_telemetry")
+        else {
+            log::error!("charging telemetry message not found in dbc");
+            ui.add_space(8.0);
+            ui.vertical_centered(|ui| {
+                ui.label("DBC does not contain charging telemetry message definition.");
+                ui.label("CMD+S to toggle the sidebar.");
+                ui.label("Use the sidebar to select a different DBC file");
+            });
+            return egui_tiles::UiResponse::None;
+        };
+
         self.charge_request_msg = Some(charge_request_msg.clone());
         self.charge_request_msg_id =
             util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
+
+        self.charging_telemetry_msg = Some(charging_telemetry_msg.clone());
+        self.charging_telemetry_msg_id =
+            util::msg_id::can_dbc_to_u32_with_extid_flag(&charging_telemetry_msg.id);
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -278,8 +323,8 @@ impl ChargeController {
                         );
                     });
 
-                    // Graph placeholder — egui_plot goes here later
                     ui.add_space(10.0);
+                    // telemetry panel with voltage and current plots
                     Frame::NONE
                         .fill(theme.panel_color())
                         .stroke(Stroke::new(1.0, theme.accent_color()))
@@ -288,13 +333,41 @@ impl ChargeController {
                         .show(ui, |ui| {
                             ui.set_min_height(120.0);
                             ui.set_min_width(ui.available_width());
-                            ui.centered_and_justified(|ui| {
-                                ui.colored_label(
-                                    theme.text_color().linear_multiply(0.3),
-                                    "graph placeholder idk",
-                                );
-                            });
+
+                    // State badge
+                    let state_label = if self.charging_state == 1 { "● CHARGING" } else { "○ IDLE" };
+                    let state_color = if self.charging_state == 1 { theme.success_color() } else { theme.text_color().linear_multiply(0.4) };
+                    ui.horizontal(|ui| {
+                        ui.colored_label(state_color, state_label);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            ui.label(RichText::new(format!(
+                                "cell {:.2}–{:.2} V",
+                                self.min_cell_voltage, self.max_cell_voltage
+                            )).size(10.0).color(theme.text_color().linear_multiply(0.5)));
                         });
+                    });
+
+                    ui.add_space(4.0);
+
+                    Plot::new("charge_plot")
+                        .height(200.0)
+                        .show_axes([false, true])
+                        .show_grid(false)
+                        .allow_drag(false)
+                        .allow_zoom(false)
+                        .include_y(0.0)
+                        .show(ui, |plot_ui: &mut egui_plot::PlotUi| {
+                            let v_points = PlotPoints::new(self.voltage_history.iter().cloned().collect());
+                            plot_ui.line(Line::new("v_points",v_points)
+                                .color(theme.info_color())
+                                .name("Pack V"));
+
+                            let i_points = PlotPoints::new(self.current_history.iter().cloned().collect());
+                            plot_ui.line(Line::new("i_points",i_points)
+                                .color(theme.warning_color())
+                                .name("Output A"));
+                        });
+    });
                 });
             });
         });
@@ -439,62 +512,94 @@ impl ChargeController {
         }
 
         if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
-            if parsed_msg.decoded.msg_id != self.status_msg_id {
-                log::debug!(
-                    "Ignoring message with ID: 0x{:X}",
-                    parsed_msg.decoded.msg_id
-                );
-                return;
-            }
+            if parsed_msg.decoded.msg_id == self.status_msg_id {
+                for (_, signal) in parsed_msg.decoded.signals.iter() {
+                    match signal.name.as_str() {
+                        "charge_voltage" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.charge_voltage_raw = *v as u16;
+                            }
+                        }
+                        "charge_current" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.charge_current_raw = *v as u16;
+                            }
+                        }
+                        "hw_fail" => {
+                            if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
+                                self.hardware_fault = *v != 0;
+                            }
+                        }
+                        "temp_fail" => {
+                            if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
+                                self.temperature_fail = *v != 0;
+                            }
+                        }
+                        "input_v_fail" => {
+                            if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
+                                self.input_voltage_fault = *v != 0;
+                            }
+                        }
+                        "startup_fail" => {
+                            if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
+                                self.start_fail = *v != 0;
+                            }
+                        }
+                        "communication_fail" => {
+                            if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
+                                self.communication_fault = *v != 0;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
 
-            for (_, signal) in parsed_msg.decoded.signals.iter() {
-                match signal.name.as_str() {
-                    "charge_voltage" => {
-                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                            self.charge_voltage_raw = *v as u16;
+                // highest bit indicates discharge or charge
+                // highest bit 1 = discharing, 0 = charging
+                self.is_discharging = util::is_discharging_from_current(self.charge_current_raw);
+                self.charge_current = util::extract_current_from_raw(self.charge_current_raw);
+
+                self.last_update = std::time::Instant::now();
+                self.is_data_stale = false;
+            }
+            if parsed_msg.decoded.msg_id == self.charging_telemetry_msg_id {
+                for (_, signal) in parsed_msg.decoded.signals.iter() {
+                    match signal.name.as_str() {
+                        "pack_voltage" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.pack_voltage = *v as f32;
+                            }
                         }
-                    }
-                    "charge_current" => {
-                        if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                            self.charge_current_raw = *v as u16;
+                        "min_cell_voltage" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.pack_voltage = *v as f32;
+                            }
                         }
-                    }
-                    "hw_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
-                            self.hardware_fault = *v != 0;
+                        "max_cell_voltage" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.pack_voltage = *v as f32;
+                            }
                         }
-                    }
-                    "temp_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
-                            self.temperature_fail = *v != 0;
+                        "charging_state" => {
+                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
+                                self.pack_voltage = *v as f32;
+                            }
                         }
+                        _ => {}
                     }
-                    "input_v_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
-                            self.input_voltage_fault = *v != 0;
-                        }
-                    }
-                    "startup_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
-                            self.start_fail = *v != 0;
-                        }
-                    }
-                    "communication_fail" => {
-                        if let can_decode::DecodedSignalValue::Enum(v, _) = &signal.value {
-                            self.communication_fault = *v != 0;
-                        }
-                    }
-                    _ => {}
+                }
+                let t = self.start_time.elapsed().as_secs_f64();
+                self.voltage_history
+                    .push_back([t, self.pack_voltage as f64]);
+                self.current_history
+                    .push_back([t, self.charge_current_raw as f64 / 10.0]);
+                if self.voltage_history.len() > self.max_history {
+                    self.voltage_history.pop_front();
+                }
+                if self.current_history.len() > self.max_history {
+                    self.current_history.pop_front();
                 }
             }
-
-            // highest bit indicates discharge or charge
-            // highest bit 1 = discharing, 0 = charging
-            self.is_discharging = util::is_discharging_from_current(self.charge_current_raw);
-            self.charge_current = util::extract_current_from_raw(self.charge_current_raw);
-
-            self.last_update = std::time::Instant::now();
-            self.is_data_stale = false;
         }
     }
 
