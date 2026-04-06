@@ -10,8 +10,9 @@ pub struct ChargeController {
     pub charge_enable: bool,
 
     // values directly from can msg, is 10x the actual value
-    pub charge_voltage_raw: u16,
-    pub charge_current_raw: u16,
+    pub charge_voltage_raw: u16, // charge voltage from elcon in decivolts
+    pub charge_current_raw: u16, // charge current with discharge bit still in it
+    pub charge_current: u16, // charge current from elcon in deciamps
     pub is_discharging: bool,
 
     pub hardware_fault: bool,
@@ -28,7 +29,7 @@ pub struct ChargeController {
     pub charge_request_msg: Option<can_dbc::Message>,
     pub charge_request_msg_id: u32,
 
-    pub command_msg_period: usize, // default 1 second, from elcon datasheet
+    pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX 
 }
 
 impl ChargeController {
@@ -40,6 +41,7 @@ impl ChargeController {
             charge_enable: false,
             charge_voltage_raw: 0,
             charge_current_raw: 0,
+            charge_current: 0,
             is_discharging: false,
             hardware_fault: false,
             temperature_fail: false,
@@ -50,7 +52,7 @@ impl ChargeController {
             is_data_stale: true,
             timeout_seconds: 2,
             status_msg_id: 0x98FF50E5, // for some reason definition in dbc is eid? override has correct number but idk
-            command_msg_period: 1000,
+            request_msg_period: 1000,
             charge_request_msg: None,
             charge_request_msg_id: 0,
         }
@@ -264,7 +266,7 @@ impl ChargeController {
                             &mut rcols[1],
                             &theme,
                             "OUTPUT A",
-                            self.charge_current_raw as f32 / 10.0,
+                            self.charge_current as f32 / 10.0,
                             "A",
                             stale,
                         );
@@ -482,8 +484,8 @@ impl ChargeController {
 
             // highest bit indicates discharge or charge
             // highest bit 1 = discharing, 0 = charging
-            self.is_discharging = self.charge_current_raw & 0x8000 != 0;
-            self.charge_current_raw = self.charge_current_raw & 0x7FFF; // clear highest bit to get actual current value
+            self.is_discharging = util::is_discharging_from_current(self.charge_current_raw);
+            self.charge_current = util::extract_current_from_raw(self.charge_current_raw);
 
             self.last_update = std::time::Instant::now();
             self.is_data_stale = false;
@@ -499,17 +501,19 @@ impl ChargeController {
 
         let signal_values: std::collections::HashMap<String, f64> = vec![
             ("charge_enable".to_string(),  self.charge_enable as u8 as f64),
-            ("charge_voltage".to_string(), self.max_charge_voltage as f64),
-            ("charge_current".to_string(), self.max_charge_current as f64),
+            ("charge_voltage".to_string(), (self.max_charge_voltage * 10.0) as f64),
+            ("charge_current".to_string(), (self.max_charge_current * 10.0) as f64),
         ].into_iter().collect();
 
         let Some(msg_bytes) = parser.parser.encode_msg(self.charge_request_msg_id, &signal_values) else {
             log::error!("Failed to encode charge_request");
+            log::error!("Attempting encode with msg_id: {} (0x{:X})", self.charge_request_msg_id, self.charge_request_msg_id);
+            log::error!("Charge request message definition: {:?}", self.charge_request_msg);
             return;
         };
 
         ui_to_can_tx.send(messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
-            amount: messages::SendAmount::Infinite { period: self.command_msg_period },
+            amount: messages::SendAmount::Infinite { period: self.request_msg_period },
             msg_id: self.charge_request_msg_id,
             is_msg_id_extended: is_extended,
             msg_bytes,

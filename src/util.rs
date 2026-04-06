@@ -92,3 +92,13 @@ pub mod msg_id {
         }
     }
 }
+
+// highest bit in current broadcast from elcon indicates discharge or charge
+// highest bit 1 = dischargiing, 0 = charging
+pub fn is_discharging_from_current(raw_current: u16) -> bool {
+    (raw_current & 0x8000) != 0
+}
+
+pub fn extract_current_from_raw(raw_current: u16) -> u16 {
+    raw_current & 0x7FFF
+}
