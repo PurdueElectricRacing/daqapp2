@@ -25,11 +25,16 @@ pub struct ChargeController {
     pub is_data_stale: bool,
     pub timeout_seconds: u64,
 
-    pub status_msg_id: u32,
+    pub elcon_status_msg: Option<can_dbc::Message>,
+    pub elcon_status_msg_id: u32,
     pub charge_request_msg: Option<can_dbc::Message>,
     pub charge_request_msg_id: u32,
 
     pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
+
+    // parser init tracking
+    pub initialized: bool,
+    pub current_parser_path: Option<std::path::PathBuf>,
 }
 
 impl ChargeController {
@@ -51,10 +56,13 @@ impl ChargeController {
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10), // start as stale
             is_data_stale: true,
             timeout_seconds: 2,
-            status_msg_id: 0x98FF50E5,
-            request_msg_period: 1000,
+            elcon_status_msg: None,
+            elcon_status_msg_id: 0,
             charge_request_msg: None,
             charge_request_msg_id: 0,
+            request_msg_period: 1000,
+            initialized: false,
+            current_parser_path: None,
         }
     }
 
@@ -78,41 +86,18 @@ impl ChargeController {
             return egui_tiles::UiResponse::None;
         };
 
-        let Some(charge_request_msg) = parser
-            .parser
-            .msg_defs()
-            .into_iter()
-            .find(|m| m.name == "charge_request")
-        else {
-            log::error!("charge request message not found in dbc");
-            ui.add_space(8.0);
-            ui.vertical_centered(|ui| {
-                ui.label("DBC does not contain charge request message definition.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to select a different DBC file");
-            });
-            return egui_tiles::UiResponse::None;
-        };
-
-        let Some(charging_telemetry_msg) = parser
-            .parser
-            .msg_defs()
-            .into_iter()
-            .find(|m| m.name == "charging_telemetry")
-        else {
-            log::error!("charging telemetry message not found in dbc");
-            ui.add_space(8.0);
-            ui.vertical_centered(|ui| {
-                ui.label("DBC does not contain charging telemetry message definition.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to select a different DBC file");
-            });
-            return egui_tiles::UiResponse::None;
-        };
-
-        self.charge_request_msg = Some(charge_request_msg.clone());
-        self.charge_request_msg_id =
-            util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
+        let parser_changed = self.current_parser_path.as_deref() != Some(&parser.dbc_path);
+        if !self.initialized || parser_changed {
+            if let Err(e) = self.init_from_parser(parser) {
+                ui.add_space(8.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(format!("DBC error: {e}"));
+                    ui.label("CMD+S to toggle the sidebar.");
+                    ui.label("Use the sidebar to select a different DBC file");
+                });
+                return egui_tiles::UiResponse::None;
+            }
+        }
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -221,94 +206,21 @@ impl ChargeController {
 
                     });
 
-                    // charge enable toggle button (full width)
-                    let (toggle_text, toggle_color) = if self.charge_enable {
-                        ("● Charge Output Enabled", theme.success_color())
-                    } else {
-                        ("○ Charge Output Disabled", theme.text_color().linear_multiply(0.4))
-                    };
-
-                    let toggle_bg = if self.charge_enable {
-                        Color32::from_rgba_unmultiplied(
-                            theme.success_color().r(),
-                            theme.success_color().g(),
-                            theme.success_color().b(),
-                            30,
-                        )
-                    } else {
-                        theme.panel_color()
-                    };
-
-                    let toggle_btn = Frame::NONE
-                        .fill(toggle_bg)
-                        .stroke(Stroke::new(1.0, toggle_color))
-                        .inner_margin(egui::Margin::symmetric(10, 7))
-                        .corner_radius(egui::CornerRadius::same(4))
-                        .show(ui, |ui| {
-                            ui.set_min_width(ui.available_width());
-                            ui.set_max_height(20.0);
-                            ui.centered_and_justified(|ui| {
-                                ui.colored_label(toggle_color, toggle_text);
-                            });
-                        });
-
-                    // charge command send enable/disable logic
-                    if toggle_btn.response.interact(egui::Sense::click()).clicked() {
-                        self.charge_enable = !self.charge_enable;
-                        if (self.charge_enable) {
-                            self.send_charge_request(&ui_to_can_tx, parser);
-                        }
-                        else {
-                            self.stop_charge_request(&ui_to_can_tx);
-                        }
+                    if Self::toggle_button(ui, &theme, "● Charge Output Enabled", "○ Charge Output Disabled", &mut self.charge_enable) {
+                        if self.charge_enable { self.send_charge_request(&ui_to_can_tx, parser); }
+                        else { self.stop_charge_request(&ui_to_can_tx); }
                     }
 
-                    ui.add_space(6.0);
+                    Self::toggle_button(ui, &theme, "● Balance Enabled", "○ Balance Disabled", &mut self.balance_enable);
 
-                    // balance enable toggle 
-                    let (toggle_text, toggle_color) = if self.balance_enable {
-                        ("● Balance Enabled", theme.success_color())
-                    } else {
-                        ("○ Balance Disabled", theme.text_color().linear_multiply(0.4))
-                    };
-
-                    let toggle_bg = if self.balance_enable {
-                        Color32::from_rgba_unmultiplied(
-                            theme.success_color().r(),
-                            theme.success_color().g(),
-                            theme.success_color().b(),
-                            30,
-                        )
-                    } else {
-                        theme.panel_color()
-                    };
-
-                    let toggle_btn = Frame::NONE
-                        .fill(toggle_bg)
-                        .stroke(Stroke::new(1.0, toggle_color))
-                        .inner_margin(egui::Margin::symmetric(10, 7))
-                        .corner_radius(egui::CornerRadius::same(4))
-                        .show(ui, |ui| {
-                            ui.set_min_width(ui.available_width());
-                            ui.set_max_height(20.0);
-                            ui.centered_and_justified(|ui| {
-                                ui.colored_label(toggle_color, toggle_text);
-                            });
-                        });
-
-                    // balance command send enable/disable logic
-                    if toggle_btn.response.interact(egui::Sense::click()).clicked() {
-                        self.balance_enable = !self.balance_enable;
-                    }
-
-                    ui.add_space(6.0);
-                });
+                        ui.add_space(6.0);
+                    });
 
                 // RIGHT: Reading cards 
                 right.vertical(|ui| {
                     // fault panel
                     ui.label(
-                        RichText::new(format!("CHARGER OUTPUT  (0x{:X})", self.status_msg_id))
+                        RichText::new(format!("CHARGER OUTPUT  (0x{:X})", self.elcon_status_msg_id))
                             .size(10.0)
                             .color(theme.text_color().linear_multiply(0.5)),
                     );
@@ -352,8 +264,41 @@ impl ChargeController {
 
         egui_tiles::UiResponse::None
     }
-
     // helper functions
+
+    // parser init: ensure all relevant messages exit and store defs and IDs
+    fn init_from_parser(&mut self, parser: &app::ParserInfo) -> Result<(), String> {
+        let msg_defs: Vec<_> = parser.parser.msg_defs().into_iter().collect();
+
+        // charge request message
+        let crm = msg_defs
+            .iter()
+            .find(|m| m.name == "charge_request")
+            .ok_or_else(|| "charge_request not found in DBC".to_string())?;
+
+        // elcon status message
+        let esm = msg_defs
+            .iter()
+            .find(|m| m.name == "elcon_status")
+            .ok_or_else(|| "elcon_status not found in DBC".to_string())?;
+
+        self.charge_request_msg = Some(crm.clone());
+        self.charge_request_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&crm.id);
+
+        self.elcon_status_msg = Some(esm.clone());
+        self.elcon_status_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&esm.id);
+
+        self.initialized = true;
+        self.current_parser_path = Some(parser.dbc_path.clone()); // or whatever uniquely IDs the parser
+
+        log::info!(
+            "ChargeController initialized — charge_request id: 0x{:X}, elcon_status id: 0x{:X}",
+            self.charge_request_msg_id,
+            self.elcon_status_msg_id
+        );
+
+        Ok(())
+    }
 
     /// Renders a fault row: label on the left, colored pill on the right.
     fn fault_pill(
@@ -482,15 +427,49 @@ impl ChargeController {
             });
     }
 
-    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
-        if std::time::Instant::now().duration_since(self.last_update)
-            > std::time::Duration::from_secs(self.timeout_seconds)
-        {
-            self.is_data_stale = true;
-        }
+    // balance and charge enable buttons
+    fn toggle_button(
+        ui: &mut egui::Ui,
+        theme: &theme::ThemeColors,
+        label_on: &str,
+        label_off: &str,
+        state: &mut bool,
+    ) -> bool {
+        let (text, color) = if *state {
+            (label_on, theme.success_color())
+        } else {
+            (label_off, theme.text_color().linear_multiply(0.4))
+        };
 
+        let bg = Color32::from_rgba_unmultiplied(
+            color.r(),
+            color.g(),
+            color.b(),
+            if *state { 30 } else { 0 },
+        );
+
+        let resp = Frame::NONE
+            .fill(bg)
+            .stroke(Stroke::new(1.0, color))
+            .inner_margin(egui::Margin::symmetric(10, 7))
+            .corner_radius(egui::CornerRadius::same(4))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                ui.set_max_height(20.0);
+                ui.centered_and_justified(|ui| ui.colored_label(color, text));
+            })
+            .response
+            .interact(egui::Sense::click());
+
+        if resp.clicked() {
+            *state = !*state;
+        }
+        resp.clicked()
+    }
+
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
         if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
-            if parsed_msg.decoded.msg_id == self.status_msg_id {
+            if parsed_msg.decoded.msg_id == self.elcon_status_msg_id {
                 for (_, signal) in parsed_msg.decoded.signals.iter() {
                     match signal.name.as_str() {
                         "charge_voltage" => {
