@@ -12,8 +12,7 @@ pub struct ChargeController {
 
     // values directly from can msg, is 10x the actual value
     pub charge_voltage_raw: u16, // charge voltage from elcon in decivolts
-    pub charge_current_raw: u16, // charge current with discharge bit still in it
-    pub charge_current: u16,     // charge current from elcon in deciamps
+    pub charge_current_raw: u16, // charge current from elcon in deciamps
     pub is_discharging: bool,
 
     pub hardware_fault: bool,
@@ -56,7 +55,6 @@ impl ChargeController {
             charge_enable: false,
             charge_voltage_raw: 0,
             charge_current_raw: 0,
-            charge_current: 0,
             is_discharging: false,
             hardware_fault: false,
             temperature_fail: false,
@@ -304,6 +302,8 @@ impl ChargeController {
                     );
                     ui.add_space(4.0);
 
+                    // show discharging vs charging state from raw current highest bit
+
                     ui.columns(2, |rcols| {
                         Self::reading_card(
                             &mut rcols[0],
@@ -313,14 +313,26 @@ impl ChargeController {
                             "V",
                             stale,
                         );
-                        Self::reading_card(
-                            &mut rcols[1],
-                            &theme,
-                            "OUTPUT A",
-                            self.charge_current as f32 / 10.0,
-                            "A",
-                            stale,
-                        );
+                        if self.is_discharging {
+                            Self::reading_card(
+                                &mut rcols[1],
+                                &theme,
+                                "DISCHARGING",
+                                self.charge_current_raw as f32 / 10.0,
+                                "A",
+                                stale,
+                            );
+                        }
+                        else {
+                            Self::reading_card(
+                                &mut rcols[1],
+                                &theme,
+                                "OUTPUT A",
+                                self.charge_current_raw as f32 / 10.0,
+                                "A",
+                                stale,
+                            );
+                        }
                     });
 
                     ui.add_space(10.0);
@@ -554,10 +566,8 @@ impl ChargeController {
                     }
                 }
 
-                // highest bit indicates discharge or charge
-                // highest bit 1 = discharing, 0 = charging
-                self.is_discharging = util::is_discharging_from_current(self.charge_current_raw);
-                self.charge_current = util::extract_current_from_raw(self.charge_current_raw);
+                self.is_discharging = if self.charge_current_raw == u16::MAX {true} else {false};
+                log::info!("is_discharging: {}, raw_current: {}", self.is_discharging, self.charge_current_raw);
 
                 self.last_update = std::time::Instant::now();
                 self.is_data_stale = false;
@@ -572,17 +582,17 @@ impl ChargeController {
                         }
                         "min_cell_voltage" => {
                             if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.pack_voltage = *v as f32;
+                                self.min_cell_voltage = *v as f32;
                             }
                         }
                         "max_cell_voltage" => {
                             if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.pack_voltage = *v as f32;
+                                self.max_cell_voltage = *v as f32;
                             }
                         }
                         "charging_state" => {
                             if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.pack_voltage = *v as f32;
+                                self.charging_state = *v as u8;
                             }
                         }
                         _ => {}
