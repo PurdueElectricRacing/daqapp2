@@ -51,7 +51,7 @@ impl ChargeController {
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10), // start as stale
             is_data_stale: true,
             timeout_seconds: 2,
-            status_msg_id: 0x98FF50E5, 
+            status_msg_id: 0x98FF50E5,
             request_msg_period: 1000,
             charge_request_msg: None,
             charge_request_msg_id: 0,
@@ -561,7 +561,10 @@ impl ChargeController {
                 (self.max_charge_current as f64),
             ),
             ("charge_enable".to_string(), self.charge_enable as u8 as f64),
-            ("balance_enable".to_string(), self.balance_enable as u8 as f64), 
+            (
+                "balance_enable".to_string(),
+                self.balance_enable as u8 as f64,
+            ),
         ]
         .into_iter()
         .collect();
