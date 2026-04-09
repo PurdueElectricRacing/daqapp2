@@ -1,7 +1,6 @@
 use crate::util;
 use crate::{app, messages, theme};
 use eframe::egui::{self, Color32, Frame, RichText, Stroke, Vec2};
-use egui_plot::{Line, Plot, PlotPoints};
 
 pub struct ChargeController {
     pub title: String,
@@ -25,16 +24,7 @@ pub struct ChargeController {
     pub is_data_stale: bool,
     pub timeout_seconds: u64,
 
-    pub elcon_status_msg: Option<can_dbc::Message>,
-    pub elcon_status_msg_id: u32,
-    pub charge_request_msg: Option<can_dbc::Message>,
-    pub charge_request_msg_id: u32,
-
     pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
-
-    // parser init tracking
-    pub initialized: bool,
-    pub current_parser_path: Option<std::path::PathBuf>,
 }
 
 impl ChargeController {
@@ -56,13 +46,7 @@ impl ChargeController {
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10), // start as stale
             is_data_stale: true,
             timeout_seconds: 2,
-            elcon_status_msg: None,
-            elcon_status_msg_id: 0,
-            charge_request_msg: None,
-            charge_request_msg_id: 0,
             request_msg_period: 1000,
-            initialized: false,
-            current_parser_path: None,
         }
     }
 
@@ -75,20 +59,9 @@ impl ChargeController {
         // Pull theme colors from global ctx storage
         let theme = theme::get_theme(ui.ctx());
 
-        let Some(parser) = parser else {
-            ui.add_space(8.0);
-            ui.vertical_centered(|ui| {
-                ui.label("No DBC selected yet.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to select a DBC file");
-            });
-
-            return egui_tiles::UiResponse::None;
-        };
-
-        let parser_changed = self.current_parser_path.as_deref() != Some(&parser.dbc_path);
-        if !self.initialized || parser_changed {
-            if let Err(e) = self.init_from_parser(parser) {
+        let parser = match Self::check_required_msgs(parser) {
+            Ok(parser) => parser,
+            Err(e) => {
                 ui.add_space(8.0);
                 ui.vertical_centered(|ui| {
                     ui.label(format!("DBC error: {e}"));
@@ -97,7 +70,7 @@ impl ChargeController {
                 });
                 return egui_tiles::UiResponse::None;
             }
-        }
+        };
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -202,25 +175,27 @@ impl ChargeController {
                         Self::input_row(ui, &theme, "Max Voltage", &mut self.max_charge_voltage, "V", 0.0..=1000.0);
                         ui.add_space(4.0);
                         Self::input_row(ui, &theme, "Max Current", &mut self.max_charge_current, "A", 0.0..=500.0);
-                        ui.add_space(8.0);
+                        ui.add_space(4.0);
+
+                        Self::toggle_button(ui, &theme, "● Balance Enabled", "○ Balance Disabled", &mut self.balance_enable);
 
                     });
 
+                    ui.add_space(8.0);
+
                     if Self::toggle_button(ui, &theme, "● Charge Output Enabled", "○ Charge Output Disabled", &mut self.charge_enable) {
                         if self.charge_enable { self.send_charge_request(&ui_to_can_tx, parser); }
-                        else { self.stop_charge_request(&ui_to_can_tx); }
+                        else { self.stop_charge_request(&ui_to_can_tx, parser); }
                     }
 
-                    Self::toggle_button(ui, &theme, "● Balance Enabled", "○ Balance Disabled", &mut self.balance_enable);
-
-                        ui.add_space(6.0);
+                    ui.add_space(6.0);
                     });
 
                 // RIGHT: Reading cards 
                 right.vertical(|ui| {
                     // fault panel
                     ui.label(
-                        RichText::new(format!("CHARGER OUTPUT  (0x{:X})", self.elcon_status_msg_id))
+                        RichText::new(format!("CHARGER OUTPUT"))
                             .size(10.0)
                             .color(theme.text_color().linear_multiply(0.5)),
                     );
@@ -266,38 +241,25 @@ impl ChargeController {
     }
     // helper functions
 
-    // parser init: ensure all relevant messages exit and store defs and IDs
-    fn init_from_parser(&mut self, parser: &app::ParserInfo) -> Result<(), String> {
+    fn check_required_msgs(parser: Option<&app::ParserInfo>) -> Result<&app::ParserInfo, String> {
+        // check if parser is some
+        let parser = parser.ok_or_else(|| "No DBC loaded".to_string())?;
+
         let msg_defs: Vec<_> = parser.parser.msg_defs().into_iter().collect();
 
         // charge request message
-        let crm = msg_defs
+        let _crm = msg_defs
             .iter()
             .find(|m| m.name == "charge_request")
             .ok_or_else(|| "charge_request not found in DBC".to_string())?;
 
         // elcon status message
-        let esm = msg_defs
+        let _esm = msg_defs
             .iter()
             .find(|m| m.name == "elcon_status")
             .ok_or_else(|| "elcon_status not found in DBC".to_string())?;
 
-        self.charge_request_msg = Some(crm.clone());
-        self.charge_request_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&crm.id);
-
-        self.elcon_status_msg = Some(esm.clone());
-        self.elcon_status_msg_id = util::msg_id::can_dbc_to_u32_with_extid_flag(&esm.id);
-
-        self.initialized = true;
-        self.current_parser_path = Some(parser.dbc_path.clone()); // or whatever uniquely IDs the parser
-
-        log::info!(
-            "ChargeController initialized — charge_request id: 0x{:X}, elcon_status id: 0x{:X}",
-            self.charge_request_msg_id,
-            self.elcon_status_msg_id
-        );
-
-        Ok(())
+        Ok(parser)
     }
 
     /// Renders a fault row: label on the left, colored pill on the right.
@@ -469,7 +431,7 @@ impl ChargeController {
 
     pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
         if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
-            if parsed_msg.decoded.msg_id == self.elcon_status_msg_id {
+            if parsed_msg.decoded.name == "elcon_status" {
                 for (_, signal) in parsed_msg.decoded.signals.iter() {
                     match signal.name.as_str() {
                         "charge_voltage" => {
@@ -522,11 +484,18 @@ impl ChargeController {
         ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: &app::ParserInfo,
     ) {
+        // find charge_request message definition
+        let crm = parser
+            .parser
+            .msg_defs()
+            .into_iter()
+            .find(|m| m.name == "charge_request");
+
+        let crm_id = util::msg_id::can_dbc_to_u32_with_extid_flag(
+            &crm.as_ref().expect("Charge request message not found").id,
+        );
         let is_extended = matches!(
-            self.charge_request_msg
-                .as_ref()
-                .expect("Charge request message not found")
-                .id,
+            &crm.as_ref().expect("Charge request message not found").id,
             can_dbc::MessageId::Extended(_)
         );
 
@@ -548,20 +517,8 @@ impl ChargeController {
         .into_iter()
         .collect();
 
-        let Some(msg_bytes) = parser
-            .parser
-            .encode_msg(self.charge_request_msg_id, &signal_values)
-        else {
+        let Some(msg_bytes) = parser.parser.encode_msg(crm_id, &signal_values) else {
             log::error!("Failed to encode charge_request");
-            log::error!(
-                "Attempting encode with msg_id: {} (0x{:X})",
-                self.charge_request_msg_id,
-                self.charge_request_msg_id
-            );
-            log::error!(
-                "Charge request message definition: {:?}",
-                self.charge_request_msg
-            );
             return;
         };
 
@@ -571,7 +528,7 @@ impl ChargeController {
                     amount: messages::SendAmount::Infinite {
                         period: self.request_msg_period,
                     },
-                    msg_id: self.charge_request_msg_id,
+                    msg_id: crm_id,
                     is_msg_id_extended: is_extended,
                     msg_bytes,
                 },
@@ -579,11 +536,23 @@ impl ChargeController {
             .expect("Failed to send charge_request");
     }
 
-    fn stop_charge_request(&self, ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>) {
+    fn stop_charge_request(
+        &self,
+        ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
+        parser: &app::ParserInfo,
+    ) {
+        // find charge_request message definition
+        let crm = parser
+            .parser
+            .msg_defs()
+            .into_iter()
+            .find(|m| m.name == "charge_request");
+
+        let crm_id = util::msg_id::can_dbc_to_u32_with_extid_flag(
+            &crm.as_ref().expect("Charge request message not found").id,
+        );
         ui_to_can_tx
-            .send(messages::MsgFromUi::DeleteSendMessage {
-                msg_id: self.charge_request_msg_id,
-            })
+            .send(messages::MsgFromUi::DeleteSendMessage { msg_id: crm_id })
             .expect("Failed to send DeleteSendMessage");
     }
 }
