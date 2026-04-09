@@ -9,7 +9,7 @@ pub struct ChargeController {
     pub max_charge_voltage: f32,
     pub max_charge_current: f32,
     pub charge_enable: bool,
-
+    pub balance_enable: bool,
     // values directly from can msg, is 10x the actual value
     pub charge_voltage_raw: u16, // charge voltage from elcon in decivolts
     pub charge_current_raw: u16, // charge current from elcon in deciamps
@@ -30,20 +30,6 @@ pub struct ChargeController {
     pub charge_request_msg_id: u32,
 
     pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
-
-    // abox reported telemetry
-    pub charging_telemetry_msg: Option<can_dbc::Message>,
-    pub charging_telemetry_msg_id: u32,
-    pub pack_voltage: f32,
-    pub min_cell_voltage: f32,
-    pub max_cell_voltage: f32,
-    pub charging_state: u8,
-
-    pub voltage_history: std::collections::VecDeque<[f64; 2]>, // [time, value]
-    pub current_history: std::collections::VecDeque<[f64; 2]>,
-    pub start_time: std::time::Instant,
-
-    pub max_history: usize, // ~5 min at 1hz
 }
 
 impl ChargeController {
@@ -53,6 +39,7 @@ impl ChargeController {
             max_charge_voltage: 0.0,
             max_charge_current: 0.0,
             charge_enable: false,
+            balance_enable: false,
             charge_voltage_raw: 0,
             charge_current_raw: 0,
             is_discharging: false,
@@ -64,20 +51,10 @@ impl ChargeController {
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10), // start as stale
             is_data_stale: true,
             timeout_seconds: 2,
-            status_msg_id: 0x98FF50E5, // for some reason definition in dbc is eid? override has correct number but idk
+            status_msg_id: 0x98FF50E5, 
             request_msg_period: 1000,
             charge_request_msg: None,
             charge_request_msg_id: 0,
-            charging_telemetry_msg: None,
-            charging_telemetry_msg_id: 0,
-            pack_voltage: 0.0,
-            min_cell_voltage: 0.0,
-            max_cell_voltage: 0.0,
-            charging_state: 0,
-            voltage_history: std::collections::VecDeque::new(),
-            current_history: std::collections::VecDeque::new(),
-            start_time: std::time::Instant::now(),
-            max_history: 300, // ~5 min at 1hz
         }
     }
 
@@ -136,10 +113,6 @@ impl ChargeController {
         self.charge_request_msg = Some(charge_request_msg.clone());
         self.charge_request_msg_id =
             util::msg_id::can_dbc_to_u32_with_extid_flag(&charge_request_msg.id);
-
-        self.charging_telemetry_msg = Some(charging_telemetry_msg.clone());
-        self.charging_telemetry_msg_id =
-            util::msg_id::can_dbc_to_u32_with_extid_flag(&charging_telemetry_msg.id);
 
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
@@ -209,9 +182,9 @@ impl ChargeController {
             let left  = &mut left_slice[0];
             let right = &mut right_slice[0];
 
-                // LEFT: fault states & charge command 
+                // LEFT: charge request & fault states
                 left.vertical(|ui| {
-                    // fault panel
+
                     Frame::NONE
                         .fill(theme.panel_color())
                         .stroke(Stroke::new(1.0, theme.accent_color()))
@@ -233,7 +206,6 @@ impl ChargeController {
                         });
 
                     ui.add_space(10.0);
-
                     // charge command inputs
                     ui.label(
                         RichText::new("CHARGE REQUEST")
@@ -274,6 +246,7 @@ impl ChargeController {
                         .corner_radius(egui::CornerRadius::same(4))
                         .show(ui, |ui| {
                             ui.set_min_width(ui.available_width());
+                            ui.set_max_height(20.0);
                             ui.centered_and_justified(|ui| {
                                 ui.colored_label(toggle_color, toggle_text);
                             });
@@ -291,10 +264,49 @@ impl ChargeController {
                     }
 
                     ui.add_space(6.0);
+
+                    // balance enable toggle 
+                    let (toggle_text, toggle_color) = if self.balance_enable {
+                        ("● Balance Enabled", theme.success_color())
+                    } else {
+                        ("○ Balance Disabled", theme.text_color().linear_multiply(0.4))
+                    };
+
+                    let toggle_bg = if self.balance_enable {
+                        Color32::from_rgba_unmultiplied(
+                            theme.success_color().r(),
+                            theme.success_color().g(),
+                            theme.success_color().b(),
+                            30,
+                        )
+                    } else {
+                        theme.panel_color()
+                    };
+
+                    let toggle_btn = Frame::NONE
+                        .fill(toggle_bg)
+                        .stroke(Stroke::new(1.0, toggle_color))
+                        .inner_margin(egui::Margin::symmetric(10, 7))
+                        .corner_radius(egui::CornerRadius::same(4))
+                        .show(ui, |ui| {
+                            ui.set_min_width(ui.available_width());
+                            ui.set_max_height(20.0);
+                            ui.centered_and_justified(|ui| {
+                                ui.colored_label(toggle_color, toggle_text);
+                            });
+                        });
+
+                    // balance command send enable/disable logic
+                    if toggle_btn.response.interact(egui::Sense::click()).clicked() {
+                        self.balance_enable = !self.balance_enable;
+                    }
+
+                    ui.add_space(6.0);
                 });
 
                 // RIGHT: Reading cards 
                 right.vertical(|ui| {
+                    // fault panel
                     ui.label(
                         RichText::new(format!("CHARGER OUTPUT  (0x{:X})", self.status_msg_id))
                             .size(10.0)
@@ -334,52 +346,6 @@ impl ChargeController {
                             );
                         }
                     });
-
-                    ui.add_space(10.0);
-                    // telemetry panel with voltage and current plots
-                    Frame::NONE
-                        .fill(theme.panel_color())
-                        .stroke(Stroke::new(1.0, theme.accent_color()))
-                        .inner_margin(egui::Margin::same(10))
-                        .corner_radius(egui::CornerRadius::same(4))
-                        .show(ui, |ui| {
-                            ui.set_min_height(120.0);
-                            ui.set_min_width(ui.available_width());
-
-                    // State badge
-                    let state_label = if self.charging_state == 1 { "● CHARGING" } else { "○ IDLE" };
-                    let state_color = if self.charging_state == 1 { theme.success_color() } else { theme.text_color().linear_multiply(0.4) };
-                    ui.horizontal(|ui| {
-                        ui.colored_label(state_color, state_label);
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(RichText::new(format!(
-                                "cell {:.2}–{:.2} V",
-                                self.min_cell_voltage, self.max_cell_voltage
-                            )).size(10.0).color(theme.text_color().linear_multiply(0.5)));
-                        });
-                    });
-
-                    ui.add_space(4.0);
-
-                    Plot::new("charge_plot")
-                        .height(200.0)
-                        .show_axes([false, true])
-                        .show_grid(false)
-                        .allow_drag(false)
-                        .allow_zoom(false)
-                        .include_y(0.0)
-                        .show(ui, |plot_ui: &mut egui_plot::PlotUi| {
-                            let v_points = PlotPoints::new(self.voltage_history.iter().cloned().collect());
-                            plot_ui.line(Line::new("v_points",v_points)
-                                .color(theme.info_color())
-                                .name("Pack V"));
-
-                            let i_points = PlotPoints::new(self.current_history.iter().cloned().collect());
-                            plot_ui.line(Line::new("i_points",i_points)
-                                .color(theme.warning_color())
-                                .name("Output A"));
-                        });
-    });
                 });
             });
         });
@@ -566,49 +532,8 @@ impl ChargeController {
                     }
                 }
 
-                self.is_discharging = if self.charge_current_raw == u16::MAX {true} else {false};
-                log::info!("is_discharging: {}, raw_current: {}", self.is_discharging, self.charge_current_raw);
-
                 self.last_update = std::time::Instant::now();
                 self.is_data_stale = false;
-            }
-            if parsed_msg.decoded.msg_id == self.charging_telemetry_msg_id {
-                for (_, signal) in parsed_msg.decoded.signals.iter() {
-                    match signal.name.as_str() {
-                        "pack_voltage" => {
-                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.pack_voltage = *v as f32;
-                            }
-                        }
-                        "min_cell_voltage" => {
-                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.min_cell_voltage = *v as f32;
-                            }
-                        }
-                        "max_cell_voltage" => {
-                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.max_cell_voltage = *v as f32;
-                            }
-                        }
-                        "charging_state" => {
-                            if let can_decode::DecodedSignalValue::Numeric(v) = &signal.value {
-                                self.charging_state = *v as u8;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                let t = self.start_time.elapsed().as_secs_f64();
-                self.voltage_history
-                    .push_back([t, self.pack_voltage as f64]);
-                self.current_history
-                    .push_back([t, self.charge_current_raw as f64 / 10.0]);
-                if self.voltage_history.len() > self.max_history {
-                    self.voltage_history.pop_front();
-                }
-                if self.current_history.len() > self.max_history {
-                    self.current_history.pop_front();
-                }
             }
         }
     }
@@ -627,15 +552,16 @@ impl ChargeController {
         );
 
         let signal_values: std::collections::HashMap<String, f64> = vec![
-            ("charge_enable".to_string(), self.charge_enable as u8 as f64),
             (
                 "charge_voltage".to_string(),
-                (self.max_charge_voltage * 10.0) as f64,
+                (self.max_charge_voltage as f64),
             ),
             (
                 "charge_current".to_string(),
-                (self.max_charge_current * 10.0) as f64,
+                (self.max_charge_current as f64),
             ),
+            ("charge_enable".to_string(), self.charge_enable as u8 as f64),
+            ("balance_enable".to_string(), self.balance_enable as u8 as f64), 
         ]
         .into_iter()
         .collect();
