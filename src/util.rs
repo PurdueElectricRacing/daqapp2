@@ -92,7 +92,3 @@ pub mod msg_id {
         }
     }
 }
-
-pub fn extract_current_from_raw(raw_current: u16) -> u16 {
-    raw_current & 0x7FFF
-}
