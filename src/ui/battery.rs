@@ -353,8 +353,8 @@ impl BatteryPage {
     ) {
         const V_MIN: f64 = 3.2;
         const V_MAX: f64 = 4.2;
-        const BAR_W: f64 = 28.0;
-        const BAR_H: f64 = 52.0;
+        const BAR_W: f32 = 28.0;
+        const BAR_H: f32 = 52.0;
 
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
@@ -362,7 +362,7 @@ impl BatteryPage {
             Self::voltage_color(cell.voltage)
         };
 
-        let fill_frac = ((cell.voltage - V_MIN) / (V_MAX - V_MIN)).clamp(0.0, 1.0);
+        let fill_frac = ((cell.voltage - V_MIN) / (V_MAX - V_MIN)).clamp(0.0, 1.0) as f32;
 
         ui.vertical(|ui| {
             ui.set_max_width(BAR_W + 4.0);
