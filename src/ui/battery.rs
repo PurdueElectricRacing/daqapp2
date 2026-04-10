@@ -8,13 +8,17 @@ const CELLS_PER_MODULE: usize = 16;
 
 #[derive(Default, Clone)]
 pub struct CellData {
-    pub voltage: f32,
+    pub voltage: f64,
     pub balancing: bool,
 }
 
 pub struct BatteryPage {
     pub title: String,
+
     pub modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
+    pub pack_sum: f64,
+    pub cell_min: f64,
+    pub cell_max: f64,
 
     pub last_update: std::time::Instant,
     pub is_data_stale: bool,
@@ -26,6 +30,9 @@ impl BatteryPage {
         Self {
             title: format!("Battery Viewer #{}", instance_num),
             modules: vec![vec![CellData::default(); CELLS_PER_MODULE]; NUM_MODULES],
+            pack_sum: -1.0,
+            cell_min: -1.0,
+            cell_max: -1.0,
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10),
             is_data_stale: true,
             timeout_seconds: 2,
@@ -40,24 +47,24 @@ impl BatteryPage {
                 "cell_telemetry" => {
                     let mut module_num: Option<usize> = None;
                     let mut cell_num: Option<usize> = None;
-                    let mut voltage: Option<f32> = None;
+                    let mut voltage: Option<f64> = None;
                     let mut balancing: Option<bool> = None;
 
                     for (_, sig) in parsed.decoded.signals.iter() {
                         match sig.name.as_str() {
                             "module_num" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    module_num = Some(*v as usize);
+                                    module_num = Some(v.round() as usize);
                                 }
                             }
                             "cell_num" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    cell_num = Some(*v as usize);
+                                    cell_num = Some(v.round() as usize);
                                 }
                             }
                             "cell_voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    voltage = Some(*v as f32 * 0.01); // scale
+                                    voltage = Some(*v);
                                 }
                             }
                             "balance_status" => {
@@ -81,6 +88,28 @@ impl BatteryPage {
                     self.last_update = std::time::Instant::now();
                     self.is_data_stale = false;
                 }
+                "charging_telemetry" => {
+                    for (_, sig) in parsed.decoded.signals.iter() {
+                        match sig.name.as_str() {
+                            "pack_voltage" => {
+                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
+                                    self.pack_sum = *v;
+                                }
+                            }
+                            "min_cell_voltage" => {
+                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
+                                    self.cell_min = *v;
+                                }
+                            }
+                            "max_cell_voltage" => {
+                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
+                                    self.cell_max = *v;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -94,23 +123,23 @@ impl BatteryPage {
         self.is_data_stale =
             self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
         let stale = self.is_data_stale;
-        let elapsed = self.last_update.elapsed().as_secs_f32();
+        let elapsed = self.last_update.elapsed().as_secs_f64();
 
         // ── collect pack-level stats ─────────────────────────────────────────
-        let all_voltages: Vec<f32> = self
+        let all_voltages: Vec<f64> = self
             .modules
             .iter()
             .flat_map(|m| m.iter().map(|c| c.voltage))
             .filter(|v| *v > 0.0)
             .collect();
 
-        let pack_sum: f32 = all_voltages.iter().sum();
-        let pack_min = all_voltages.iter().cloned().fold(f32::MAX, f32::min);
-        let pack_max = all_voltages.iter().cloned().fold(f32::MIN, f32::max);
-        let pack_delta = if pack_min < f32::MAX {
+        let pack_sum = self.pack_sum;
+        let pack_min = self.cell_min;
+        let pack_max = self.cell_max;
+        let pack_delta = if pack_min < f64::MAX {
             pack_max - pack_min
         } else {
-            0.0
+            -1.0
         };
 
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -167,7 +196,7 @@ impl BatteryPage {
                     &mut cols[1],
                     &theme,
                     "CELL MIN",
-                    if pack_min < f32::MAX { pack_min } else { 0.0 },
+                    if pack_min < f64::MAX { pack_min } else { 0.0 },
                     "V",
                     stale,
                     None,
@@ -176,7 +205,7 @@ impl BatteryPage {
                     &mut cols[2],
                     &theme,
                     "CELL MAX",
-                    if pack_max > f32::MIN { pack_max } else { 0.0 },
+                    if pack_max > f64::MIN { pack_max } else { 0.0 },
                     "V",
                     stale,
                     None,
@@ -202,11 +231,11 @@ impl BatteryPage {
 
             // ── per-module panels ────────────────────────────────────────────
             for (mi, module) in self.modules.iter().enumerate() {
-                let mvs: Vec<f32> = module.iter().map(|c| c.voltage).collect();
-                let mod_sum: f32 = mvs.iter().sum();
-                let mod_min = mvs.iter().cloned().fold(f32::MAX, f32::min);
-                let mod_max = mvs.iter().cloned().fold(f32::MIN, f32::max);
-                let mod_delta = if mod_min < f32::MAX {
+                let mvs: Vec<f64> = module.iter().map(|c| c.voltage).collect();
+                let mod_sum: f64 = mvs.iter().sum();
+                let mod_min = mvs.iter().cloned().fold(f64::MAX, f64::min);
+                let mod_max = mvs.iter().cloned().fold(f64::MIN, f64::max);
+                let mod_delta = if mod_min < f64::MAX {
                     mod_max - mod_min
                 } else {
                     0.0
@@ -273,7 +302,7 @@ impl BatteryPage {
         ui: &mut egui::Ui,
         theme: &ui::theme::ThemeColors,
         label: &str,
-        value: f32,
+        value: f64,
         unit: &str,
         stale: bool,
         override_color: Option<Color32>,
@@ -322,10 +351,10 @@ impl BatteryPage {
         cell: &CellData,
         stale: bool,
     ) {
-        const V_MIN: f32 = 3.2;
-        const V_MAX: f32 = 4.2;
-        const BAR_W: f32 = 28.0;
-        const BAR_H: f32 = 52.0;
+        const V_MIN: f64 = 3.2;
+        const V_MAX: f64 = 4.2;
+        const BAR_W: f64 = 28.0;
+        const BAR_H: f64 = 52.0;
 
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
@@ -395,7 +424,7 @@ impl BatteryPage {
         });
     }
 
-    fn voltage_color(v: f32) -> Color32 {
+    fn voltage_color(v: f64) -> Color32 {
         if v < 3.50 {
             Color32::from_rgb(217, 83, 79) // red — low
         } else if v < 3.70 {
