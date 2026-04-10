@@ -28,7 +28,7 @@
             dbus
 
             (rust-bin.stable.latest.default.override {
-              extensions = [ "rust-src" "clippy" "rustfmt" ];
+              extensions = [ "rust-src" "clippy" "rustfmt" "rust-analyzer" ];
             })
           ];
 

@@ -1,4 +1,6 @@
 pub mod bootloader;
+pub mod battery;
+pub mod theme;
 pub mod bus_load;
 pub mod command_palette;
 pub mod log_parser;

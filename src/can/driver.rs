@@ -61,7 +61,7 @@ impl SerialDriver {
             })?;
 
         socket
-            .open(NominalBitRate::Rate500Kbit)
+            .open(NominalBitRate::Rate250Kbit)
             .map_err(|e| DriverError::ConnectionFailed(format!("Failed to open CAN: {}", e)))?;
 
         Ok(Self {

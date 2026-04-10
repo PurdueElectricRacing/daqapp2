@@ -3,9 +3,6 @@ use eframe::egui;
 use egui_plot::{Line, Plot, PlotPoints};
 use std::collections::VecDeque;
 
-// TODO add trigger
-// TODO fft view
-
 pub struct Scope {
     pub title: String,
     msg_id: u32,
