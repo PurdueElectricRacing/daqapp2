@@ -219,7 +219,15 @@ impl BatteryViewer {
 
             ui.columns(5, |cols| {
                 Self::stat_card(&mut cols[0], &theme, "PACK SUM", pack_sum, "V", stale, None);
-                Self::stat_card(&mut cols[1], &theme, "CURRENT", self.current, "A", stale, None);
+                Self::stat_card(
+                    &mut cols[1],
+                    &theme,
+                    "CURRENT",
+                    self.current,
+                    "A",
+                    stale,
+                    None,
+                );
                 Self::stat_card(
                     &mut cols[2],
                     &theme,
@@ -309,10 +317,15 @@ impl BatteryViewer {
 
                         ui.add_space(6.0);
 
-                        // cell bars — wrap at 12 per row
-                        ui.horizontal_wrapped(|ui| {
-                            for (ci, cell) in module.iter().enumerate() {
-                                Self::cell_bar(ui, &theme, ci, cell, stale);
+                        // ── right: dynamic cell grid ──────────────────────
+                        let available = ui.available_width();
+                        let cell_spacing = ui.spacing().item_spacing.x; // actual egui spacing, ~4px
+                        let cells = CELLS_PER_MODULE as f32;
+                        let bar_w = ((available - cell_spacing * cells) / cells).max(8.0);
+
+                        ui.horizontal(|ui| {
+                            for (col, cell) in module.iter().enumerate() {
+                                Self::cell_bar(ui, &theme, col, cell, stale, bar_w);
                             }
                         });
                     });
@@ -378,10 +391,8 @@ impl BatteryViewer {
         cell_idx: usize,
         cell: &CellData,
         stale: bool,
+        bar_w: f32,
     ) {
-        const BAR_W: f32 = 28.0;
-        const BAR_H: f32 = 28.0;
-
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
         } else {
@@ -391,10 +402,10 @@ impl BatteryViewer {
         let fill_frac = ((cell.voltage - V_MIN) / (V_MAX - V_MIN)).clamp(0.0, 1.0) as f32;
 
         ui.vertical(|ui| {
-            ui.set_max_width(BAR_W + 4.0);
+            ui.set_max_width(bar_w + 4.0);
 
             let (outer_rect, _) =
-                ui.allocate_exact_size(egui::Vec2::new(BAR_W, BAR_H), egui::Sense::hover());
+                ui.allocate_exact_size(egui::Vec2::new(bar_w, 20.0), egui::Sense::hover());
 
             let painter = ui.painter();
 
@@ -415,27 +426,30 @@ impl BatteryViewer {
             );
             painter.rect_filled(fill_rect, 2.0, fill_color);
 
-            // voltage label below bar
-            ui.label(
-                RichText::new(if stale {
-                    "—".to_string()
-                } else {
-                    format!("{:.2}", cell.voltage)
-                })
-                .size(9.0)
-                .color(
-                    theme
-                        .text_color()
-                        .linear_multiply(if stale { 0.25 } else { 0.65 }),
-                ),
-            );
-
-            // cell index
-            ui.label(
-                RichText::new(format!("C{cell_idx}"))
+            ui.horizontal_wrapped(|ui| {
+                // voltage label below bar
+                ui.label(
+                    RichText::new(if stale {
+                        "—".to_string()
+                    } else {
+                        format!("{:.2}", cell.voltage)
+                    })
                     .size(9.0)
-                    .color(theme.text_color().linear_multiply(0.35)),
-            );
+                    .color(
+                        theme
+                            .text_color()
+                            .linear_multiply(if stale { 0.25 } else { 0.65 }),
+                    ),
+                );
+
+                // cell index
+                ui.label(
+                    RichText::new(format!("C{cell_idx}"))
+                        .italics()
+                        .size(9.0)
+                        .color(theme.text_color().linear_multiply(0.35)),
+                );
+            });
         });
     }
 }
