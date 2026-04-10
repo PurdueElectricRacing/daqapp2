@@ -179,7 +179,7 @@ impl DAQApp {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }
                     action::WidgetType::BatteryViewer => {
-                        widgets::Widget::BatteryPage(ui::battery::BatteryPage::new(self.next_battery_viewer_num))
+                        widgets::Widget::BatteryPage(ui::battery::BatteryViewer::new(self.next_battery_viewer_num))
                     }
                 };
                 self.add_widget_to_tree(widget);

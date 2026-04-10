@@ -39,7 +39,7 @@ impl CellData {
     }
 }
 
-pub struct BatteryPage {
+pub struct BatteryViewer {
     pub title: String,
 
     pub modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
@@ -53,7 +53,7 @@ pub struct BatteryPage {
     pub timeout_seconds: u64,
 }
 
-impl BatteryPage {
+impl BatteryViewer {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("Battery Viewer #{}", instance_num),
