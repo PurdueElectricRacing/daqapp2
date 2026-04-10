@@ -1,4 +1,4 @@
-use crate::{messages, ui};
+use crate::{messages, ui, util};
 use eframe::egui::{self, Color32, Frame, RichText, Stroke};
 
 const NUM_MODULES: usize = 8;
@@ -10,6 +10,30 @@ const CELLS_PER_MODULE: usize = 16;
 pub struct CellData {
     pub voltage: f64,
     pub balancing: bool,
+}
+impl CellData {
+    pub fn color(&self) -> Color32 {
+        // Blue override for discharge
+        if self.balancing {
+            return Color32::from_rgb(33, 150, 243);
+        }
+
+        // Clamp voltage range
+        let v = self.voltage.clamp(2.7, 4.2);
+
+        // Piecewise interpolate hue
+        let hue = if v <= 3.7 {
+            // 2.7 → 3.7 maps 0° → 45°
+            let t = (v - 2.7) / (3.7 - 2.7);
+            util::lerp(0.0, 45.0, t)
+        } else {
+            // 3.7 → 4.2 maps 45° → 120°
+            let t = (v - 3.7) / (4.2 - 3.7);
+            util::lerp(45.0, 120.0, t)
+        };
+
+        util::hsv_to_color32(hue, 1.0, 1.0)
+    }
 }
 
 pub struct BatteryPage {
@@ -126,13 +150,6 @@ impl BatteryPage {
         let elapsed = self.last_update.elapsed().as_secs_f64();
 
         // ── collect pack-level stats ─────────────────────────────────────────
-        let all_voltages: Vec<f64> = self
-            .modules
-            .iter()
-            .flat_map(|m| m.iter().map(|c| c.voltage))
-            .filter(|v| *v > 0.0)
-            .collect();
-
         let pack_sum = self.pack_sum;
         let pack_min = self.cell_min;
         let pack_max = self.cell_max;
@@ -359,7 +376,7 @@ impl BatteryPage {
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
         } else {
-            Self::voltage_color(cell.voltage)
+            cell.color()
         };
 
         let fill_frac = ((cell.voltage - V_MIN) / (V_MAX - V_MIN)).clamp(0.0, 1.0) as f32;
@@ -390,15 +407,15 @@ impl BatteryPage {
             painter.rect_filled(fill_rect, 2.0, fill_color);
 
             // blue balancing indicator dot at top of bar
-            if cell.balancing && !stale {
-                let dot_center = egui::pos2(outer_rect.center().x, outer_rect.min.y + 6.0);
-                painter.circle_filled(dot_center, 3.5, Color32::from_rgb(77, 166, 255));
-                painter.circle_stroke(
-                    dot_center,
-                    3.5,
-                    Stroke::new(1.0, Color32::from_rgb(120, 200, 255)),
-                );
-            }
+            // if cell.balancing && !stale {
+            //     let dot_center = egui::pos2(outer_rect.center().x, outer_rect.min.y + 6.0);
+            //     painter.circle_filled(dot_center, 3.5, Color32::from_rgb(77, 166, 255));
+            //     painter.circle_stroke(
+            //         dot_center,
+            //         3.5,
+            //         Stroke::new(1.0, Color32::from_rgb(120, 200, 255)),
+            //     );
+            // }
 
             // voltage label below bar
             ui.label(
@@ -422,17 +439,5 @@ impl BatteryPage {
                     .color(theme.text_color().linear_multiply(0.35)),
             );
         });
-    }
-
-    fn voltage_color(v: f64) -> Color32 {
-        if v < 3.50 {
-            Color32::from_rgb(217, 83, 79) // red — low
-        } else if v < 3.70 {
-            Color32::from_rgb(232, 160, 42) // amber — warning
-        } else if v <= 4.10 {
-            Color32::from_rgb(76, 175, 80) // green — good
-        } else {
-            Color32::from_rgb(33, 150, 243) // blue — high
-        }
     }
 }
