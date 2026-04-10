@@ -3,6 +3,9 @@ use eframe::egui::{self, Color32, Frame, RichText, Stroke};
 
 const NUM_MODULES: usize = 8;
 const CELLS_PER_MODULE: usize = 16;
+const V_MIN: f64 = 2.7;
+const V_MAX: f64 = 4.2;
+const V_NOM: f64 = 3.7;
 
 // ─── Data model ────────────────────────────────────────────────────────────────
 
@@ -19,16 +22,16 @@ impl CellData {
         }
 
         // Clamp voltage range
-        let v = self.voltage.clamp(2.7, 4.2);
+        let v = self.voltage.clamp(V_MIN, V_MAX);
 
         // Piecewise interpolate hue
-        let hue = if v <= 3.7 {
-            // 2.7 → 3.7 maps 0° → 45°
-            let t = (v - 2.7) / (3.7 - 2.7);
+        let hue = if v <= V_NOM {
+            // V_MIN → V_NOM maps 0° → 45°
+            let t = (v - V_MIN) / (V_NOM - V_MIN);
             util::lerp(0.0, 45.0, t)
         } else {
-            // 3.7 → 4.2 maps 45° → 120°
-            let t = (v - 3.7) / (4.2 - 3.7);
+            // V_NOM → V_MAX maps 45° → 120°
+            let t = (v - V_NOM) / (V_MAX - V_NOM);
             util::lerp(45.0, 120.0, t)
         };
 
@@ -40,6 +43,7 @@ pub struct BatteryPage {
     pub title: String,
 
     pub modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
+    pub current: f64,
     pub pack_sum: f64,
     pub cell_min: f64,
     pub cell_max: f64,
@@ -54,6 +58,7 @@ impl BatteryPage {
         Self {
             title: format!("Battery Viewer #{}", instance_num),
             modules: vec![vec![CellData::default(); CELLS_PER_MODULE]; NUM_MODULES],
+            current: -1.0,
             pack_sum: -1.0,
             cell_min: -1.0,
             cell_max: -1.0,
@@ -118,6 +123,11 @@ impl BatteryPage {
                             "pack_voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
                                     self.pack_sum = *v;
+                                }
+                            }
+                            "pack_current" => {
+                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
+                                    self.current = *v;
                                 }
                             }
                             "min_cell_voltage" => {
@@ -207,10 +217,11 @@ impl BatteryPage {
             );
             ui.add_space(4.0);
 
-            ui.columns(4, |cols| {
+            ui.columns(5, |cols| {
                 Self::stat_card(&mut cols[0], &theme, "PACK SUM", pack_sum, "V", stale, None);
+                Self::stat_card(&mut cols[1], &theme, "CURRENT", self.current, "A", stale, None);
                 Self::stat_card(
-                    &mut cols[1],
+                    &mut cols[2],
                     &theme,
                     "CELL MIN",
                     if pack_min < f64::MAX { pack_min } else { 0.0 },
@@ -219,7 +230,7 @@ impl BatteryPage {
                     None,
                 );
                 Self::stat_card(
-                    &mut cols[2],
+                    &mut cols[3],
                     &theme,
                     "CELL MAX",
                     if pack_max > f64::MIN { pack_max } else { 0.0 },
@@ -228,7 +239,7 @@ impl BatteryPage {
                     None,
                 );
                 Self::stat_card(
-                    &mut cols[3],
+                    &mut cols[4],
                     &theme,
                     "DELTA",
                     pack_delta,
@@ -368,10 +379,8 @@ impl BatteryPage {
         cell: &CellData,
         stale: bool,
     ) {
-        const V_MIN: f64 = 3.2;
-        const V_MAX: f64 = 4.2;
         const BAR_W: f32 = 28.0;
-        const BAR_H: f32 = 52.0;
+        const BAR_H: f32 = 28.0;
 
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
@@ -405,17 +414,6 @@ impl BatteryPage {
                 outer_rect.max,
             );
             painter.rect_filled(fill_rect, 2.0, fill_color);
-
-            // blue balancing indicator dot at top of bar
-            // if cell.balancing && !stale {
-            //     let dot_center = egui::pos2(outer_rect.center().x, outer_rect.min.y + 6.0);
-            //     painter.circle_filled(dot_center, 3.5, Color32::from_rgb(77, 166, 255));
-            //     painter.circle_stroke(
-            //         dot_center,
-            //         3.5,
-            //         Stroke::new(1.0, Color32::from_rgb(120, 200, 255)),
-            //     );
-            // }
 
             // voltage label below bar
             ui.label(
