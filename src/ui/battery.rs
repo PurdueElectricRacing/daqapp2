@@ -107,12 +107,10 @@ impl BatteryViewer {
 
                     if let (Some(m), Some(c), Some(v), Some(b)) =
                         (module_num, cell_num, voltage, balancing)
-                    {
-                        if m < self.modules.len() && c < self.modules[m].len() {
+                        && m < self.modules.len() && c < self.modules[m].len() {
                             self.modules[m][c].voltage = v;
                             self.modules[m][c].balancing = b;
                         }
-                    }
 
                     self.last_update = std::time::Instant::now();
                     self.is_data_stale = false;
