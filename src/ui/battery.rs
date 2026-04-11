@@ -369,7 +369,7 @@ impl BatteryViewer {
                         );
                     } else {
                         ui.label(
-                            RichText::new(format!("{:.3}", value))
+                            RichText::new(format!("{:.2}", value))
                                 .size(20.0)
                                 .color(val_color),
                         );
