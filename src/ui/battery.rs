@@ -107,10 +107,12 @@ impl BatteryViewer {
 
                     if let (Some(m), Some(c), Some(v), Some(b)) =
                         (module_num, cell_num, voltage, balancing)
-                        && m < self.modules.len() && c < self.modules[m].len() {
-                            self.modules[m][c].voltage = v;
-                            self.modules[m][c].balancing = b;
-                        }
+                        && m < self.modules.len()
+                        && c < self.modules[m].len()
+                    {
+                        self.modules[m][c].voltage = v;
+                        self.modules[m][c].balancing = b;
+                    }
 
                     self.last_update = std::time::Instant::now();
                     self.is_data_stale = false;
@@ -322,8 +324,8 @@ impl BatteryViewer {
                         let bar_w = ((available - cell_spacing * cells) / cells).max(8.0);
 
                         ui.horizontal(|ui| {
-                            for (col, cell) in module.iter().enumerate() {
-                                Self::cell_bar(ui, &theme, col, cell, stale, bar_w);
+                            for cell in module.iter() {
+                                Self::cell_bar(ui, &theme, cell, stale, bar_w);
                             }
                         });
                     });
@@ -383,14 +385,82 @@ impl BatteryViewer {
             });
     }
 
+    // fn cell_bar(
+    //     ui: &mut egui::Ui,
+    //     theme: &ui::theme::ThemeColors,
+    //     cell_idx: usize,
+    //     cell: &CellData,
+    //     stale: bool,
+    //     bar_w: f32,
+    // ) {
+    //     let fill_color = if stale {
+    //         theme.text_color().linear_multiply(0.12)
+    //     } else {
+    //         cell.color()
+    //     };
+
+    //     let fill_frac = ((cell.voltage - V_MIN) / (V_MAX - V_MIN)).clamp(0.0, 1.0) as f32;
+
+    //     ui.vertical(|ui| {
+    //         ui.set_max_width(bar_w + 4.0);
+
+    //         let (outer_rect, _) =
+    //             ui.allocate_exact_size(egui::Vec2::new(bar_w, 20.0), egui::Sense::hover());
+
+    //         let painter = ui.painter();
+
+    //         // background track
+    //         painter.rect_filled(outer_rect, 3.0, theme.text_color().linear_multiply(0.06));
+    //         painter.rect_stroke(
+    //             outer_rect,
+    //             3.0,
+    //             Stroke::new(0.5, theme.accent_color()),
+    //             egui::StrokeKind::Inside,
+    //         );
+
+    //         // filled bar (bottom-anchored)
+    //         let fill_h = outer_rect.height() * fill_frac;
+    //         let fill_rect = egui::Rect::from_min_max(
+    //             egui::pos2(outer_rect.min.x, outer_rect.max.y - fill_h),
+    //             outer_rect.max,
+    //         );
+    //         painter.rect_filled(fill_rect, 2.0, fill_color);
+
+    //         ui.horizontal_wrapped(|ui| {
+    //             // voltage label below bar
+    //             ui.label(
+    //                 RichText::new(if stale {
+    //                     "—".to_string()
+    //                 } else {
+    //                     format!("{:.2}", cell.voltage)
+    //                 })
+    //                 .size(9.0)
+    //                 .color(
+    //                     theme
+    //                         .text_color()
+    //                         .linear_multiply(if stale { 0.25 } else { 0.65 }),
+    //                 ),
+    //             );
+
+    //             // cell index
+    //             ui.label(
+    //                 RichText::new(format!("C{cell_idx}"))
+    //                     .italics()
+    //                     .size(9.0)
+    //                     .color(theme.text_color().linear_multiply(0.35)),
+    //             );
+    //         });
+    //     });
+    // }
     fn cell_bar(
         ui: &mut egui::Ui,
         theme: &ui::theme::ThemeColors,
-        cell_idx: usize,
         cell: &CellData,
         stale: bool,
         bar_w: f32,
     ) {
+        use egui::{Align2, FontId, Stroke};
+
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
         } else {
@@ -407,8 +477,9 @@ impl BatteryViewer {
 
             let painter = ui.painter();
 
-            // background track
+            // --- Background track ---
             painter.rect_filled(outer_rect, 3.0, theme.text_color().linear_multiply(0.06));
+
             painter.rect_stroke(
                 outer_rect,
                 3.0,
@@ -416,38 +487,39 @@ impl BatteryViewer {
                 egui::StrokeKind::Inside,
             );
 
-            // filled bar (bottom-anchored)
+            // --- Filled portion (bottom-anchored) ---
             let fill_h = outer_rect.height() * fill_frac;
+
             let fill_rect = egui::Rect::from_min_max(
                 egui::pos2(outer_rect.min.x, outer_rect.max.y - fill_h),
                 outer_rect.max,
             );
+
             painter.rect_filled(fill_rect, 2.0, fill_color);
 
-            ui.horizontal_wrapped(|ui| {
-                // voltage label below bar
-                ui.label(
-                    RichText::new(if stale {
-                        "—".to_string()
-                    } else {
-                        format!("{:.2}", cell.voltage)
-                    })
-                    .size(9.0)
-                    .color(
-                        theme
-                            .text_color()
-                            .linear_multiply(if stale { 0.25 } else { 0.65 }),
-                    ),
-                );
+            // --- Voltage text (inside bar) ---
+            let text = if stale {
+                "—".to_string()
+            } else {
+                format!("{:.2}", cell.voltage)
+            };
 
-                // cell index
-                ui.label(
-                    RichText::new(format!("C{cell_idx}"))
-                        .italics()
-                        .size(9.0)
-                        .color(theme.text_color().linear_multiply(0.35)),
-                );
-            });
+            // Contrast-aware text color
+            let text_color = if stale {
+                theme.text_color().linear_multiply(0.25)
+            } else if fill_frac > 0.5 {
+                egui::Color32::BLACK
+            } else {
+                egui::Color32::WHITE
+            };
+
+            painter.text(
+                outer_rect.center(),
+                Align2::CENTER_CENTER,
+                text,
+                FontId::proportional(10.0),
+                text_color,
+            );
         });
     }
 }
