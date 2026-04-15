@@ -220,7 +220,7 @@ impl SimulatedDriver {
 }
 
 impl Driver for SimulatedDriver {
-    fn read_frame(&mut self) -> DriverResult<CanFrame> {
+    fn read_frames(&mut self) -> DriverResult<Vec<CanFrame>> {
         if self.connected {
             let mut rng = rand::rng();
 
@@ -246,7 +246,7 @@ impl Driver for SimulatedDriver {
                 };
                 let can_frame = slcan::Can2Frame::new_data(id, &data)
                     .expect("failed to create CAN frame from random data");
-                Ok(can_frame.into())
+                Ok(vec![can_frame.into()])
             } else {
                 // If no DBC is loaded, just return random frames with random IDs and data
                 let id = rng.random_range(0..=util::msg_id::STANDARD_ID_MASK) as u16;
@@ -255,7 +255,7 @@ impl Driver for SimulatedDriver {
                 rng.fill_bytes(&mut data);
                 let can2 = slcan::Can2Frame::new_data(sid, &data)
                     .expect("failed to create CAN frame from random data");
-                Ok(can2.into())
+                Ok(vec![can2.into()])
             }
         } else {
             Err(DriverError::ReadError(DriverReadError::Other(
