@@ -92,6 +92,8 @@ impl SendUi {
                         {
                             if self.search_text.is_empty() {
                                 self.search_results.clear();
+                            } else if self.search_text.trim() == "*" {
+                                self.search_results = parser.parser.msg_defs().clone();
                             } else {
                                 self.search_results = parser
                                     .parser
@@ -110,7 +112,7 @@ impl SendUi {
                         ui.label(egui::RichText::new("No messages found.").italics().weak());
                     } else if self.search_text.is_empty() && self.selected_msg.is_none() {
                         ui.label(
-                            egui::RichText::new("Start typing to search for messages...")
+                            egui::RichText::new("Start typing to search for messages... (Use * to show all messages.)")
                                 .italics()
                                 .weak(),
                         );
