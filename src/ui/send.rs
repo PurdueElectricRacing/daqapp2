@@ -54,9 +54,17 @@ impl Drop for SendUi {
         );
         for msg in &self.sending_messages {
             let msg_id = msg.msg_id;
-            self.ui_to_can_tx_copy
+            if let Err(e) = self
+                .ui_to_can_tx_copy
                 .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
-                .expect("Failed to send DeleteSendMessage");
+            {
+                // Don't panic in Drop, just log the error
+                log::error!(
+                    "Failed to send DeleteSendMessage for msg_id {}: {}",
+                    msg_id,
+                    e
+                );
+            }
         }
     }
 }
