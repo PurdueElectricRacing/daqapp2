@@ -160,9 +160,7 @@ impl Driver for UdpDriver {
     fn read_frames(&mut self) -> DriverResult<Vec<CanFrame>> {
         let mut buf = [0; UDP_MAX_PACKET_SIZE];
         match self.socket.recv_from(&mut buf) {
-                // TODO: parse buffer into one or more CanFrame(s) per your protocol.
-                parse_udp_buffer(&buf, num_bytes)
-            }
+            Ok((num_bytes, _src_port)) => parse_udp_buffer(&buf, num_bytes),
             Err(e) => {
                 log::warn!("{}", e);
                 if e.kind() == std::io::ErrorKind::WouldBlock
