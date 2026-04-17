@@ -17,6 +17,9 @@ pub struct SendUi {
     finite_amount: usize,
 
     error: Option<String>,
+
+    // Required to be stored on the struct so Drop can send cancellation messages when the UI closes
+    ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -39,8 +42,35 @@ enum SendUiActions {
     DeleteMessage { msg_id: u32 },
 }
 
+impl Drop for SendUi {
+    fn drop(&mut self) {
+        // When the Send UI is closed, we want to stop all sending messages
+        log::info!(
+            "Dropping SendUi, stopping all sending messages: {:?}",
+            self.sending_messages
+                .iter()
+                .map(|msg| msg.msg_id)
+                .collect::<Vec<_>>()
+        );
+        for msg in &self.sending_messages {
+            let msg_id = msg.msg_id;
+            if let Err(e) = self
+                .ui_to_can_tx
+                .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
+            {
+                // Don't panic in Drop, just log the error
+                log::error!(
+                    "Failed to send DeleteSendMessage for msg_id {}: {}",
+                    msg_id,
+                    e
+                );
+            }
+        }
+    }
+}
+
 impl SendUi {
-    pub fn new(num: usize) -> Self {
+    pub fn new(num: usize, ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>) -> Self {
         Self {
             title: format!("Send UI {}", num),
 
@@ -57,13 +87,14 @@ impl SendUi {
             finite_amount: 10,
 
             error: None,
+
+            ui_to_can_tx,
         }
     }
 
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         let Some(parser) = parser else {
@@ -279,7 +310,7 @@ impl SendUi {
                             self.selected_msg = None;
                             self.signal_values.clear();
 
-                            ui_to_can_tx
+                            self.ui_to_can_tx
                                 .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
                                 .expect("Failed to send AddSendMessage");
                         }
@@ -317,7 +348,7 @@ impl SendUi {
                         match action {
                             SendUiActions::DeleteMessage { msg_id } => {
                                 self.sending_messages.retain(|msg| msg.msg_id != msg_id);
-                                ui_to_can_tx
+                                self.ui_to_can_tx
                                     .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
                                     .expect("Failed to send DeleteSendMessage");
                             }

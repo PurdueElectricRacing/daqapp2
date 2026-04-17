@@ -50,7 +50,7 @@ impl Widget {
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, parser),
-            Widget::SendUi(w) => w.show(ui, ui_to_can_tx, parser),
+            Widget::SendUi(w) => w.show(ui, parser),
             Widget::BusLoad(w) => w.show(ui),
         }
     }
