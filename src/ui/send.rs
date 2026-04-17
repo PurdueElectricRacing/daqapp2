@@ -19,7 +19,7 @@ pub struct SendUi {
     error: Option<String>,
 
     // Required to be stored on the struct so Drop can send cancellation messages when the UI closes
-    ui_to_can_tx_drop: std::sync::mpsc::Sender<messages::MsgFromUi>,
+    ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -55,7 +55,7 @@ impl Drop for SendUi {
         for msg in &self.sending_messages {
             let msg_id = msg.msg_id;
             if let Err(e) = self
-                .ui_to_can_tx_drop
+                .ui_to_can_tx
                 .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
             {
                 // Don't panic in Drop, just log the error
@@ -88,14 +88,13 @@ impl SendUi {
 
             error: None,
 
-            ui_to_can_tx_drop: ui_to_can_tx,
+            ui_to_can_tx,
         }
     }
 
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         let Some(parser) = parser else {
@@ -311,7 +310,7 @@ impl SendUi {
                             self.selected_msg = None;
                             self.signal_values.clear();
 
-                            ui_to_can_tx
+                            self.ui_to_can_tx
                                 .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
                                 .expect("Failed to send AddSendMessage");
                         }
@@ -349,7 +348,7 @@ impl SendUi {
                         match action {
                             SendUiActions::DeleteMessage { msg_id } => {
                                 self.sending_messages.retain(|msg| msg.msg_id != msg_id);
-                                ui_to_can_tx
+                                self.ui_to_can_tx
                                     .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
                                     .expect("Failed to send DeleteSendMessage");
                             }
