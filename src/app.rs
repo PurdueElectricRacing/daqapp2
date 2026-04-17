@@ -169,9 +169,10 @@ impl DAQApp {
                     action::WidgetType::LogParser => widgets::Widget::LogParser(
                         ui::log_parser::LogParser::new(self.next_log_parser_num),
                     ),
-                    action::WidgetType::SendUi => {
-                        widgets::Widget::SendUi(ui::send::SendUi::new(self.next_send_ui_num))
-                    }
+                    action::WidgetType::SendUi => widgets::Widget::SendUi(ui::send::SendUi::new(
+                        self.next_send_ui_num,
+                        self.ui_to_can_tx.clone(),
+                    )),
                     action::WidgetType::BusLoad => {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }

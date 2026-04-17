@@ -17,6 +17,9 @@ pub struct SendUi {
     finite_amount: usize,
 
     error: Option<String>,
+
+    // For DROP
+    ui_to_can_tx_copy: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -39,8 +42,27 @@ enum SendUiActions {
     DeleteMessage { msg_id: u32 },
 }
 
+impl Drop for SendUi {
+    fn drop(&mut self) {
+        // When the Send UI is closed, we want to stop all sending messages
+        log::info!(
+            "Dropping SendUi, stopping all sending messages: {:?}",
+            self.sending_messages
+                .iter()
+                .map(|msg| msg.msg_id)
+                .collect::<Vec<_>>()
+        );
+        for msg in &self.sending_messages {
+            let msg_id = msg.msg_id;
+            self.ui_to_can_tx_copy
+                .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
+                .expect("Failed to send DeleteSendMessage");
+        }
+    }
+}
+
 impl SendUi {
-    pub fn new(num: usize) -> Self {
+    pub fn new(num: usize, ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>) -> Self {
         Self {
             title: format!("Send UI {}", num),
 
@@ -57,6 +79,8 @@ impl SendUi {
             finite_amount: 10,
 
             error: None,
+
+            ui_to_can_tx_copy: ui_to_can_tx,
         }
     }
 
