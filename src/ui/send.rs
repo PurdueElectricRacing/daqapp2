@@ -18,8 +18,8 @@ pub struct SendUi {
 
     error: Option<String>,
 
-    // For DROP
-    ui_to_can_tx_copy: std::sync::mpsc::Sender<messages::MsgFromUi>,
+    // Required to be stored on the struct so Drop can send cancellation messages when the UI closes
+    ui_to_can_tx_drop: std::sync::mpsc::Sender<messages::MsgFromUi>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -55,7 +55,7 @@ impl Drop for SendUi {
         for msg in &self.sending_messages {
             let msg_id = msg.msg_id;
             if let Err(e) = self
-                .ui_to_can_tx_copy
+                .ui_to_can_tx_drop
                 .send(messages::MsgFromUi::DeleteSendMessage { msg_id })
             {
                 // Don't panic in Drop, just log the error
@@ -88,7 +88,7 @@ impl SendUi {
 
             error: None,
 
-            ui_to_can_tx_copy: ui_to_can_tx,
+            ui_to_can_tx_drop: ui_to_can_tx,
         }
     }
 
