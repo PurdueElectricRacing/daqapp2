@@ -131,9 +131,7 @@ pub struct UdpDriver {
 }
 
 impl UdpDriver {
-    /// Create a new UDP driver
     pub fn new(port: u16) -> DriverResult<Self> {
-        // TODO: Implement UDP connection
         let udp_addr = format!("0.0.0.0:{}", port);
         let socket = UdpSocket::bind(udp_addr).map_err(|e| {
             DriverError::ConnectionFailed(format!("Failed to bind to port {}: {}", port, e))
@@ -162,7 +160,6 @@ impl Driver for UdpDriver {
     fn read_frames(&mut self) -> DriverResult<Vec<CanFrame>> {
         let mut buf = [0; UDP_MAX_PACKET_SIZE];
         match self.socket.recv_from(&mut buf) {
-            Ok((num_bytes, _src_port)) => {
                 // TODO: parse buffer into one or more CanFrame(s) per your protocol.
                 parse_udp_buffer(&buf, num_bytes)
             }
@@ -185,7 +182,7 @@ impl Driver for UdpDriver {
     }
 
     fn write_frame(&mut self, _frame: CanFrame) -> DriverResult<()> {
-        log::error!("UDP write requested but not implemented; ignoring frame.");
+        log::error!("UDP write requested but not supported; ignoring frame.");
         Ok(())
     }
 
@@ -300,6 +297,9 @@ pub fn parse_udp_buffer(
             UDP_RAW_FRAME_SIZE
         );
     }
+
+    let x = num_bytes / UDP_RAW_FRAME_SIZE;
+    println!("Parsing UDP frame: {num_bytes} ({x})");
 
     let mut frames = Vec::with_capacity(num_bytes / UDP_RAW_FRAME_SIZE);
     let mask_id = (1u32 << 29) - 1;
