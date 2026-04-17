@@ -100,7 +100,10 @@ impl SendUi {
                                     .parser
                                     .msg_defs()
                                     .iter()
-                                    .filter(|msg| msg.name.to_lowercase().contains(&search_lower))
+                                    .filter(|msg| {
+                                        let id_str = format!("0x{:03X}", util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id));
+                                        id_str.contains(&search_lower) || msg.name.to_lowercase().contains(&search_lower)
+                                    })
                                     .cloned()
                                     .collect();
                             }
