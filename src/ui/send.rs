@@ -95,11 +95,12 @@ impl SendUi {
                             } else if self.search_text.trim() == "*" {
                                 self.search_results = parser.parser.msg_defs().clone();
                             } else {
+                                let search_lower = self.search_text.to_lowercase();
                                 self.search_results = parser
                                     .parser
                                     .msg_defs()
                                     .iter()
-                                    .filter(|msg| msg.name.contains(&self.search_text))
+                                    .filter(|msg| msg.name.to_lowercase().contains(&search_lower))
                                     .cloned()
                                     .collect();
                             }
