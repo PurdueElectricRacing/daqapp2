@@ -9,7 +9,8 @@ pub enum Widget {
     LogParser(ui::log_parser::LogParser),
     SendUi(ui::send::SendUi),
     BusLoad(ui::bus_load::BusLoad),
-    BatteryPage(ui::battery::BatteryViewer), }
+    BatteryPage(ui::battery::BatteryViewer),
+}
 
 impl Widget {
     pub fn title(&self) -> &str {
@@ -53,7 +54,7 @@ impl Widget {
             Widget::LogParser(w) => w.show(ui, parser),
             Widget::SendUi(w) => w.show(ui, parser),
             Widget::BusLoad(w) => w.show(ui),
-            Widget::BatteryPage(w) => w.show(ui)
+            Widget::BatteryPage(w) => w.show(ui),
         }
     }
 

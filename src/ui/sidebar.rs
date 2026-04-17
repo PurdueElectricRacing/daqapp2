@@ -70,8 +70,9 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             }
 
             if ui.button("Add Battery Viewer").clicked() {
-                app.action_queue
-                    .push(action::AppAction::SpawnWidget(action::WidgetType::BatteryViewer));
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::BatteryViewer,
+                ));
             }
 
             ui.separator();
