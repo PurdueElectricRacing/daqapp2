@@ -268,10 +268,9 @@ impl BatteryViewer {
 
             // Per module panels with dynamic cell bars
             for (mi, module) in self.modules.iter().enumerate() {
-                let mvs: Vec<f64> = module.iter().map(|c| c.voltage).collect();
-                let mod_sum: f64 = mvs.iter().sum();
-                let mod_min = mvs.iter().cloned().fold(f64::MAX, f64::min);
-                let mod_max = mvs.iter().cloned().fold(f64::MIN, f64::max);
+                let mod_sum: f64 = module.iter().map(|c| c.voltage).sum();
+                let mod_min = module.iter().map(|c| c.voltage).fold(f64::MAX, f64::min);
+                let mod_max = module.iter().map(|c| c.voltage).fold(f64::MIN, f64::max);
                 let mod_delta = if mod_min < f64::MAX {
                     mod_max - mod_min
                 } else {
