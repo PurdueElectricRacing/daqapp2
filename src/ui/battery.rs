@@ -40,17 +40,21 @@ impl CellData {
     }
 }
 
+struct ChargingTelemetry {
+    pack_voltage: f64,
+    pack_current: f64,
+    min_cell_voltage: f64,
+    max_cell_voltage: f64,
+}
+
 pub struct BatteryViewer {
     pub title: String,
 
-    pub modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
-    pub current: f64,
-    pub pack_sum: f64,
-    pub cell_min: f64,
-    pub cell_max: f64,
+    modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
+    charging_telemetry: Option<ChargingTelemetry>,
 
-    pub last_update: std::time::Instant,
-    pub is_data_stale: bool,
+    last_update: std::time::Instant,
+    is_data_stale: bool,
 }
 
 impl BatteryViewer {
@@ -58,10 +62,7 @@ impl BatteryViewer {
         Self {
             title: format!("Battery Viewer #{}", instance_num),
             modules: vec![vec![CellData::default(); CELLS_PER_MODULE]; NUM_MODULES],
-            current: -1.0,
-            pack_sum: -1.0,
-            cell_min: -1.0,
-            cell_max: -1.0,
+            charging_telemetry: None,
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10),
             is_data_stale: true,
         }
@@ -121,22 +122,50 @@ impl BatteryViewer {
                         match sig.name.as_str() {
                             "pack_voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.pack_sum = *v;
+                                    self.charging_telemetry
+                                        .get_or_insert(ChargingTelemetry {
+                                            pack_voltage: *v,
+                                            pack_current: 0.0,
+                                            min_cell_voltage: 0.0,
+                                            max_cell_voltage: 0.0,
+                                        })
+                                        .pack_voltage = *v;
                                 }
                             }
                             "pack_current" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.current = *v;
+                                    self.charging_telemetry
+                                        .get_or_insert(ChargingTelemetry {
+                                            pack_voltage: 0.0,
+                                            pack_current: *v,
+                                            min_cell_voltage: 0.0,
+                                            max_cell_voltage: 0.0,
+                                        })
+                                        .pack_current = *v;
                                 }
                             }
                             "min_cell_voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.cell_min = *v;
+                                    self.charging_telemetry
+                                        .get_or_insert(ChargingTelemetry {
+                                            pack_voltage: 0.0,
+                                            pack_current: 0.0,
+                                            min_cell_voltage: *v,
+                                            max_cell_voltage: 0.0,
+                                        })
+                                        .min_cell_voltage = *v;
                                 }
                             }
                             "max_cell_voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.cell_max = *v;
+                                    self.charging_telemetry
+                                        .get_or_insert(ChargingTelemetry {
+                                            pack_voltage: 0.0,
+                                            pack_current: 0.0,
+                                            min_cell_voltage: 0.0,
+                                            max_cell_voltage: *v,
+                                        })
+                                        .max_cell_voltage = *v;
                                 }
                             }
                             _ => {}
@@ -159,13 +188,14 @@ impl BatteryViewer {
         let elapsed = self.last_update.elapsed().as_secs_f64();
 
         // ── collect pack-level stats ─────────────────────────────────────────
-        let pack_sum = self.pack_sum;
-        let pack_min = self.cell_min;
-        let pack_max = self.cell_max;
-        let pack_delta = if pack_min < f64::MAX {
-            pack_max - pack_min
+        let pack_sum = self.charging_telemetry.as_ref().map(|t| t.pack_voltage);
+        let current = self.charging_telemetry.as_ref().map(|t| t.pack_current);
+        let pack_min = self.charging_telemetry.as_ref().map(|t| t.min_cell_voltage);
+        let pack_max = self.charging_telemetry.as_ref().map(|t| t.max_cell_voltage);
+        let pack_delta = if let (Some(min), Some(max)) = (pack_min, pack_max) {
+            Some(max - min)
         } else {
-            -1.0
+            None
         };
 
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -173,7 +203,7 @@ impl BatteryViewer {
             ui.heading(&self.title);
             ui.add_space(4.0);
 
-            // ── staleness banner ─────────────────────────────────────────────
+            // Staleness banner
             {
                 let (bg, dot, text) = if stale {
                     let c = theme.warning_color();
@@ -222,7 +252,7 @@ impl BatteryViewer {
                     &mut cols[1],
                     &theme,
                     "CURRENT",
-                    self.current,
+                    current,
                     "A",
                     stale,
                     None,
@@ -231,7 +261,7 @@ impl BatteryViewer {
                     &mut cols[2],
                     &theme,
                     "CELL MIN",
-                    if pack_min < f64::MAX { pack_min } else { 0.0 },
+                    pack_min,
                     "V",
                     stale,
                     None,
@@ -240,7 +270,7 @@ impl BatteryViewer {
                     &mut cols[3],
                     &theme,
                     "CELL MAX",
-                    if pack_max > f64::MIN { pack_max } else { 0.0 },
+                    pack_max,
                     "V",
                     stale,
                     None,
@@ -252,12 +282,14 @@ impl BatteryViewer {
                     pack_delta,
                     "V",
                     stale,
-                    Some(if pack_delta > 0.050 {
-                        theme.error_color()
-                    } else if pack_delta > 0.020 {
-                        theme.warning_color()
-                    } else {
-                        theme.success_color()
+                    pack_delta.map(|d| {
+                        if d > 0.050 {
+                            theme.error_color()
+                        } else if d > 0.020 {
+                            theme.warning_color()
+                        } else {
+                            theme.success_color()
+                        }
                     }),
                 );
             });
@@ -342,7 +374,7 @@ impl BatteryViewer {
         ui: &mut egui::Ui,
         theme: &ui::theme::ThemeColors,
         label: &str,
-        value: f64,
+        value: Option<f64>,
         unit: &str,
         stale: bool,
         override_color: Option<Color32>,
@@ -370,9 +402,13 @@ impl BatteryViewer {
                         );
                     } else {
                         ui.label(
-                            RichText::new(format!("{:.2}", value))
-                                .size(20.0)
-                                .color(val_color),
+                            RichText::new(if let Some(v) = value {
+                                format!("{:.2}", v)
+                            } else {
+                                "—".to_string()
+                            })
+                            .size(20.0)
+                            .color(val_color),
                         );
                         ui.label(
                             RichText::new(unit)
