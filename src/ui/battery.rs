@@ -27,11 +27,11 @@ impl CellData {
 
         // Piecewise interpolate hue
         let hue = if v <= V_NOM {
-            // V_MIN → V_NOM maps 0° → 45°
+            // V_MIN -> V_NOM maps 0° -> 45°
             let t = (v - V_MIN) / (V_NOM - V_MIN);
             util::lerp(0.0, 45.0, t)
         } else {
-            // V_NOM → V_MAX maps 45° → 120°
+            // V_NOM -> V_MAX maps 45° -> 120°
             let t = (v - V_NOM) / (V_MAX - V_NOM);
             util::lerp(45.0, 120.0, t)
         };
