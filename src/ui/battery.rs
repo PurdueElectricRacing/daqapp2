@@ -8,7 +8,6 @@ const V_MAX: f64 = 4.2;
 const V_NOM: f64 = 3.7;
 const STALE_TIMEOUT_SECONDS: u64 = 1;
 
-// ─── Data model ────────────────────────────────────────────────────────────────
 
 #[derive(Default, Clone)]
 pub struct CellData {
@@ -67,8 +66,6 @@ impl BatteryViewer {
             is_data_stale: true,
         }
     }
-
-    // ─── CAN handler ──────────────────────────────────────────────────────────
 
     pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
         if let messages::MsgFromCan::ParsedMessage(parsed) = msg {
@@ -177,8 +174,6 @@ impl BatteryViewer {
         }
     }
 
-    // ─── UI ───────────────────────────────────────────────────────────────────
-
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         let theme = ui::theme::get_theme(ui.ctx());
 
@@ -187,7 +182,7 @@ impl BatteryViewer {
         let stale = self.is_data_stale;
         let elapsed = self.last_update.elapsed().as_secs_f64();
 
-        // ── collect pack-level stats ─────────────────────────────────────────
+        // Extract summary values for header cards
         let pack_sum = self.charging_telemetry.as_ref().map(|t| t.pack_voltage);
         let current = self.charging_telemetry.as_ref().map(|t| t.pack_current);
         let pack_min = self.charging_telemetry.as_ref().map(|t| t.min_cell_voltage);
@@ -238,7 +233,7 @@ impl BatteryViewer {
 
             ui.add_space(8.0);
 
-            // ── pack summary cards ───────────────────────────────────────────
+            // Pack summary cards
             ui.label(
                 RichText::new("PACK SUMMARY")
                     .size(10.0)
@@ -296,7 +291,7 @@ impl BatteryViewer {
 
             ui.add_space(12.0);
 
-            // ── per-module panels ────────────────────────────────────────────
+            // Per module panels with dynamic cell bars
             for (mi, module) in self.modules.iter().enumerate() {
                 let mvs: Vec<f64> = module.iter().map(|c| c.voltage).collect();
                 let mod_sum: f64 = mvs.iter().sum();
@@ -348,7 +343,7 @@ impl BatteryViewer {
 
                         ui.add_space(6.0);
 
-                        // ── right: dynamic cell grid ──────────────────────
+                        // Dynamic cell grid with bars
                         let available = ui.available_width();
                         let cell_spacing = ui.spacing().item_spacing.x; // actual egui spacing, ~4px
                         let cells = CELLS_PER_MODULE as f32;
@@ -445,7 +440,7 @@ impl BatteryViewer {
 
             let painter = ui.painter();
 
-            // --- Background track ---
+            // Background track
             painter.rect_filled(outer_rect, 3.0, theme.text_color().linear_multiply(0.06));
 
             painter.rect_stroke(
@@ -455,7 +450,7 @@ impl BatteryViewer {
                 egui::StrokeKind::Inside,
             );
 
-            // --- Filled portion (bottom-anchored) ---
+            // Filled portion (bottom-anchored)
             let fill_h = outer_rect.height() * fill_frac;
 
             let fill_rect = egui::Rect::from_min_max(
@@ -465,7 +460,7 @@ impl BatteryViewer {
 
             painter.rect_filled(fill_rect, 2.0, fill_color);
 
-            // --- Voltage text (inside bar) ---
+            // Voltage text (inside bar)
             let text = if stale {
                 "—".to_string()
             } else {
