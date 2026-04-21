@@ -167,6 +167,9 @@ impl BatteryViewer {
                             _ => {}
                         }
                     }
+
+                    self.last_update = std::time::Instant::now();
+                    self.is_data_stale = false;
                 }
                 _ => {}
             }
