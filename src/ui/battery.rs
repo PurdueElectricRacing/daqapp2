@@ -6,6 +6,7 @@ const CELLS_PER_MODULE: usize = 16;
 const V_MIN: f64 = 2.7;
 const V_MAX: f64 = 4.2;
 const V_NOM: f64 = 3.7;
+const STALE_TIMEOUT_SECONDS: u64 = 1;
 
 // ─── Data model ────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,6 @@ pub struct BatteryViewer {
 
     pub last_update: std::time::Instant,
     pub is_data_stale: bool,
-    pub timeout_seconds: u64,
 }
 
 impl BatteryViewer {
@@ -64,7 +64,6 @@ impl BatteryViewer {
             cell_max: -1.0,
             last_update: std::time::Instant::now() - std::time::Duration::from_secs(10),
             is_data_stale: true,
-            timeout_seconds: 2,
         }
     }
 
@@ -155,7 +154,7 @@ impl BatteryViewer {
         let theme = ui::theme::get_theme(ui.ctx());
 
         self.is_data_stale =
-            self.last_update.elapsed() > std::time::Duration::from_secs(self.timeout_seconds);
+            self.last_update.elapsed() > std::time::Duration::from_secs(STALE_TIMEOUT_SECONDS);
         let stale = self.is_data_stale;
         let elapsed = self.last_update.elapsed().as_secs_f64();
 
