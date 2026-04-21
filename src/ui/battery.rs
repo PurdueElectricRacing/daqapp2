@@ -8,7 +8,6 @@ const V_MAX: f64 = 4.2;
 const V_NOM: f64 = 3.7;
 const STALE_TIMEOUT_SECONDS: u64 = 1;
 
-
 #[derive(Default, Clone)]
 pub struct CellData {
     pub voltage: f64,
@@ -243,33 +242,9 @@ impl BatteryViewer {
 
             ui.columns(5, |cols| {
                 Self::stat_card(&mut cols[0], &theme, "PACK SUM", pack_sum, "V", stale, None);
-                Self::stat_card(
-                    &mut cols[1],
-                    &theme,
-                    "CURRENT",
-                    current,
-                    "A",
-                    stale,
-                    None,
-                );
-                Self::stat_card(
-                    &mut cols[2],
-                    &theme,
-                    "CELL MIN",
-                    pack_min,
-                    "V",
-                    stale,
-                    None,
-                );
-                Self::stat_card(
-                    &mut cols[3],
-                    &theme,
-                    "CELL MAX",
-                    pack_max,
-                    "V",
-                    stale,
-                    None,
-                );
+                Self::stat_card(&mut cols[1], &theme, "CURRENT", current, "A", stale, None);
+                Self::stat_card(&mut cols[2], &theme, "CELL MIN", pack_min, "V", stale, None);
+                Self::stat_card(&mut cols[3], &theme, "CELL MAX", pack_max, "V", stale, None);
                 Self::stat_card(
                     &mut cols[4],
                     &theme,
