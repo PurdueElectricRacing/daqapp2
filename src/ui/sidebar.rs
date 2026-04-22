@@ -69,6 +69,12 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                     .push(action::AppAction::SpawnWidget(action::WidgetType::BusLoad));
             }
 
+            if ui.button("Add Battery Viewer").clicked() {
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::BatteryViewer,
+                ));
+            }
+
             ui.separator();
             ui.heading("Connection Settings");
 

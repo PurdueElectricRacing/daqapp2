@@ -44,6 +44,7 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub next_send_ui_num: usize,
     pub next_bus_load_num: usize,
+    pub next_battery_viewer_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
@@ -90,6 +91,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             next_send_ui_num: 1,
             next_bus_load_num: 1,
+            next_battery_viewer_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
             action_queue: Vec::new(),
@@ -176,6 +178,9 @@ impl DAQApp {
                     action::WidgetType::BusLoad => {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }
+                    action::WidgetType::BatteryViewer => widgets::Widget::BatteryViewer(
+                        ui::battery::BatteryViewer::new(self.next_battery_viewer_num),
+                    ),
                 };
                 self.add_widget_to_tree(widget);
 
@@ -201,6 +206,9 @@ impl DAQApp {
                     }
                     action::WidgetType::BusLoad => {
                         self.next_bus_load_num += 1;
+                    }
+                    action::WidgetType::BatteryViewer => {
+                        self.next_battery_viewer_num += 1;
                     }
                 }
             }
