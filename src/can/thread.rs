@@ -207,11 +207,12 @@ pub fn start_can_thread(
                 continue;
             };
 
-            match active_driver.read_frame() {
-                Ok(frame) => {
-                    let data_bytes = process_can_frame(frame, &state);
-                    state.bus_load_tracker.record_frame(data_bytes);
-
+            match active_driver.read_frames() {
+                Ok(frames) => {
+                    for frame in frames {
+                        let data_bytes = process_can_frame(frame, &state);
+                        state.bus_load_tracker.record_frame(data_bytes);
+                    }
                     // Send bus load updates periodically
                     if state.last_bus_load_update.elapsed().as_millis() >= BUS_LOAD_UPDATE_MS {
                         state.bus_load_tracker.cleanup();

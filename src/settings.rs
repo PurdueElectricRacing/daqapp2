@@ -1,7 +1,7 @@
 use crate::{connection, theme};
 
 pub const SETTINGS_PATH: &str = "settings.json";
-const DEFAULT_UDP_PORT: u16 = 5000;
+const DEFAULT_UDP_PORT: u16 = 5005;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Settings {
