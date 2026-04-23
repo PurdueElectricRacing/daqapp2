@@ -3,6 +3,7 @@ pub mod bootloader;
 pub mod bus_load;
 pub mod command_palette;
 pub mod gg_plot;
+pub mod dynamics;
 pub mod log_parser;
 pub mod scope;
 pub mod send;
