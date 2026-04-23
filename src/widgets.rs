@@ -10,6 +10,7 @@ pub enum Widget {
     SendUi(ui::send::SendUi),
     BusLoad(ui::bus_load::BusLoad),
     BatteryViewer(ui::battery::BatteryViewer),
+    Dynamics(ui::dynamics::Dynamics),
 }
 
 impl Widget {
@@ -23,6 +24,7 @@ impl Widget {
             Widget::SendUi(w) => &w.title,
             Widget::BusLoad(w) => &w.title,
             Widget::BatteryViewer(w) => &w.title,
+            Widget::Dynamics(w) => &w.title,
         }
     }
 
@@ -55,6 +57,7 @@ impl Widget {
             Widget::SendUi(w) => w.show(ui, parser),
             Widget::BusLoad(w) => w.show(ui),
             Widget::BatteryViewer(w) => w.show(ui),
+            Widget::Dynamics(w) => w.show(ui),
         }
     }
 
@@ -66,6 +69,7 @@ impl Widget {
             Widget::SendUi(w) => w.handle_can_message(msg),
             Widget::BusLoad(w) => w.handle_can_message(msg),
             Widget::BatteryViewer(w) => w.handle_can_message(msg),
+            Widget::Dynamics(w) => w.handle_can_message(msg),
             _ => {}
         }
     }
