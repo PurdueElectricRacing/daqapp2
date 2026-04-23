@@ -7,6 +7,11 @@ pub struct LogParser {
     pub logs_dir: Option<std::path::PathBuf>,
     pub output_dir: Option<std::path::PathBuf>,
 
+    bus_0_dbc: Option<std::path::PathBuf>,
+    bus_0_use_override: bool,
+    bus_1_dbc: Option<std::path::PathBuf>,
+    bus_1_use_override: bool,
+
     parse_to_ui_rx: Option<std::sync::mpsc::Receiver<MsgFromParserThread>>,
     parse_text: String,
 }
@@ -23,6 +28,10 @@ impl LogParser {
             title: format!("Log Parser #{}", instance_num),
             logs_dir: None,
             output_dir: None,
+            bus_0_dbc: None,
+            bus_0_use_override: false,
+            bus_1_dbc: None,
+            bus_1_use_override: false,
             parse_to_ui_rx: None,
             parse_text: String::new(),
         }
@@ -40,13 +49,25 @@ impl LogParser {
         }
     }
 
-    fn parse_logs(&mut self, parser: Option<&app::ParserInfo>) {
+    fn select_bus_dbc(current: &mut Option<std::path::PathBuf>) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("DBC Files", &["dbc"])
+            .pick_file()
+        {
+            *current = Some(path);
+        }
+    }
+
+    fn parse_logs(
+        &mut self,
+        sidebar_parser: Option<&app::ParserInfo>,
+    ) {
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
                 // TODO: make persistent log directories
-                log::error!("Error: Logs directory not selected");
                 self.parse_text = "Error: Logs directory not selected".to_string();
+                log::error!("{}", self.parse_text);
                 return;
             }
         };
@@ -54,23 +75,50 @@ impl LogParser {
         let output_dir = match &self.output_dir {
             Some(p) => p,
             None => {
-                log::error!("Error: Output directory not selected");
                 self.parse_text = "Error: Output directory not selected".to_string();
+                log::error!("{}", self.parse_text);
                 return;
             }
         };
 
-        let parser_info = match parser {
-            Some(p) => p,
-            None => {
-                log::error!("Error: No DBC selected, not parsing");
-                self.parse_text = "Error: No DBC selected, not parsing".to_string();
-                return;
+        let dbc_path_bus_0 = if self.bus_0_use_override {
+            match &self.bus_0_dbc {
+                Some(p) => p.clone(),
+                None => {
+                    self.parse_text = "Error: BUS 0 DBC override enabled but no file selected".to_string();
+                    log::error!("{}", self.parse_text);
+                    return;
+                }
+            }
+        } else {
+            match sidebar_parser {
+                Some(p) => p.dbc_path.clone(),
+                None => {
+                    self.parse_text = "Error: No DBC selected for BUS 0 (VCAN)".to_string();
+                    log::error!("{}", self.parse_text);
+                    return;
+                }
             }
         };
-
-        // Clone for lifetimes in thread
-        let dbc_path = parser_info.dbc_path.clone();
+        let dbc_path_bus_1 = if self.bus_1_use_override {
+            match &self.bus_1_dbc {
+                Some(p) => p.clone(),
+                None => {
+                    self.parse_text = "Error: BUS 1 DBC override enabled but no file selected".to_string();
+                    log::error!("{}", self.parse_text);
+                    return;
+                }
+            }
+        } else {
+            match sidebar_parser {
+                Some(p) => p.dbc_path.clone(),
+                None => {
+                    self.parse_text = "Error: No DBC selected for BUS 1 (MCAN)".to_string();
+                    log::error!("{}", self.parse_text);
+                    return;
+                }
+            }
+        };
         let logs_dir = logs_dir.clone();
         let output_dir = output_dir.clone();
 
@@ -78,47 +126,60 @@ impl LogParser {
         self.parse_to_ui_rx = Some(parse_to_ui_rx);
 
         std::thread::spawn(move || {
-            log::info!("Using DBC: {:?}", dbc_path);
+            log::info!("Using DBC: {:?} for BUS 0 (VCAN)", dbc_path_bus_0);
+            log::info!("Using DBC: {:?} for BUS 1 (MCAN)", dbc_path_bus_1);
             log::info!("Parsing logs from: {}", logs_dir.display());
             log::info!("Output to: {}", output_dir.display());
 
-            let Ok(parser) = can_decode::Parser::from_dbc_file(&dbc_path) else {
-                log::error!("Failed to create CAN parser from DBC file: {:?}", dbc_path);
-                parse_to_ui_tx
-                    .send(MsgFromParserThread::FatalExit(
-                        "Failed to create CAN parser from DBC file".to_string(),
-                    ))
-                    .unwrap_or_else(|e| {
-                        log::error!("Failed to send fatal error message to UI: {}", e)
-                    });
+            let Ok(parser_bus_0) = can_decode::Parser::from_dbc_file(&dbc_path_bus_0) else {
+                log::error!(
+                    "Failed to create CAN parser from DBC file for BUS 0: {:?}",
+                    dbc_path_bus_0
+                );
+                let _ = parse_to_ui_tx.send(MsgFromParserThread::FatalExit(
+                    "Failed to create CAN parser from DBC file for BUS 0".to_string(),
+                ));
                 return;
             };
 
-            parse_to_ui_tx
-                .send(MsgFromParserThread::Update("Parsing logs...".to_string()))
-                .unwrap_or_else(|e| log::error!("Failed to send update message to UI: {}", e));
+            let Ok(parser_bus_1) = can_decode::Parser::from_dbc_file(&dbc_path_bus_1) else {
+                log::error!(
+                    "Failed to create CAN parser from DBC file for BUS 1: {:?}",
+                    dbc_path_bus_1
+                );
+                let _ = parse_to_ui_tx.send(MsgFromParserThread::FatalExit(
+                    "Failed to create CAN parser from DBC file for BUS 1".to_string(),
+                ));
+                return;
+            };
 
-            let parsed = daq_log_parse::parse::parse_log_files(&logs_dir, &parser);
+            let _ = parse_to_ui_tx
+                .send(MsgFromParserThread::Update("Parsing logs...".to_string()));
+
+            let parsed = daq_log_parse::parse::parse_log_files(
+                &logs_dir,
+                &parser_bus_0,
+                &parser_bus_1,
+            );
             let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
 
             let mut table_builder = daq_log_parse::table::TableBuilder::new();
-            table_builder.create_header(&parser);
+            table_builder.create_header(&parser_bus_0, "VCAN");
+            table_builder.create_header(&parser_bus_1, "MCAN");
             table_builder.create_and_write_tables(&output_dir, chunked_parsed);
 
             log::info!("Parsing completed successfully");
-            parse_to_ui_tx
-                .send(MsgFromParserThread::SuccessExit(format!(
-                    "Parsing completed successfully. Output at: {}",
-                    output_dir.display()
-                )))
-                .unwrap_or_else(|e| log::error!("Failed to send success message to UI: {}", e));
+            let _ = parse_to_ui_tx.send(MsgFromParserThread::SuccessExit(format!(
+                "Parsing completed successfully. Output at: {}",
+                output_dir.display()
+            )));
         });
     }
 
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
-        parser: Option<&app::ParserInfo>,
+        sidebar_parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🔧 {}", self.title));
         ui.separator();
@@ -128,11 +189,10 @@ impl LogParser {
             if ui.button("📁 Select Logs Dir").clicked() {
                 self.select_logs_dir();
             }
-            if let Some(path) = &self.logs_dir {
-                ui.label(format!("Logs: {}", path.display()));
-            } else {
-                ui.label("Logs: None selected");
-            }
+            match &self.logs_dir {
+                Some(p) => ui.label(format!("Logs: {}", p.display())),
+                None => ui.label("Logs: None selected"),
+            };
         });
 
         ui.separator();
@@ -142,11 +202,97 @@ impl LogParser {
             if ui.button("📁 Select Output Dir").clicked() {
                 self.select_output_dir();
             }
-            if let Some(path) = &self.output_dir {
-                ui.label(format!("Output: {}", path.display()));
-            } else {
-                ui.label("Output: None selected");
+            match &self.output_dir {
+                Some(p) => ui.label(format!("Output: {}", p.display())),
+                None => ui.label("Output: None selected"),
+            };
+        });
+
+        ui.separator();
+
+        // ── DBC selection per bus ─────────────────────────────────────────
+        ui.label("DBC Files:");
+
+        // BUS 0 — VCAN (BUS ID bit cleared / 0 in firmware)
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.bus_0_use_override, "")
+                .on_hover_text(
+                    "BUS 0 = VCAN (BUS ID bit cleared/0 in firmware).\n\
+                     ☑ Use the DBC selected here.\n\
+                     ☐ Fall back to the DBC selected in the sidebar.",
+                );
+
+            let btn = egui::Button::new("📁 BUS 0 (VCAN)");
+            if ui
+                .add_enabled(self.bus_0_use_override, btn)
+                .on_hover_text("Select a DBC file for BUS 0 (VCAN)")
+                .clicked()
+            {
+                Self::select_bus_dbc(&mut self.bus_0_dbc);
             }
+
+            let label_text = if self.bus_0_use_override {
+                match &self.bus_0_dbc {
+                    Some(p) => p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string()),
+                    None => "None selected".to_string(),
+                }
+            } else {
+                match sidebar_parser {
+                    Some(p) => format!(
+                        "{} (sidebar)",
+                        p.dbc_path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| p.dbc_path.display().to_string())
+                    ),
+                    None => "None selected (sidebar)".to_string(),
+                }
+            };
+            ui.label(label_text);
+        });
+
+        // BUS 1 — MCAN
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.bus_1_use_override, "")
+                .on_hover_text(
+                    "BUS 1 = MCAN (BUS ID bit set/1 in firmware).\n\
+                     ☑ Use the DBC selected here.\n\
+                     ☐ Fall back to the DBC selected in the sidebar.",
+                );
+
+            let btn = egui::Button::new("📁 BUS 1 (MCAN)");
+            if ui
+                .add_enabled(self.bus_1_use_override, btn)
+                .on_hover_text("Select a DBC file for BUS 1 (MCAN)")
+                .clicked()
+            {
+                Self::select_bus_dbc(&mut self.bus_1_dbc);
+            }
+
+            let label_text = if self.bus_1_use_override {
+                match &self.bus_1_dbc {
+                    Some(p) => p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string()),
+                    None => "None selected".to_string(),
+                }
+            } else {
+                match sidebar_parser {
+                    Some(p) => format!(
+                        "{} (sidebar)",
+                        p.dbc_path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().into_owned())
+                            .unwrap_or_else(|| p.dbc_path.display().to_string())
+                    ),
+                    None => "None selected (sidebar)".to_string(),
+                }
+            };
+            ui.label(label_text);
         });
 
         ui.separator();
@@ -157,7 +303,7 @@ impl LogParser {
             .add_enabled(!currently_parsing, egui::Button::new("▶ Parse Logs"))
             .clicked()
         {
-            self.parse_logs(parser);
+            self.parse_logs(sidebar_parser);
         }
 
         // Parser thread messages
@@ -166,15 +312,17 @@ impl LogParser {
                 Ok(msg) => match msg {
                     MsgFromParserThread::FatalExit(text) => {
                         self.parse_text = format!("Error: {}", text);
+                        self.parse_to_ui_rx = None;
                     }
                     MsgFromParserThread::SuccessExit(text) => {
                         self.parse_text = text;
+                        self.parse_to_ui_rx = None;
                     }
                     MsgFromParserThread::Update(text) => {
                         self.parse_text = text;
                     }
                 },
-                Err(std::sync::mpsc::TryRecvError::Empty) => {} // No message, do nothing
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.parse_to_ui_rx = None;
                 }
