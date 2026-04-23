@@ -58,10 +58,7 @@ impl LogParser {
         }
     }
 
-    fn parse_logs(
-        &mut self,
-        sidebar_parser: Option<&app::ParserInfo>,
-    ) {
+    fn parse_logs(&mut self, sidebar_parser: Option<&app::ParserInfo>) {
         let logs_dir = match &self.logs_dir {
             Some(p) => p,
             None => {
@@ -85,7 +82,8 @@ impl LogParser {
             match &self.bus_0_dbc {
                 Some(p) => p.clone(),
                 None => {
-                    self.parse_text = "Error: BUS 0 DBC override enabled but no file selected".to_string();
+                    self.parse_text =
+                        "Error: BUS 0 DBC override enabled but no file selected".to_string();
                     log::error!("{}", self.parse_text);
                     return;
                 }
@@ -104,7 +102,8 @@ impl LogParser {
             match &self.bus_1_dbc {
                 Some(p) => p.clone(),
                 None => {
-                    self.parse_text = "Error: BUS 1 DBC override enabled but no file selected".to_string();
+                    self.parse_text =
+                        "Error: BUS 1 DBC override enabled but no file selected".to_string();
                     log::error!("{}", self.parse_text);
                     return;
                 }
@@ -153,14 +152,10 @@ impl LogParser {
                 return;
             };
 
-            let _ = parse_to_ui_tx
-                .send(MsgFromParserThread::Update("Parsing logs...".to_string()));
+            let _ = parse_to_ui_tx.send(MsgFromParserThread::Update("Parsing logs...".to_string()));
 
-            let parsed = daq_log_parse::parse::parse_log_files(
-                &logs_dir,
-                &parser_bus_0,
-                &parser_bus_1,
-            );
+            let parsed =
+                daq_log_parse::parse::parse_log_files(&logs_dir, &parser_bus_0, &parser_bus_1);
             let chunked_parsed = daq_log_parse::parse::chunk_parsed(parsed);
 
             let mut table_builder = daq_log_parse::table::TableBuilder::new();
@@ -215,12 +210,11 @@ impl LogParser {
 
         // BUS 0 — VCAN (BUS ID bit cleared / 0 in firmware)
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.bus_0_use_override, "")
-                .on_hover_text(
-                    "BUS 0 = VCAN (BUS ID bit cleared/0 in firmware).\n\
+            ui.checkbox(&mut self.bus_0_use_override, "").on_hover_text(
+                "BUS 0 = VCAN (BUS ID bit cleared/0 in firmware).\n\
                      ☑ Use the DBC selected here.\n\
                      ☐ Fall back to the DBC selected in the sidebar.",
-                );
+            );
 
             let btn = egui::Button::new("📁 BUS 0 (VCAN)");
             if ui
@@ -256,12 +250,11 @@ impl LogParser {
 
         // BUS 1 — MCAN
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.bus_1_use_override, "")
-                .on_hover_text(
-                    "BUS 1 = MCAN (BUS ID bit set/1 in firmware).\n\
+            ui.checkbox(&mut self.bus_1_use_override, "").on_hover_text(
+                "BUS 1 = MCAN (BUS ID bit set/1 in firmware).\n\
                      ☑ Use the DBC selected here.\n\
                      ☐ Fall back to the DBC selected in the sidebar.",
-                );
+            );
 
             let btn = egui::Button::new("📁 BUS 1 (MCAN)");
             if ui

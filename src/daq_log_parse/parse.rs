@@ -40,7 +40,11 @@ pub fn parse_log_files(
     all_parsed
 }
 
-fn parse_log_file(in_file: &std::path::Path, parser_bus_0: &can_decode::Parser, parser_bus_1: &can_decode::Parser) -> Vec<ParsedMessage> {
+fn parse_log_file(
+    in_file: &std::path::Path,
+    parser_bus_0: &can_decode::Parser,
+    parser_bus_1: &can_decode::Parser,
+) -> Vec<ParsedMessage> {
     let mut content = std::fs::read(in_file).unwrap();
 
     // add padding zeroes if content length is not multiple of raw frame size
@@ -83,8 +87,16 @@ fn parse_log_file(in_file: &std::path::Path, parser_bus_0: &can_decode::Parser, 
             frame.identity & util::msg_id::STANDARD_ID_MASK
         };
 
-        let bus_id = if (frame.identity & consts::BUS_ID_MASK) != 0 { 1 } else { 0 };
-        let parser = if bus_id == 0 { parser_bus_0 } else { parser_bus_1 };
+        let bus_id = if (frame.identity & consts::BUS_ID_MASK) != 0 {
+            1
+        } else {
+            0
+        };
+        let parser = if bus_id == 0 {
+            parser_bus_0
+        } else {
+            parser_bus_1
+        };
 
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
             parsed.push(ParsedMessage {

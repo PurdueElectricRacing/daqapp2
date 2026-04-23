@@ -24,10 +24,9 @@ impl TableBuilder {
             indexer: std::collections::HashMap::new(),
         };
         tb
-}
+    }
 
-    pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name : &str) {
-
+    pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name: &str) {
         let mut message_defs = parser.msg_defs();
         message_defs.sort_by_key(|m| match m.id {
             can_dbc::MessageId::Standard(id) => id as u32,
