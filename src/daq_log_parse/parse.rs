@@ -5,11 +5,12 @@ use bytemuck::{Pod, Zeroable};
 pub struct ParsedMessage {
     pub timestamp: u32,
     pub decoded: can_decode::DecodedMessage,
+    pub bus_name: String,
 }
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone)]
-// based on definition of timestamped_frame_t in spmc.h in firmware repo
+// based on definition of timestamped_frame_t in timestamped_frame.h in firmware repo
 struct RawFrame {
     ticks_ms: u32,
     identity: u32,
@@ -99,9 +100,11 @@ fn parse_log_file(
         };
 
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
+            let bus_name = if bus_id == 0 { "VCAN" } else { "MCAN" };
             parsed.push(ParsedMessage {
                 timestamp: frame.ticks_ms,
                 decoded,
+                bus_name: bus_name.to_string(),
             });
         } else {
             log::error!(

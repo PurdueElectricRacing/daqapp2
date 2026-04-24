@@ -8,8 +8,8 @@ pub struct TableBuilder {
     message_row: Vec<String>,
     signal_row: Vec<String>,
 
-    // Key is (msg name, signal name), value is column index
-    indexer: std::collections::HashMap<(String, String), usize>,
+    // Key is (bus name, msg name, signal name), value is column index
+    indexer: std::collections::HashMap<(String, String, String), usize>,
     next_col_idx: usize,
 }
 
@@ -41,7 +41,7 @@ impl TableBuilder {
             };
 
             for sig in msg.signals {
-                let key = (msg.name.clone(), sig.name.clone());
+                let key = (bus_id.to_string(), msg.name.clone(), sig.name.clone());
                 if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
                     e.insert(self.next_col_idx);
 
@@ -90,7 +90,7 @@ impl TableBuilder {
             for msg in chunk {
                 let decoded = &msg.decoded;
                 for (sig_name, sig_value) in &decoded.signals {
-                    let key = (decoded.name.clone(), sig_name.clone());
+                    let key = (msg.bus_name.clone(), decoded.name.clone(), sig_name.clone());
                     if let Some(&col_idx) = self.indexer.get(&key) {
                         let row_idx = (msg.timestamp - first_row_time) / consts::BIN_WIDTH_MS;
                         if let Some(row) = csv_table.get_mut(row_idx as usize + 4)
