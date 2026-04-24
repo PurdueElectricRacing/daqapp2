@@ -186,7 +186,9 @@ impl DAQApp {
                     action::WidgetType::ChargeController => {
                         if !self.is_charge_controller_open {
                             widgets::Widget::ChargeController(
-                                ui::charge_controller::ChargeController::new(),
+                                ui::charge_controller::ChargeController::new(
+                                    self.ui_to_can_tx.clone(),
+                                ),
                             )
                         } else {
                             // avoid making duplicate charge controller

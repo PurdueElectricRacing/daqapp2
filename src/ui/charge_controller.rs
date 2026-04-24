@@ -25,10 +25,29 @@ pub struct ChargeController {
     pub timeout_seconds: u64,
 
     pub request_msg_period: usize, // default 1 second, 1250 ms stale timeout defined by ABOX
+
+    // Required to be stored on the struct so Drop can send cancellation messages when the UI closes (from Send UI logic)
+    pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+
+    pub active_msg_id: Option<u32>, // store the active charge request message ID so we can cancel it on drop
+}
+
+impl Drop for ChargeController {
+    fn drop(&mut self) {
+        log::info!("Dropping ChargeController, stopping charge request");
+        if let Some(crm_id) = self.active_msg_id {
+            if let Err(e) = self
+                .ui_to_can_tx
+                .send(messages::MsgFromUi::DeleteSendMessage { msg_id: crm_id })
+            {
+                log::error!("Failed to send DeleteSendMessage in drop: {}", e);
+            }
+        }
+    }
 }
 
 impl ChargeController {
-    pub fn new() -> Self {
+    pub fn new(ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>) -> Self {
         Self {
             title: "Charge Controller".to_string(),
             max_charge_voltage: 0.0,
@@ -47,6 +66,8 @@ impl ChargeController {
             is_data_stale: true,
             timeout_seconds: 2,
             request_msg_period: 1000,
+            ui_to_can_tx,
+            active_msg_id: None,
         }
     }
 
@@ -480,7 +501,7 @@ impl ChargeController {
     }
 
     fn send_charge_request(
-        &self,
+        &mut self,
         ui_to_can_tx: &std::sync::mpsc::Sender<messages::MsgFromUi>,
         parser: &app::ParserInfo,
     ) {
@@ -494,6 +515,9 @@ impl ChargeController {
         let crm_id = util::msg_id::can_dbc_to_u32_with_extid_flag(
             &crm.as_ref().expect("Charge request message not found").id,
         );
+
+        self.active_msg_id = Some(crm_id);
+
         let is_extended = matches!(
             &crm.as_ref().expect("Charge request message not found").id,
             can_dbc::MessageId::Extended(_)
