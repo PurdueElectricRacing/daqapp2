@@ -5,11 +5,12 @@ use bytemuck::{Pod, Zeroable};
 pub struct ParsedMessage {
     pub timestamp: u32,
     pub decoded: can_decode::DecodedMessage,
+    pub bus_name: String,
 }
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone)]
-// based on definition of timestamped_frame_t in spmc.h in firmware repo
+// based on definition of timestamped_frame_t in timestamped_frame.h in firmware repo
 struct RawFrame {
     ticks_ms: u32,
     identity: u32,
@@ -18,7 +19,8 @@ struct RawFrame {
 
 pub fn parse_log_files(
     in_folder: &std::path::Path,
-    parser: &can_decode::Parser,
+    parser_bus_0: &can_decode::Parser,
+    parser_bus_1: &can_decode::Parser,
 ) -> Vec<ParsedMessage> {
     let mut all_parsed = Vec::new();
     let mut file_paths = std::fs::read_dir(in_folder)
@@ -32,14 +34,18 @@ pub fn parse_log_files(
     file_paths.sort();
     for path in file_paths {
         println!("Parsing log file: {}", path.display());
-        let parsed = parse_log_file(&path, parser);
+        let parsed = parse_log_file(&path, parser_bus_0, parser_bus_1);
         all_parsed.extend(parsed);
     }
 
     all_parsed
 }
 
-fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec<ParsedMessage> {
+fn parse_log_file(
+    in_file: &std::path::Path,
+    parser_bus_0: &can_decode::Parser,
+    parser_bus_1: &can_decode::Parser,
+) -> Vec<ParsedMessage> {
     let mut content = std::fs::read(in_file).unwrap();
 
     // add padding zeroes if content length is not multiple of raw frame size
@@ -82,17 +88,31 @@ fn parse_log_file(in_file: &std::path::Path, parser: &can_decode::Parser) -> Vec
             frame.identity & util::msg_id::STANDARD_ID_MASK
         };
 
+        let bus_id = if (frame.identity & consts::BUS_ID_MASK) != 0 {
+            1
+        } else {
+            0
+        };
+        let parser = if bus_id == 0 {
+            parser_bus_0
+        } else {
+            parser_bus_1
+        };
+
         if let Some(decoded) = parser.decode_msg(arb_id, &frame.data) {
+            let bus_name = if bus_id == 0 { "VCAN" } else { "MCAN" };
             parsed.push(ParsedMessage {
                 timestamp: frame.ticks_ms,
                 decoded,
+                bus_name: bus_name.to_string(),
             });
         } else {
             log::error!(
-                "Failed to decode message at {} ms with CAN ID {:X} and data {:?}",
+                "Failed to decode message at {} ms with CAN ID {:X} and data {:?} on bus {}",
                 frame.ticks_ms,
                 arb_id,
                 frame.data,
+                bus_id
             );
         }
     }

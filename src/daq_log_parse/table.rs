@@ -8,53 +8,48 @@ pub struct TableBuilder {
     message_row: Vec<String>,
     signal_row: Vec<String>,
 
-    // Key is (msg name, signal name), value is column index
-    indexer: std::collections::HashMap<(String, String), usize>,
+    // Key is (bus name, msg name, signal name), value is column index
+    indexer: std::collections::HashMap<(String, String, String), usize>,
+    next_col_idx: usize,
 }
 
 impl TableBuilder {
     pub fn new() -> Self {
-        Self {
-            bus_row: Vec::new(),
-            node_row: Vec::new(),
-            message_row: Vec::new(),
-            signal_row: Vec::new(),
+        let mut tb = Self {
+            bus_row: vec!["Bus".to_string()],
+            node_row: vec!["Node".to_string()],
+            message_row: vec!["Message".to_string()],
+            signal_row: vec!["Signal".to_string()],
+            next_col_idx: 1,
             indexer: std::collections::HashMap::new(),
-        }
+        };
+        tb
     }
 
-    pub fn create_header(&mut self, parser: &can_decode::Parser) {
-        // old code from per log parser, idk why it doesnt work here
+    pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name: &str) {
         let mut message_defs = parser.msg_defs();
         message_defs.sort_by_key(|m| match m.id {
             can_dbc::MessageId::Standard(id) => id as u32,
             can_dbc::MessageId::Extended(id) => id,
         });
 
-        self.bus_row.push("Bus".to_string());
-        self.node_row.push("Node".to_string());
-        self.message_row.push("Message".to_string());
-        self.signal_row.push("Signal".to_string());
-
-        let mut col_idx = 1;
-
         for msg in message_defs {
-            let bus_id = "Main";
+            let bus_id = bus_name;
             let node = match msg.transmitter {
                 can_dbc::Transmitter::NodeName(n) => n,
                 can_dbc::Transmitter::VectorXXX => "N/A".to_string(),
             };
 
             for sig in msg.signals {
-                let key = (msg.name.clone(), sig.name.clone());
+                let key = (bus_id.to_string(), msg.name.clone(), sig.name.clone());
                 if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
-                    e.insert(col_idx);
-                    col_idx += 1;
+                    e.insert(self.next_col_idx);
 
                     self.bus_row.push(bus_id.to_string());
                     self.node_row.push(node.to_string());
                     self.message_row.push(msg.name.to_string());
                     self.signal_row.push(sig.name.to_string());
+                    self.next_col_idx += 1;
                 }
             }
         }
@@ -95,7 +90,7 @@ impl TableBuilder {
             for msg in chunk {
                 let decoded = &msg.decoded;
                 for (sig_name, sig_value) in &decoded.signals {
-                    let key = (decoded.name.clone(), sig_name.clone());
+                    let key = (msg.bus_name.clone(), decoded.name.clone(), sig_name.clone());
                     if let Some(&col_idx) = self.indexer.get(&key) {
                         let row_idx = (msg.timestamp - first_row_time) / consts::BIN_WIDTH_MS;
                         if let Some(row) = csv_table.get_mut(row_idx as usize + 4)
