@@ -672,9 +672,8 @@ dependencies = [
 
 [[package]]
 name = "can_decode"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fefccdec1df347e580059c67c2cb721a4ff08f727b810457bc3be31db11810f0"
+version = "0.6.1"
+source = "git+https://github.com/PurdueElectricRacing/can_decode?branch=millan%2Ffix-BE#b64b8350630b43fa6b3b0b865ac23848c7371f74"
 dependencies = [
  "can-dbc",
  "indexmap",
