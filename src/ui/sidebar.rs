@@ -75,6 +75,11 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 ));
             }
 
+            if ui.button("Add G-G Plot").clicked() {
+                app.action_queue
+                    .push(action::AppAction::SpawnWidget(action::WidgetType::GgPlot));
+            }
+
             ui.separator();
             ui.heading("Connection Settings");
 
