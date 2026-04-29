@@ -9,6 +9,7 @@ pub enum Widget {
     LogParser(ui::log_parser::LogParser),
     SendUi(ui::send::SendUi),
     BusLoad(ui::bus_load::BusLoad),
+    ChargeController(ui::charge_controller::ChargeController),
     BatteryViewer(ui::battery::BatteryViewer),
 }
 
@@ -22,6 +23,7 @@ impl Widget {
             Widget::LogParser(w) => &w.title,
             Widget::SendUi(w) => &w.title,
             Widget::BusLoad(w) => &w.title,
+            Widget::ChargeController(w) => &w.title,
             Widget::BatteryViewer(w) => &w.title,
         }
     }
@@ -54,6 +56,7 @@ impl Widget {
             Widget::LogParser(w) => w.show(ui, parser),
             Widget::SendUi(w) => w.show(ui, parser),
             Widget::BusLoad(w) => w.show(ui),
+            Widget::ChargeController(w) => w.show(ui, ui_to_can_tx, parser),
             Widget::BatteryViewer(w) => w.show(ui),
         }
     }
@@ -65,6 +68,7 @@ impl Widget {
             Widget::Scope(w) => w.handle_can_message(msg),
             Widget::SendUi(w) => w.handle_can_message(msg),
             Widget::BusLoad(w) => w.handle_can_message(msg),
+            Widget::ChargeController(w) => w.handle_can_message(msg),
             Widget::BatteryViewer(w) => w.handle_can_message(msg),
             _ => {}
         }

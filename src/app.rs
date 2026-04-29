@@ -44,12 +44,14 @@ pub struct DAQApp {
     pub next_log_parser_num: usize,
     pub next_send_ui_num: usize,
     pub next_bus_load_num: usize,
+    pub is_charge_controller_open: bool,
     pub next_battery_viewer_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
     pub selected_source: Option<connection::ConnectionSource>,
     pub theme: egui::Style,
+    pub theme_colors: theme::ThemeColors,
     pub theme_selection: theme::ThemeSelection,
     pub pixels_per_point: Option<f32>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
@@ -78,6 +80,7 @@ impl DAQApp {
     ) -> Self {
         let theme_selection = settings.theme;
         let theme_style = theme_selection.get_style();
+        let theme_colors = theme_selection.get_colors();
 
         Self {
             connection_status: ConnectionStatus::Disconnected,
@@ -91,6 +94,7 @@ impl DAQApp {
             next_log_parser_num: 1,
             next_send_ui_num: 1,
             next_bus_load_num: 1,
+            is_charge_controller_open: false,
             next_battery_viewer_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
@@ -103,6 +107,7 @@ impl DAQApp {
             parser: ParserInfo::new_maybe(settings.dbc_path),
             udp_port: settings.udp_port,
             can_messages: Vec::new(),
+            theme_colors,
         }
     }
 
@@ -178,6 +183,18 @@ impl DAQApp {
                     action::WidgetType::BusLoad => {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }
+                    action::WidgetType::ChargeController => {
+                        if !self.is_charge_controller_open {
+                            widgets::Widget::ChargeController(
+                                ui::charge_controller::ChargeController::new(
+                                    self.ui_to_can_tx.clone(),
+                                ),
+                            )
+                        } else {
+                            // avoid making duplicate charge controller
+                            return;
+                        }
+                    }
                     action::WidgetType::BatteryViewer => widgets::Widget::BatteryViewer(
                         ui::battery::BatteryViewer::new(self.next_battery_viewer_num),
                     ),
@@ -206,6 +223,10 @@ impl DAQApp {
                     }
                     action::WidgetType::BusLoad => {
                         self.next_bus_load_num += 1;
+                    }
+                    action::WidgetType::ChargeController => {
+                        // no counter, we should only ever have one charge controller widget
+                        self.is_charge_controller_open = true;
                     }
                     action::WidgetType::BatteryViewer => {
                         self.next_battery_viewer_num += 1;
@@ -238,17 +259,22 @@ impl DAQApp {
         }
     }
 
-    pub fn toggle_theme(&mut self) {
+    pub fn toggle_theme(&mut self, ctx: &egui::Context) {
         self.theme_selection = self.theme_selection.next();
         self.theme = self.theme_selection.get_style();
+        self.theme_colors = self.theme_selection.get_colors(); // update global theme colors 
+        theme::store_theme(ctx, self.theme_colors.clone());
     }
 
     // Close the currently active widget in the tile tree
     pub fn close_active_widget(&mut self) {
         let active_tiles = self.tile_tree.active_tiles();
-
         for tile_id in active_tiles {
-            if let Some(egui_tiles::Tile::Pane(_)) = self.tile_tree.tiles.get(tile_id) {
+            if let Some(egui_tiles::Tile::Pane(widget)) = self.tile_tree.tiles.get(tile_id) {
+                if matches!(widget, widgets::Widget::ChargeController(_)) {
+                    log::info!("Closing Charge Controlller");
+                    self.is_charge_controller_open = false;
+                }
                 self.tile_tree.tiles.remove(tile_id);
                 break;
             }
@@ -283,7 +309,8 @@ impl eframe::App for DAQApp {
         if let Some(ppp) = self.pixels_per_point {
             ctx.set_pixels_per_point(ppp);
         }
-        ctx.set_style(self.theme.clone());
+
+        ctx.set_style(self.theme_colors.to_egui_style());
 
         // Handle keyboard shortcuts
         self.action_queue

@@ -21,6 +21,7 @@ pub enum WidgetType {
     SendUi,
     BusLoad,
     BatteryViewer,
+    ChargeController,
 }
 
 impl AppAction {
@@ -32,6 +33,7 @@ impl AppAction {
             ("Spawn Log Parser", WidgetType::LogParser),
             ("Spawn Send UI", WidgetType::SendUi),
             ("Spawn Bus Load", WidgetType::BusLoad),
+            ("Spawn Charge Controller", WidgetType::ChargeController),
             ("Spawn Battery Viewer", WidgetType::BatteryViewer),
         ]
     }

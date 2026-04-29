@@ -1,5 +1,5 @@
-use crate::{action, app, connection, messages, util};
-use eframe::egui;
+use crate::{action, app, connection, messages, theme, util};
+use eframe::egui::{self};
 
 pub fn select_dbc(
     app: &mut app::DAQApp,
@@ -20,6 +20,7 @@ pub fn select_dbc(
 }
 
 pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
+    let theme = theme::get_theme(ctx);
     egui::SidePanel::left("left_sidebar")
         .resizable(true)
         .show_animated(ctx, app.is_sidebar_open, |ui| {
@@ -29,7 +30,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             let theme_label = format!("🎨 Theme: {}", app.theme_selection.get_name());
 
             if ui.button(theme_label).clicked() {
-                app.toggle_theme();
+                app.toggle_theme(ctx);
                 app.save_settings();
             }
 
@@ -67,6 +68,11 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             if ui.button("Add Bus Load").clicked() {
                 app.action_queue
                     .push(action::AppAction::SpawnWidget(action::WidgetType::BusLoad));
+            }
+            if ui.button("Add Charge Controller").clicked() {
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::ChargeController,
+                ));
             }
 
             if ui.button("Add Battery Viewer").clicked() {
@@ -171,13 +177,13 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 // Connection status indicator
                 let (status_icon, status_color) = match &app.connection_status {
                     app::ConnectionStatus::Disconnected => {
-                        ("⚪ Disconnected".to_string(), egui::Color32::GRAY)
+                        ("⚪ Disconnected".to_string(), theme.warning_color())
                     }
                     app::ConnectionStatus::Connected => {
-                        ("🟢 Connected".to_string(), egui::Color32::GREEN)
+                        ("🟢 Connected".to_string(), theme.success_color())
                     }
                     app::ConnectionStatus::Error(e) => {
-                        (format!("🔴 Error: {}", e), egui::Color32::RED)
+                        (format!("🔴 Error: {}", e), theme.error_color())
                     }
                 };
                 ui.label(egui::RichText::new(status_icon).color(status_color));
