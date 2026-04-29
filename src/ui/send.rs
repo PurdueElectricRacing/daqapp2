@@ -15,6 +15,7 @@ pub struct SendUi {
     send_mode: SendMode,
     period_ms: usize,
     finite_amount: usize,
+    adjustable_values_enabled: bool,
 
     error: Option<String>,
 
@@ -45,6 +46,7 @@ struct SendingMessage {
     pub is_msg_id_extended: bool,
     pub msg_bytes: Vec<u8>,
     pub signal_values: Vec<SignalValue>,
+    pub adjustable_values_enabled: bool,
     pub last_sent: chrono::DateTime<chrono::Local>,
 }
 
@@ -95,6 +97,7 @@ impl SendUi {
             send_mode: SendMode::Infinite,
             period_ms: 1000,
             finite_amount: 10,
+            adjustable_values_enabled: false,
 
             error: None,
 
@@ -258,6 +261,7 @@ impl SendUi {
                                 });
                             }
                         }
+                        ui.checkbox(&mut self.adjustable_values_enabled, "Adjustable values");
                         for i in 0..self.signal_values.len() {
                             ui.horizontal(|ui| {
                                 let signal = &mut self.signal_values[i];
@@ -318,6 +322,7 @@ impl SendUi {
                                 ),
                                 msg_bytes: msg_bytes.clone(),
                                 signal_values: self.signal_values.clone(),
+                                adjustable_values_enabled: self.adjustable_values_enabled,
                                 last_sent: chrono::Local::now(),
                             });
 
@@ -330,6 +335,7 @@ impl SendUi {
 
                             self.selected_msg = None;
                             self.signal_values.clear();
+                            self.adjustable_values_enabled = false;
 
                             self.ui_to_can_tx
                                 .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
@@ -358,6 +364,9 @@ impl SendUi {
                         }
 
                         let msg = &self.sending_messages[idx];
+                        if !msg.adjustable_values_enabled {
+                            continue;
+                        }
                         let encoded = encode_msg_from_signals(
                             &parser.parser,
                             msg.msg_id_with_ext_flag,
@@ -494,15 +503,22 @@ impl SendingMessage {
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    if ui
-                                        .add(
-                                            egui::DragValue::new(&mut signal.value)
-                                            .range(signal.min..=signal.max)
-                                            .speed(0.1),
-                                        )
-                                        .changed()
-                                    {
-                                        updates_to_send.push(msg_idx);
+                                    if self.adjustable_values_enabled {
+                                        if ui
+                                            .add(
+                                                egui::DragValue::new(&mut signal.value)
+                                                    .range(signal.min..=signal.max)
+                                                    .speed(0.1),
+                                            )
+                                            .changed()
+                                        {
+                                            updates_to_send.push(msg_idx);
+                                        }
+                                    } else {
+                                        ui.label(
+                                            egui::RichText::new(format!("{:.2}", signal.value))
+                                                .monospace(),
+                                        );
                                     }
                                 },
                             );
