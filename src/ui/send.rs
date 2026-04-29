@@ -456,16 +456,14 @@ impl SendingMessage {
                     .size(16.0)
                     .color(ui.visuals().text_color()),
             );
-            ui.label(
-                egui::RichText::new(self.amount.display()).color(ui.visuals().text_color()),
-            );
+            ui.label(egui::RichText::new(self.amount.display()).color(ui.visuals().text_color()));
             ui.label(
                 egui::RichText::new(format!(
                     "~{} ms ago",
                     (chrono::Local::now() - self.last_sent).num_milliseconds()
                 ))
-                    .italics()
-                    .color(ui.visuals().weak_text_color()),
+                .italics()
+                .color(ui.visuals().weak_text_color()),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗑").on_hover_text("Delete message").clicked() {
