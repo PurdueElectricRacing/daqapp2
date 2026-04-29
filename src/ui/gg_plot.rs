@@ -7,10 +7,15 @@ const STALE_TIMEOUT_SECONDS: u64 = 1;
 const MAX_HISTORY_POINTS: usize = 350;
 const AXIS_LIMIT_G: f32 = 2.0;
 const IMU_ACCEL_MSG_NAME: &str = "IMU_acceleration";
-/// CAN signal named X — in our DBC this axis is **lateral** (+ left).
-const IMU_ACCEL_CAN_X_NAME: &str = "X_axis";
-/// CAN signal named Y — in our DBC this axis is **longitudinal** (+ forward).
-const IMU_ACCEL_CAN_Y_NAME: &str = "Y_axis";
+/// DBC is vehicle frame: +X forward, +Y left (g).
+const IMU_ACCEL_X_NAME: &str = "X_axis";
+const IMU_ACCEL_Y_NAME: &str = "Y_axis";
+
+/// Vehicle (+X forward, +Y left) to `egui_plot` data: horizontal = −Ay, vertical = Ax.
+#[inline]
+fn vehicle_accel_to_plot_xy(ax_g: f32, ay_g: f32) -> [f64; 2] {
+    [-ay_g as f64, ax_g as f64]
+}
 
 pub struct GgPlot {
     pub title: String,
@@ -39,32 +44,28 @@ impl GgPlot {
                 return;
             }
 
-            let mut can_x = None;
-            let mut can_y = None;
+            let mut forward_g = None;
+            let mut left_g = None;
             for (_, sig) in &parsed.decoded.signals {
                 match sig.name.as_str() {
-                    IMU_ACCEL_CAN_X_NAME => {
+                    IMU_ACCEL_X_NAME => {
                         if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                            can_x = Some(*v as f32);
+                            forward_g = Some(*v as f32);
                         }
                     }
-                    IMU_ACCEL_CAN_Y_NAME => {
+                    IMU_ACCEL_Y_NAME => {
                         if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                            can_y = Some(*v as f32);
+                            left_g = Some(*v as f32);
                         }
                     }
                     _ => {}
                 }
             }
 
-            // Vehicle frame: forward (+ longitudinal plot axis), left (+ lateral plot axis).
-            // Map CAN naming → body: X_axis ↔ lateral, Y_axis ↔ longitudinal.
-            if let (Some(can_x), Some(can_y)) = (can_x, can_y) {
-                let forward_g = can_y;
-                let left_g = can_x;
-                self.accel_x_g = forward_g;
-                self.accel_y_g = left_g;
-                self.points_g.push_back((forward_g, left_g));
+            if let (Some(ax), Some(ay)) = (forward_g, left_g) {
+                self.accel_x_g = ax;
+                self.accel_y_g = ay;
+                self.points_g.push_back((ax, ay));
                 while self.points_g.len() > MAX_HISTORY_POINTS {
                     self.points_g.pop_front();
                 }
@@ -99,8 +100,9 @@ impl GgPlot {
             .include_y(-axis_limit)
             .include_y(axis_limit)
             .show_axes([true, true])
-            .x_axis_label("Longitudinal (g), forward +")
-            .y_axis_label("Lateral (g), left +")
+            // Vehicle: +X forward (Ax), +Y left (Ay). egui_plot: plot x = −Ay, plot y = Ax.
+            .x_axis_label("plot x = −Ay (g)")
+            .y_axis_label("plot y = Ax (g)")
             .show(ui, |plot_ui| {
                 for radius in [0.5, 1.0, 1.5] {
                     let mut points = Vec::with_capacity(65);
@@ -117,11 +119,10 @@ impl GgPlot {
                     );
                 }
 
-                // Plot X = forward (X_axis), plot Y = left (Y_axis)
                 let trail: Vec<[f64; 2]> = self
                     .points_g
                     .iter()
-                    .map(|(ax_g, ay_g)| [*ax_g as f64, *ay_g as f64])
+                    .map(|(ax_g, ay_g)| vehicle_accel_to_plot_xy(*ax_g, *ay_g))
                     .collect();
                 if !trail.is_empty() {
                     plot_ui.points(
@@ -135,7 +136,9 @@ impl GgPlot {
                     plot_ui.points(
                         egui_plot::Points::new(
                             "current",
-                            egui_plot::PlotPoints::from(vec![[*ax_g as f64, *ay_g as f64]]),
+                            egui_plot::PlotPoints::from(vec![vehicle_accel_to_plot_xy(
+                                *ax_g, *ay_g,
+                            )]),
                         )
                         .radius(4.5)
                         .color(theme.error_color()),
@@ -146,10 +149,11 @@ impl GgPlot {
         ui.add_space(6.0);
         let mag_g = (self.accel_x_g.powi(2) + self.accel_y_g.powi(2)).sqrt();
         ui.label(format!(
-            "Ax: {:+.2} g | Ay: {:+.2} g",
+            "Vehicle Ax (fwd+): {:+.2} g | Ay (left+): {:+.2} g",
             self.accel_x_g, self.accel_y_g
         ));
         ui.label(format!("|a|: {:.2} g", mag_g));
+        ui.label(egui::RichText::new("Plot: x = −Ay, y = Ax (vehicle frame → egui axes)").weak());
 
         egui_tiles::UiResponse::None
     }
