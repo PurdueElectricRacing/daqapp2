@@ -1,11 +1,18 @@
 use crate::{messages, ui};
 use eframe::egui::{self, Color32, Frame, Stroke, Vec2, Pos2, StrokeKind};
 use std::time::Instant;
+use std::f32::consts::PI;
 
 const STALE_TIMEOUT_SECONDS: u64 = 1;
 const WHEELBASE_M: f32 = 1.530; // Standard Formula Student wheelbase
 const CHASSIS_WIDTH_M: f32 = 1.4;
 const CHASSIS_LENGTH_M: f32 = 2.5;
+const ACCEL_VECTOR_SCALE: f32 = 20.0;
+const SPEED_VECTOR_SCALE: f32 = 2.0;
+const YAW_RATE_MAX_FOR_DRAW: f32 = 2.0; // rad/s clamp for visualization
+const YAW_ARC_MIN_SWEEP_RAD: f32 = PI / 8.0;
+const YAW_ARC_MAX_SWEEP_RAD: f32 = PI * 1.4;
+const YAW_ARC_SEGMENTS: usize = 28;
 
 pub struct Dynamics {
     pub title: String,
@@ -220,15 +227,22 @@ impl Dynamics {
         let front_axle_y = center.y - axle_dist_px / 2.0;
         let rear_axle_y = center.y + axle_dist_px / 2.0;
 
-        // 3. Acceleration Vector (Red)
-        let accel_scale = 20.0;
-        let accel_vec = Vec2::new(-self.accel_y * accel_scale, -self.accel_x * accel_scale);
-        painter.line_segment([center, center + accel_vec], Stroke::new(3.0, theme.error_color()));
-        painter.circle_filled(center + accel_vec, 4.0, theme.error_color());
+        // 3. Acceleration Vectors (separate X and Y)
+        let accel_x_vec = Vec2::new(0.0, -self.accel_x * ACCEL_VECTOR_SCALE);
+        let accel_y_vec = Vec2::new(-self.accel_y * ACCEL_VECTOR_SCALE, 0.0);
+        painter.line_segment(
+            [center, center + accel_x_vec],
+            Stroke::new(3.0, theme.error_color()),
+        );
+        painter.circle_filled(center + accel_x_vec, 4.0, theme.error_color());
+        painter.line_segment(
+            [center, center + accel_y_vec],
+            Stroke::new(3.0, theme.error_color()),
+        );
+        painter.circle_filled(center + accel_y_vec, 4.0, theme.error_color());
 
         // 4. Velocity Vector (Green)
-        let speed_scale = 2.0;
-        let vel_vec = Vec2::new(0.0, -self.velocity_mps * speed_scale);
+        let vel_vec = Vec2::new(0.0, -self.velocity_mps * SPEED_VECTOR_SCALE);
         painter.line_segment(
             [
                 Pos2::new(center.x, front_axle_y),
@@ -237,7 +251,34 @@ impl Dynamics {
             Stroke::new(3.0, theme.success_color()),
         );
 
-        // 5. Turn Radius Projection
+        // 5. Yaw rotation arc + arrowhead
+        self.draw_yaw_rotation_arrow(painter, center, pixels_per_meter, theme);
+
+        // 6. Labels
+        let label_top_left = Pos2::new(center.x - 110.0, center.y - (CHASSIS_LENGTH_M * pixels_per_meter / 2.0) - 48.0);
+        painter.text(
+            label_top_left,
+            egui::Align2::LEFT_TOP,
+            format!("Yaw: {:+.2} rad/s", self.yaw_rate_rads),
+            egui::FontId::monospace(12.0),
+            theme.text_color(),
+        );
+        painter.text(
+            label_top_left + Vec2::new(0.0, 16.0),
+            egui::Align2::LEFT_TOP,
+            format!("Accel X: {:+.2} m/s²", self.accel_x),
+            egui::FontId::monospace(12.0),
+            theme.error_color(),
+        );
+        painter.text(
+            label_top_left + Vec2::new(0.0, 32.0),
+            egui::Align2::LEFT_TOP,
+            format!("Accel Y: {:+.2} m/s²", self.accel_y),
+            egui::FontId::monospace(12.0),
+            theme.error_color(),
+        );
+
+        // 7. Turn Radius Projection
         if self.steer_angle_rad.abs() > 0.01 {
             let r_m = WHEELBASE_M / self.steer_angle_rad.tan();
             let r_px = r_m * pixels_per_meter;
@@ -249,6 +290,43 @@ impl Dynamics {
                 Stroke::new(1.0, theme.info_color().linear_multiply(0.3)),
             );
         }
+    }
+
+    fn draw_yaw_rotation_arrow(
+        &self,
+        painter: &egui::Painter,
+        center: Pos2,
+        pixels_per_meter: f32,
+        theme: &ui::theme::ThemeColors,
+    ) {
+        let yaw_abs = self.yaw_rate_rads.abs();
+        if yaw_abs < 0.01 {
+            return;
+        }
+
+        let yaw_norm = (yaw_abs / YAW_RATE_MAX_FOR_DRAW).clamp(0.0, 1.0);
+        let sweep = YAW_ARC_MIN_SWEEP_RAD + yaw_norm * (YAW_ARC_MAX_SWEEP_RAD - YAW_ARC_MIN_SWEEP_RAD);
+        let direction = if self.yaw_rate_rads >= 0.0 { 1.0 } else { -1.0 };
+        let start_angle = -PI / 2.0;
+        let end_angle = start_angle + direction * sweep;
+        let radius = pixels_per_meter * (CHASSIS_WIDTH_M * 0.75);
+        let stroke = Stroke::new(1.5 + 1.5 * yaw_norm, theme.success_color());
+
+        let mut prev = Self::point_on_circle(center, radius, start_angle);
+        for i in 1..=YAW_ARC_SEGMENTS {
+            let t = i as f32 / YAW_ARC_SEGMENTS as f32;
+            let angle = start_angle + (end_angle - start_angle) * t;
+            let next = Self::point_on_circle(center, radius, angle);
+            painter.line_segment([prev, next], stroke);
+            prev = next;
+        }
+
+        // Dot marker at arc end
+        painter.circle_filled(prev, 4.0, theme.success_color());
+    }
+
+    fn point_on_circle(center: Pos2, radius: f32, angle: f32) -> Pos2 {
+        Pos2::new(center.x + radius * angle.cos(), center.y + radius * angle.sin())
     }
 }
 
