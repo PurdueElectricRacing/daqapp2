@@ -8,13 +8,14 @@ pub struct SendUi {
     search_results: Vec<can_dbc::Message>,
 
     selected_msg: Option<can_dbc::Message>,
-    signal_values: Vec<(String, f64)>,
+    signal_values: Vec<SignalValue>,
 
     sending_messages: Vec<SendingMessage>,
 
     send_mode: SendMode,
     period_ms: usize,
     finite_amount: usize,
+    adjustable_values_enabled: bool,
 
     error: Option<String>,
 
@@ -29,12 +30,23 @@ enum SendMode {
     Finite,
 }
 
+#[derive(Clone)]
+struct SignalValue {
+    name: String,
+    value: f64,
+    min: f64,
+    max: f64,
+}
+
 struct SendingMessage {
     pub amount: messages::SendAmount,
     pub msg_name: String,
     pub msg_id: u32,
+    pub msg_id_with_ext_flag: u32,
+    pub is_msg_id_extended: bool,
     pub msg_bytes: Vec<u8>,
-    pub signal_values: Vec<(String, String)>,
+    pub signal_values: Vec<SignalValue>,
+    pub adjustable_values_enabled: bool,
     pub last_sent: chrono::DateTime<chrono::Local>,
 }
 
@@ -85,6 +97,7 @@ impl SendUi {
             send_mode: SendMode::Infinite,
             period_ms: 1000,
             finite_amount: 10,
+            adjustable_values_enabled: false,
 
             error: None,
 
@@ -166,7 +179,15 @@ impl SendUi {
                                 self.signal_values = msg
                                     .signals
                                     .iter()
-                                    .map(|sig| (sig.name.clone(), 0.0))
+                                    .map(|sig| {
+                                        let (min, max) = signal_range(sig);
+                                        SignalValue {
+                                            name: sig.name.clone(),
+                                            value: 0.0,
+                                            min,
+                                            max,
+                                        }
+                                    })
                                     .collect();
                                 self.error = None;
 
@@ -240,23 +261,29 @@ impl SendUi {
                                 });
                             }
                         }
+                        ui.checkbox(&mut self.adjustable_values_enabled, "Adjustable values");
                         for i in 0..self.signal_values.len() {
                             ui.horizontal(|ui| {
-                                let (sig_name, value) = &mut self.signal_values[i];
-                                ui.label(sig_name.as_str());
-                                if ui.add(egui::DragValue::new(value).speed(0.1)).changed() {
-                                    self.signal_values[i].1 = *value;
+                                let signal = &mut self.signal_values[i];
+                                ui.label(signal.name.as_str());
+                                if ui
+                                    .add(
+                                        egui::DragValue::new(&mut signal.value)
+                                        .range(signal.min..=signal.max)
+                                        .speed(0.1),
+                                    )
+                                    .changed()
+                                {
+                                    self.signal_values[i].value = signal.value;
                                 }
                             });
                         }
 
                         if ui.button("Send Message").clicked() {
-                            let values_hashmap = self.signal_values.iter().cloned().collect();
-
-                            let encoded = parser.parser.encode_msg(
-                                util::msg_id::can_dbc_to_u32_with_extid_flag(&selected_msg.id),
-                                &values_hashmap,
-                            );
+                            let msg_id_with_ext_flag =
+                                util::msg_id::can_dbc_to_u32_with_extid_flag(&selected_msg.id);
+                            let encoded =
+                                encode_msg_from_signals(&parser.parser, msg_id_with_ext_flag, &self.signal_values);
 
                             let Some(msg_bytes) = encoded else {
                                 self.error = Some(
@@ -288,27 +315,27 @@ impl SendUi {
                                 amount: send_amount,
                                 msg_name: selected_msg.name.clone(),
                                 msg_id: msg_id_u32,
+                                msg_id_with_ext_flag,
+                                is_msg_id_extended: matches!(
+                                    selected_msg.id,
+                                    can_dbc::MessageId::Extended(_)
+                                ),
                                 msg_bytes: msg_bytes.clone(),
-                                signal_values: self
-                                    .signal_values
-                                    .iter()
-                                    .map(|(name, value)| (name.clone(), format!("{:.2}", value)))
-                                    .collect(),
+                                signal_values: self.signal_values.clone(),
+                                adjustable_values_enabled: self.adjustable_values_enabled,
                                 last_sent: chrono::Local::now(),
                             });
 
                             let add_send_msg = messages::AddSendMessage {
                                 amount: send_amount,
                                 msg_id: msg_id_u32,
-                                is_msg_id_extended: matches!(
-                                    selected_msg.id,
-                                    can_dbc::MessageId::Extended(_)
-                                ),
+                                is_msg_id_extended: matches!(selected_msg.id, can_dbc::MessageId::Extended(_)),
                                 msg_bytes,
                             };
 
                             self.selected_msg = None;
                             self.signal_values.clear();
+                            self.adjustable_values_enabled = false;
 
                             self.ui_to_can_tx
                                 .send(messages::MsgFromUi::AddSendMessage(add_send_msg))
@@ -319,29 +346,51 @@ impl SendUi {
                     ui.separator();
 
                     let mut all_actions = Vec::new();
-                    for msg in self.sending_messages.iter().rev() {
-                        let signals = msg
-                            .signal_values
-                            .iter()
-                            .map(|(name, value)| (name.as_str(), value.as_str()))
-                            .collect();
-                        let raw_bytes_str = msg
-                            .msg_bytes
-                            .iter()
-                            .map(|b| format!("{:02X}", b))
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        let card = MessageCard {
-                            msg_name: &msg.msg_name,
-                            msg_id: msg.msg_id,
-                            send_amount: &msg.amount,
-                            sent_ago_ms: (chrono::Local::now() - msg.last_sent).num_milliseconds(),
-                            raw_bytes: raw_bytes_str.as_str(),
-                            signals,
-                        };
-                        let actions = card.ui(ui);
-                        all_actions.extend(actions);
+                    let mut updates_to_send = Vec::new();
+                    for idx in (0..self.sending_messages.len()).rev() {
+                        if let Some(action) =
+                            self.sending_messages[idx].ui(ui, idx, &mut updates_to_send)
+                        {
+                            all_actions.push(action);
+                        }
                         ui.add_space(8.0);
+                    }
+
+                    updates_to_send.sort_unstable();
+                    updates_to_send.dedup();
+                    for idx in updates_to_send {
+                        if idx >= self.sending_messages.len() {
+                            continue;
+                        }
+
+                        let msg = &self.sending_messages[idx];
+                        if !msg.adjustable_values_enabled {
+                            continue;
+                        }
+                        let encoded = encode_msg_from_signals(
+                            &parser.parser,
+                            msg.msg_id_with_ext_flag,
+                            &msg.signal_values,
+                        );
+                        let Some(msg_bytes) = encoded else {
+                            self.error = Some(format!(
+                                "Failed to encode {} while applying slider update.",
+                                msg.msg_name
+                            ));
+                            continue;
+                        };
+
+                        self.sending_messages[idx].msg_bytes = msg_bytes.clone();
+                        self.error = None;
+
+                        self.ui_to_can_tx
+                            .send(messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
+                                amount: self.sending_messages[idx].amount,
+                                msg_id: self.sending_messages[idx].msg_id,
+                                is_msg_id_extended: self.sending_messages[idx].is_msg_id_extended,
+                                msg_bytes,
+                            }))
+                            .expect("Failed to send AddSendMessage");
                     }
 
                     for action in all_actions {
@@ -384,18 +433,21 @@ impl SendUi {
     }
 }
 
-struct MessageCard<'a> {
-    msg_name: &'a str,
-    msg_id: u32,
-    send_amount: &'a messages::SendAmount,
-    sent_ago_ms: i64,
-    raw_bytes: &'a str,
-    signals: Vec<(&'a str, &'a str)>,
-}
+impl SendingMessage {
+    fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        msg_idx: usize,
+        updates_to_send: &mut Vec<usize>,
+    ) -> Option<SendUiActions> {
+        let mut delete_action = None;
+        let raw_bytes_str = self
+            .msg_bytes
+            .iter()
+            .map(|b| format!("{:02X}", b))
+            .collect::<Vec<_>>()
+            .join(" ");
 
-impl MessageCard<'_> {
-    fn ui(&self, ui: &mut egui::Ui) -> Vec<SendUiActions> {
-        let mut action_queue = Vec::new();
         // Header (outside card)
         ui.horizontal(|ui| {
             ui.label(
@@ -404,22 +456,23 @@ impl MessageCard<'_> {
                     .size(16.0)
                     .color(ui.visuals().text_color()),
             );
+            ui.label(egui::RichText::new(self.amount.display()).color(ui.visuals().text_color()));
             ui.label(
-                egui::RichText::new(self.send_amount.display()).color(ui.visuals().text_color()),
-            );
-            ui.label(
-                egui::RichText::new(format!("~{} ms ago", self.sent_ago_ms))
-                    .italics()
-                    .color(ui.visuals().weak_text_color()),
+                egui::RichText::new(format!(
+                    "~{} ms ago",
+                    (chrono::Local::now() - self.last_sent).num_milliseconds()
+                ))
+                .italics()
+                .color(ui.visuals().weak_text_color()),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("🗑").on_hover_text("Delete message").clicked() {
-                    action_queue.push(SendUiActions::DeleteMessage {
+                    delete_action = Some(SendUiActions::DeleteMessage {
                         msg_id: self.msg_id,
                     });
                 }
                 ui.label(
-                    egui::RichText::new(self.raw_bytes)
+                    egui::RichText::new(raw_bytes_str)
                         .monospace()
                         .color(ui.visuals().text_color()),
                 );
@@ -437,27 +490,69 @@ impl MessageCard<'_> {
             .inner_margin(egui::Margin::symmetric(8, 6))
             .show(ui, |ui| {
                 ui.vertical(|ui| {
-                    for (i, (sig_name, value)) in self.signals.iter().enumerate() {
+                    let total_signals = self.signal_values.len();
+                    for (i, signal) in self.signal_values.iter_mut().enumerate() {
                         ui.horizontal(|ui| {
                             ui.label(
-                                egui::RichText::new(*sig_name)
+                                egui::RichText::new(&signal.name)
                                     .monospace()
                                     .color(ui.visuals().text_color()),
                             );
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    ui.label(egui::RichText::new(*value).monospace());
+                                    if self.adjustable_values_enabled {
+                                        if ui
+                                            .add(
+                                                egui::DragValue::new(&mut signal.value)
+                                                    .range(signal.min..=signal.max)
+                                                    .speed(0.1),
+                                            )
+                                            .changed()
+                                        {
+                                            updates_to_send.push(msg_idx);
+                                        }
+                                    } else {
+                                        ui.label(
+                                            egui::RichText::new(format!("{:.2}", signal.value))
+                                                .monospace(),
+                                        );
+                                    }
                                 },
                             );
                         });
-                        if i < self.signals.len() - 1 {
+                        if i < total_signals - 1 {
                             ui.separator();
                         }
                     }
                 });
             });
 
-        action_queue
+        delete_action
     }
+}
+
+fn encode_msg_from_signals(
+    parser: &can_decode::Parser,
+    msg_id_with_ext_flag: u32,
+    signals: &[SignalValue],
+) -> Option<Vec<u8>> {
+    let values_hashmap = signals
+        .iter()
+        .map(|signal| (signal.name.clone(), signal.value))
+        .collect();
+    parser.encode_msg(msg_id_with_ext_flag, &values_hashmap)
+}
+
+fn signal_range(sig: &can_dbc::Signal) -> (f64, f64) {
+    let fallback = (-1000.0, 1000.0);
+    let mut min = sig.min;
+    let mut max = sig.max;
+
+    if !min.is_finite() || !max.is_finite() || min >= max {
+        min = fallback.0;
+        max = fallback.1;
+    }
+
+    (min, max)
 }
