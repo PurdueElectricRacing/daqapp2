@@ -1,7 +1,7 @@
 use crate::{messages, ui};
-use eframe::egui::{self, Color32, Frame, Stroke, Vec2, Pos2, StrokeKind};
-use std::time::Instant;
+use eframe::egui::{self, Color32, Frame, Pos2, Stroke, StrokeKind, Vec2};
 use std::f32::consts::PI;
+use std::time::Instant;
 
 const STALE_TIMEOUT_SECONDS: u64 = 1;
 const WHEELBASE_M: f32 = 1.530; // Standard Formula Student wheelbase
@@ -255,7 +255,10 @@ impl Dynamics {
         self.draw_yaw_rotation_arrow(painter, center, pixels_per_meter, theme);
 
         // 6. Labels
-        let label_top_left = Pos2::new(center.x - 110.0, center.y - (CHASSIS_LENGTH_M * pixels_per_meter / 2.0) - 48.0);
+        let label_top_left = Pos2::new(
+            center.x - 110.0,
+            center.y - (CHASSIS_LENGTH_M * pixels_per_meter / 2.0) - 48.0,
+        );
         painter.text(
             label_top_left,
             egui::Align2::LEFT_TOP,
@@ -305,7 +308,8 @@ impl Dynamics {
         }
 
         let yaw_norm = (yaw_abs / YAW_RATE_MAX_FOR_DRAW).clamp(0.0, 1.0);
-        let sweep = YAW_ARC_MIN_SWEEP_RAD + yaw_norm * (YAW_ARC_MAX_SWEEP_RAD - YAW_ARC_MIN_SWEEP_RAD);
+        let sweep =
+            YAW_ARC_MIN_SWEEP_RAD + yaw_norm * (YAW_ARC_MAX_SWEEP_RAD - YAW_ARC_MIN_SWEEP_RAD);
         let direction = if self.yaw_rate_rads >= 0.0 { 1.0 } else { -1.0 };
         let start_angle = -PI / 2.0;
         let end_angle = start_angle + direction * sweep;
@@ -326,8 +330,9 @@ impl Dynamics {
     }
 
     fn point_on_circle(center: Pos2, radius: f32, angle: f32) -> Pos2 {
-        Pos2::new(center.x + radius * angle.cos(), center.y + radius * angle.sin())
+        Pos2::new(
+            center.x + radius * angle.cos(),
+            center.y + radius * angle.sin(),
+        )
     }
 }
-
-
