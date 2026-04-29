@@ -4,6 +4,7 @@ use rand::prelude::*;
 use serialport::{ClearBuffer, SerialPort};
 use slcan::sync::CanSocket;
 use slcan::{CanFrame, NominalBitRate, OperatingMode};
+use std::collections::VecDeque;
 use std::net::UdpSocket;
 use std::time::Duration;
 
@@ -278,6 +279,57 @@ impl Driver for SimulatedDriver {
     }
 }
 
+struct LoopbackDriver {
+    connected: bool,
+    queued_frames: VecDeque<CanFrame>,
+}
+
+impl LoopbackDriver {
+    fn new() -> Self {
+        Self {
+            connected: true,
+            queued_frames: VecDeque::new(),
+        }
+    }
+}
+
+impl Driver for LoopbackDriver {
+    fn read_frames(&mut self) -> DriverResult<Vec<CanFrame>> {
+        if !self.connected {
+            return Err(DriverError::ReadError(DriverReadError::Other(
+                "Loopback driver is disconnected".into(),
+            )));
+        }
+
+        if self.queued_frames.is_empty() {
+            return Err(DriverError::ReadError(DriverReadError::Timeout));
+        }
+
+        Ok(self.queued_frames.drain(..).collect())
+    }
+
+    fn write_frame(&mut self, frame: CanFrame) -> DriverResult<()> {
+        if self.connected {
+            self.queued_frames.push_back(frame);
+            Ok(())
+        } else {
+            Err(DriverError::WriteError(
+                "Loopback driver is disconnected".into(),
+            ))
+        }
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    fn close(&mut self) -> DriverResult<()> {
+        self.connected = false;
+        self.queued_frames.clear();
+        Ok(())
+    }
+}
+
 pub fn parse_udp_buffer(
     buf: &[u8; UDP_MAX_PACKET_SIZE],
     num_bytes: usize,
@@ -357,5 +409,6 @@ pub fn create_driver(source: &ConnectionSource) -> DriverResult<Box<dyn Driver>>
             *connected,
             dbc_path.clone(),
         )?)),
+        ConnectionSource::Loopback => Ok(Box::new(LoopbackDriver::new())),
     }
 }

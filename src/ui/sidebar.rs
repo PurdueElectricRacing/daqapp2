@@ -160,6 +160,20 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                                 app.save_settings();
                             }
                         }
+                        ui.separator();
+                        ui.label("Development");
+                        let loopback_source = connection::ConnectionSource::Loopback;
+                        if ui
+                            .selectable_value(
+                                &mut app.selected_source,
+                                Some(loopback_source),
+                                "Loopback",
+                            )
+                            .changed()
+                        {
+                            app.connect_can();
+                            app.save_settings();
+                        }
                     });
 
                 if ui.button("🔄").clicked() {
