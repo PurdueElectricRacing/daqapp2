@@ -87,7 +87,7 @@ impl BatteryViewer {
                                     cell_num = Some(v.round() as usize);
                                 }
                             }
-                            "cell_voltage" => {
+                            "voltage" => {
                                 if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
                                     voltage = Some(*v);
                                 }
