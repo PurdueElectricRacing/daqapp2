@@ -97,7 +97,7 @@ impl Scope {
             // Window duration slider
             ui.label("Window Duration:");
             ui.add(
-                egui::Slider::new(&mut self.window_duration_seconds, 1.0..=120.0)
+                egui::Slider::new(&mut self.window_duration_seconds, 1.0..=900.0)
                     .suffix(" seconds"),
             );
 
