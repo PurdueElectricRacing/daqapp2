@@ -1,10 +1,8 @@
 use crate::{messages, ui};
 use chrono::DateTime;
-use eframe::egui::{self, Color32, Frame, Stroke};
+use eframe::egui;
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
 
-const STALE_TIMEOUT_SECONDS: u64 = 1;
 /// Safety cap so a mis-set window / flood cannot grow without bound.
 const MAX_HISTORY_POINTS: usize = 500_000;
 const AXIS_LIMIT_G: f32 = 2.0;
@@ -21,12 +19,8 @@ fn vehicle_accel_to_plot_xy(ax_g: f32, ay_g: f32) -> [f64; 2] {
 
 pub struct GgPlot {
     pub title: String,
-    /// IMU sample time and vehicle-frame acceleration (g).
     points_g: VecDeque<(DateTime<chrono::Local>, f32, f32)>,
-    /// How long to keep samples (matches Scope-style time window, in minutes).
     history_window_minutes: f64,
-    last_update: Instant,
-    is_data_stale: bool,
 }
 
 impl GgPlot {
@@ -35,8 +29,6 @@ impl GgPlot {
             title: format!("G-G Plot #{}", instance_num),
             points_g: VecDeque::new(),
             history_window_minutes: 5.0,
-            last_update: Instant::now() - Duration::from_secs(10),
-            is_data_stale: true,
         }
     }
 
@@ -93,20 +85,14 @@ impl GgPlot {
                 self.points_g
                     .push_back((parsed.timestamp, ax, ay));
                 self.prune_points_to_window();
-
-                self.last_update = Instant::now();
-                self.is_data_stale = false;
             }
         }
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         let theme = ui::theme::get_theme(ui.ctx());
-        self.is_data_stale = self.last_update.elapsed() > Duration::from_secs(STALE_TIMEOUT_SECONDS);
         self.prune_points_to_window();
 
-        self.draw_status_banner(ui, &theme);
-        ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.label("Retention:");
             ui.add(
@@ -130,9 +116,8 @@ impl GgPlot {
             .include_y(-axis_limit)
             .include_y(axis_limit)
             .show_axes([true, true])
-            // Vehicle: +X forward (Ax), +Y left (Ay). egui_plot: plot x = −Ay, plot y = Ax.
-            .x_axis_label("plot x = −Ay (g)")
-            .y_axis_label("plot y = Ax (g)")
+            .x_axis_label("Longitudinal acceleration")
+            .y_axis_label("Lateral acceleration")
             .show(ui, |plot_ui| {
                 for radius in [0.5, 1.0, 1.5] {
                     let mut points = Vec::with_capacity(65);
@@ -177,38 +162,5 @@ impl GgPlot {
             });
 
         egui_tiles::UiResponse::None
-    }
-
-    fn draw_status_banner(&self, ui: &mut egui::Ui, theme: &ui::theme::ThemeColors) {
-        let elapsed = self.last_update.elapsed().as_secs_f64();
-        let (bg, dot, text) = if self.is_data_stale {
-            let c = theme.warning_color();
-            (
-                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 30),
-                c,
-                format!("No data — last message {:.1} s ago", elapsed),
-            )
-        } else {
-            let c = theme.success_color();
-            (
-                Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 30),
-                c,
-                format!("Live — last message {:.1} s ago", elapsed),
-            )
-        };
-        Frame::NONE
-            .fill(bg)
-            .stroke(Stroke::new(1.0, dot.linear_multiply(0.5)))
-            .inner_margin(egui::Margin::symmetric(10, 6))
-            .corner_radius(egui::CornerRadius::same(4))
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    let (rect, _) =
-                        ui.allocate_exact_size(egui::Vec2::splat(8.0), egui::Sense::hover());
-                    ui.painter().circle_filled(rect.center(), 4.0, dot);
-                    ui.add_space(4.0);
-                    ui.colored_label(dot, text);
-                });
-            });
     }
 }
