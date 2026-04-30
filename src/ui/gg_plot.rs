@@ -82,8 +82,7 @@ impl GgPlot {
             }
 
             if let (Some(ax), Some(ay)) = (forward_g, left_g) {
-                self.points_g
-                    .push_back((parsed.timestamp, ax, ay));
+                self.points_g.push_back((parsed.timestamp, ax, ay));
                 self.prune_points_to_window();
             }
         }
@@ -95,9 +94,7 @@ impl GgPlot {
 
         ui.horizontal(|ui| {
             ui.label("Retention:");
-            ui.add(
-                egui::Slider::new(&mut self.history_window_minutes, 0.5..=20.0).suffix(" min"),
-            );
+            ui.add(egui::Slider::new(&mut self.history_window_minutes, 0.5..=20.0).suffix(" min"));
             ui.separator();
             if ui.button("🗑 Clear").clicked() {
                 self.points_g.clear();
