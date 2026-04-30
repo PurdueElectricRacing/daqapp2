@@ -1,10 +1,12 @@
 use crate::{messages, ui};
+use chrono::DateTime;
 use eframe::egui::{self, Color32, Frame, Stroke};
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 const STALE_TIMEOUT_SECONDS: u64 = 1;
-const MAX_HISTORY_POINTS: usize = 350;
+/// Safety cap so a mis-set window / flood cannot grow without bound.
+const MAX_HISTORY_POINTS: usize = 500_000;
 const AXIS_LIMIT_G: f32 = 2.0;
 const IMU_ACCEL_MSG_NAME: &str = "IMU_acceleration";
 /// DBC is vehicle frame: +X forward, +Y left (g).
@@ -19,9 +21,10 @@ fn vehicle_accel_to_plot_xy(ax_g: f32, ay_g: f32) -> [f64; 2] {
 
 pub struct GgPlot {
     pub title: String,
-    accel_x_g: f32,
-    accel_y_g: f32,
-    points_g: VecDeque<(f32, f32)>, // (forward X+, left Y+) in g
+    /// IMU sample time and vehicle-frame acceleration (g).
+    points_g: VecDeque<(DateTime<chrono::Local>, f32, f32)>,
+    /// How long to keep samples (matches Scope-style time window, in minutes).
+    history_window_minutes: f64,
     last_update: Instant,
     is_data_stale: bool,
 }
@@ -30,11 +33,35 @@ impl GgPlot {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("G-G Plot #{}", instance_num),
-            accel_x_g: 0.0,
-            accel_y_g: 0.0,
-            points_g: VecDeque::with_capacity(MAX_HISTORY_POINTS),
+            points_g: VecDeque::new(),
+            history_window_minutes: 5.0,
             last_update: Instant::now() - Duration::from_secs(10),
             is_data_stale: true,
+        }
+    }
+
+    fn retention_chrono(&self) -> chrono::Duration {
+        let window = std::time::Duration::from_secs_f64(self.history_window_minutes * 60.0);
+        chrono::Duration::from_std(window).unwrap_or_else(|_| chrono::Duration::zero())
+    }
+
+    fn prune_points_to_window(&mut self) {
+        if self.points_g.is_empty() {
+            return;
+        }
+        let Some((newest, _, _)) = self.points_g.back().cloned() else {
+            return;
+        };
+        let cutoff = newest - self.retention_chrono();
+        while let Some((t, _, _)) = self.points_g.front() {
+            if *t < cutoff {
+                self.points_g.pop_front();
+            } else {
+                break;
+            }
+        }
+        while self.points_g.len() > MAX_HISTORY_POINTS {
+            self.points_g.pop_front();
         }
     }
 
@@ -63,12 +90,9 @@ impl GgPlot {
             }
 
             if let (Some(ax), Some(ay)) = (forward_g, left_g) {
-                self.accel_x_g = ax;
-                self.accel_y_g = ay;
-                self.points_g.push_back((ax, ay));
-                while self.points_g.len() > MAX_HISTORY_POINTS {
-                    self.points_g.pop_front();
-                }
+                self.points_g
+                    .push_back((parsed.timestamp, ax, ay));
+                self.prune_points_to_window();
 
                 self.last_update = Instant::now();
                 self.is_data_stale = false;
@@ -79,10 +103,16 @@ impl GgPlot {
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         let theme = ui::theme::get_theme(ui.ctx());
         self.is_data_stale = self.last_update.elapsed() > Duration::from_secs(STALE_TIMEOUT_SECONDS);
+        self.prune_points_to_window();
 
         self.draw_status_banner(ui, &theme);
         ui.add_space(6.0);
         ui.horizontal(|ui| {
+            ui.label("Retention:");
+            ui.add(
+                egui::Slider::new(&mut self.history_window_minutes, 0.5..=20.0).suffix(" min"),
+            );
+            ui.separator();
             if ui.button("🗑 Clear").clicked() {
                 self.points_g.clear();
             }
@@ -122,7 +152,7 @@ impl GgPlot {
                 let trail: Vec<[f64; 2]> = self
                     .points_g
                     .iter()
-                    .map(|(ax_g, ay_g)| vehicle_accel_to_plot_xy(*ax_g, *ay_g))
+                    .map(|(_, ax_g, ay_g)| vehicle_accel_to_plot_xy(*ax_g, *ay_g))
                     .collect();
                 if !trail.is_empty() {
                     plot_ui.points(
@@ -132,7 +162,7 @@ impl GgPlot {
                     );
                 }
 
-                if let Some((ax_g, ay_g)) = self.points_g.back() {
+                if let Some((_, ax_g, ay_g)) = self.points_g.back() {
                     plot_ui.points(
                         egui_plot::Points::new(
                             "current",
@@ -145,15 +175,6 @@ impl GgPlot {
                     );
                 }
             });
-
-        ui.add_space(6.0);
-        let mag_g = (self.accel_x_g.powi(2) + self.accel_y_g.powi(2)).sqrt();
-        ui.label(format!(
-            "Vehicle Ax (fwd+): {:+.2} g | Ay (left+): {:+.2} g",
-            self.accel_x_g, self.accel_y_g
-        ));
-        ui.label(format!("|a|: {:.2} g", mag_g));
-        ui.label(egui::RichText::new("Plot: x = −Ay, y = Ax (vehicle frame → egui axes)").weak());
 
         egui_tiles::UiResponse::None
     }
