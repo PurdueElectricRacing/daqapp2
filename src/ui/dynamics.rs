@@ -310,7 +310,8 @@ impl Dynamics {
         let yaw_norm = (yaw_abs / YAW_RATE_MAX_FOR_DRAW).clamp(0.0, 1.0);
         let sweep =
             YAW_ARC_MIN_SWEEP_RAD + yaw_norm * (YAW_ARC_MAX_SWEEP_RAD - YAW_ARC_MIN_SWEEP_RAD);
-        let direction = if self.yaw_rate_rads >= 0.0 { 1.0 } else { -1.0 };
+        // egui screen-space has +Y downward, so positive yaw (CCW) needs negative angle sweep.
+        let direction = if self.yaw_rate_rads >= 0.0 { -1.0 } else { 1.0 };
         let start_angle = -PI / 2.0;
         let end_angle = start_angle + direction * sweep;
         let radius = pixels_per_meter * (CHASSIS_WIDTH_M * 0.75);
