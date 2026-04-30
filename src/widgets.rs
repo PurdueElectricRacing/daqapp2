@@ -11,7 +11,7 @@ pub enum Widget {
     BusLoad(ui::bus_load::BusLoad),
     BatteryViewer(ui::battery::BatteryViewer),
     GgPlot(ui::gg_plot::GgPlot),
-    Dynamics(ui::dynamics::Dynamics)
+    Dynamics(ui::dynamics::Dynamics),
 }
 
 impl Widget {

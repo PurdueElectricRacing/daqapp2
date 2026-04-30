@@ -22,7 +22,7 @@ pub enum WidgetType {
     BusLoad,
     BatteryViewer,
     GgPlot,
-    Dynamics
+    Dynamics,
 }
 
 impl AppAction {
@@ -36,7 +36,7 @@ impl AppAction {
             ("Spawn Bus Load", WidgetType::BusLoad),
             ("Spawn Battery Viewer", WidgetType::BatteryViewer),
             ("Spawn G-G Plot", WidgetType::GgPlot),
-            ("Spawn Dynamics", WidgetType::Dynamics)
+            ("Spawn Dynamics", WidgetType::Dynamics),
         ]
     }
 }
