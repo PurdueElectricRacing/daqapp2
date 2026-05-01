@@ -1,11 +1,12 @@
 use crate::{app, messages, util};
 use eframe::egui;
 
+use super::dbc_msg_picker::{no_dbc_placeholder, DbcMsgPickerState};
+
 pub struct Jitter {
     pub title: String,
 
-    search_text: String,
-    search_results: Vec<can_dbc::Message>,
+    msg_picker: DbcMsgPickerState,
 
     selected_msg: Option<can_dbc::Message>,
     period_ms: usize,
@@ -23,8 +24,7 @@ impl Jitter {
         Self {
             title: format!("Jitter #{}", instance_num),
 
-            search_text: String::new(),
-            search_results: Vec::new(),
+            msg_picker: DbcMsgPickerState::default(),
 
             selected_msg: None,
             period_ms: 100,
@@ -87,12 +87,7 @@ impl Jitter {
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         let Some(parser) = parser else {
-            ui.vertical_centered(|ui| {
-                ui.label("No DBC selected yet.");
-                ui.label("CMD+S to toggle the sidebar.");
-                ui.label("Use the sidebar to select a DBC file");
-            });
-
+            no_dbc_placeholder(ui);
             return egui_tiles::UiResponse::None;
         };
 
@@ -103,70 +98,11 @@ impl Jitter {
             .stroke(egui::Stroke::NONE)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.label("Search:");
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut self.search_text)
-                                    .hint_text("Message name..."),
-                            )
-                            .changed()
-                        {
-                            if self.search_text.is_empty() {
-                                self.search_results.clear();
-                            } else if self.search_text.trim() == "*" {
-                                self.search_results = parser.parser.msg_defs().clone();
-                            } else {
-                                let search_lower = self.search_text.to_lowercase();
-                                self.search_results = parser
-                                    .parser
-                                    .msg_defs()
-                                    .iter()
-                                    .filter(|msg| {
-                                        let id_str = format!(
-                                            "0x{:03X}",
-                                            util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id)
-                                        );
-                                        id_str.contains(&search_lower)
-                                            || msg.name.to_lowercase().contains(&search_lower)
-                                    })
-                                    .cloned()
-                                    .collect();
-                            }
-                        }
-                    });
-
-                    ui.add_space(8.0);
-
-                    if self.search_results.is_empty() && !self.search_text.is_empty() {
-                        ui.label(egui::RichText::new("No messages found.").italics().weak());
-                    } else if self.search_text.is_empty() && self.selected_msg.is_none() {
-                        ui.label(
-                            egui::RichText::new(
-                                "Start typing to search for messages... (Use * to show all messages.)",
-                            )
-                            .italics()
-                            .weak(),
-                        );
-                    } else {
-                        let mut should_clear_search = false;
-                        for msg in &self.search_results {
-                            if ui
-                                .button(format!(
-                                    "{} (0x{:03X})",
-                                    msg.name,
-                                    util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id)
-                                ))
-                                .clicked()
-                            {
-                                self.selected_msg = Some(msg.clone());
-                                should_clear_search = true;
-                            }
-                        }
-                        if should_clear_search {
-                            self.search_text.clear();
-                            self.search_results.clear();
-                        }
+                    if let Some(msg) =
+                        self.msg_picker
+                            .show(ui, &parser.parser, self.selected_msg.is_none())
+                    {
+                        self.selected_msg = Some(msg);
                     }
 
                     if let Some(selected_msg) = &self.selected_msg {

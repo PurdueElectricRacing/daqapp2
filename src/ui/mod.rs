@@ -2,6 +2,7 @@ pub mod battery;
 pub mod bootloader;
 pub mod bus_load;
 pub mod command_palette;
+pub mod dbc_msg_picker;
 pub mod dynamics;
 pub mod gg_plot;
 pub mod jitter;
