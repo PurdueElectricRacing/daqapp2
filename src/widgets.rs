@@ -12,6 +12,7 @@ pub enum Widget {
     BatteryViewer(ui::battery::BatteryViewer),
     GgPlot(ui::gg_plot::GgPlot),
     Dynamics(ui::dynamics::Dynamics),
+    Jitter(ui::jitter::Jitter),
 }
 
 impl Widget {
@@ -27,6 +28,7 @@ impl Widget {
             Widget::BatteryViewer(w) => &w.title,
             Widget::GgPlot(w) => &w.title,
             Widget::Dynamics(w) => &w.title,
+            Widget::Jitter(w) => &w.title,
         }
     }
 
@@ -61,6 +63,7 @@ impl Widget {
             Widget::BatteryViewer(w) => w.show(ui),
             Widget::GgPlot(w) => w.show(ui),
             Widget::Dynamics(w) => w.show(ui),
+            Widget::Jitter(w) => w.show(ui, parser),
         }
     }
 
@@ -74,6 +77,7 @@ impl Widget {
             Widget::BatteryViewer(w) => w.handle_can_message(msg),
             Widget::GgPlot(w) => w.handle_can_message(msg),
             Widget::Dynamics(w) => w.handle_can_message(msg),
+            Widget::Jitter(w) => w.handle_can_message(msg),
             _ => {}
         }
     }
