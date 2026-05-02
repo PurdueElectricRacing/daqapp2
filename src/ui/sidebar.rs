@@ -92,6 +92,37 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.heading("Connection Settings");
 
             ui.horizontal(|ui| {
+                ui.label("CAN Speed:");
+                let speed_options = connection::CanBusSpeed::options();
+                let selected_speed = app.can_bus_speed;
+                egui::ComboBox::from_id_salt("can_speed_combo")
+                    .selected_text(selected_speed.display_name())
+                    .show_ui(ui, |ui| {
+                        for speed in speed_options {
+                            if ui
+                                .selectable_value(
+                                    &mut app.can_bus_speed,
+                                    speed,
+                                    speed.display_name(),
+                                )
+                                .changed()
+                            {
+                                if let &mut Some(connection::ConnectionSource::Serial(
+                                    _,
+                                    ref mut selected_speed,
+                                )) = &mut app.selected_source
+                                {
+                                    *selected_speed = app.can_bus_speed;
+                                }
+
+                                app.connect_can();
+                                app.save_settings();
+                            }
+                        }
+                    });
+            });
+
+            ui.horizontal(|ui| {
                 ui.label("UDP Port:");
                 if ui
                     .add(egui::DragValue::new(&mut app.udp_port).range(1..=65535))
@@ -117,12 +148,15 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                             .map(|p| p.port_name.clone())
                             .collect();
                         for port_name in ports {
-                            let source = connection::ConnectionSource::Serial(port_name.clone());
+                            let source = connection::ConnectionSource::Serial(
+                                port_name.clone(),
+                                app.can_bus_speed,
+                            );
                             if ui
                                 .selectable_value(
                                     &mut app.selected_source,
                                     Some(source.clone()),
-                                    &port_name,
+                                    format!("{} ({})", port_name, app.can_bus_speed.display_name()),
                                 )
                                 .changed()
                             {
