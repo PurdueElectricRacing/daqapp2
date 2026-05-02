@@ -1,7 +1,7 @@
 use crate::{app, messages, util};
 use eframe::egui;
 
-use super::dbc_msg_picker::{no_dbc_placeholder, DbcMsgPickerState};
+use super::dbc_msg_picker::{DbcMsgPickerState, no_dbc_placeholder};
 
 pub struct SendUi {
     pub title: String,
@@ -210,8 +210,8 @@ impl SendUi {
                                 if ui
                                     .add(
                                         egui::DragValue::new(&mut signal.value)
-                                        .range(signal.min..=signal.max)
-                                        .speed(0.1),
+                                            .range(signal.min..=signal.max)
+                                            .speed(0.1),
                                     )
                                     .changed()
                                 {
@@ -223,8 +223,11 @@ impl SendUi {
                         if ui.button("Send Message").clicked() {
                             let msg_id_with_ext_flag =
                                 util::msg_id::can_dbc_to_u32_with_extid_flag(&selected_msg.id);
-                            let encoded =
-                                encode_msg_from_signals(&parser.parser, msg_id_with_ext_flag, &self.signal_values);
+                            let encoded = encode_msg_from_signals(
+                                &parser.parser,
+                                msg_id_with_ext_flag,
+                                &self.signal_values,
+                            );
 
                             let Some(msg_bytes) = encoded else {
                                 self.error = Some(
@@ -270,7 +273,10 @@ impl SendUi {
                             let add_send_msg = messages::AddSendMessage {
                                 amount: send_amount,
                                 msg_id: msg_id_u32,
-                                is_msg_id_extended: matches!(selected_msg.id, can_dbc::MessageId::Extended(_)),
+                                is_msg_id_extended: matches!(
+                                    selected_msg.id,
+                                    can_dbc::MessageId::Extended(_)
+                                ),
                                 msg_bytes,
                             };
 
@@ -325,12 +331,15 @@ impl SendUi {
                         self.error = None;
 
                         self.ui_to_can_tx
-                            .send(messages::MsgFromUi::AddSendMessage(messages::AddSendMessage {
-                                amount: self.sending_messages[idx].amount,
-                                msg_id: self.sending_messages[idx].msg_id,
-                                is_msg_id_extended: self.sending_messages[idx].is_msg_id_extended,
-                                msg_bytes,
-                            }))
+                            .send(messages::MsgFromUi::AddSendMessage(
+                                messages::AddSendMessage {
+                                    amount: self.sending_messages[idx].amount,
+                                    msg_id: self.sending_messages[idx].msg_id,
+                                    is_msg_id_extended: self.sending_messages[idx]
+                                        .is_msg_id_extended,
+                                    msg_bytes,
+                                },
+                            ))
                             .expect("Failed to send AddSendMessage");
                     }
 

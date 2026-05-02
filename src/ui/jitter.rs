@@ -1,7 +1,7 @@
 use crate::{app, messages, util};
 use eframe::egui;
 
-use super::dbc_msg_picker::{no_dbc_placeholder, DbcMsgPickerState};
+use super::dbc_msg_picker::{DbcMsgPickerState, no_dbc_placeholder};
 
 pub struct Jitter {
     pub title: String,
@@ -159,11 +159,7 @@ impl Jitter {
                         ui.label(egui::RichText::new("Statistics").strong());
                         ui.label("(Absolute deviation from nominal period, % of period)");
 
-                        let status = if self.active {
-                            "Monitoring"
-                        } else {
-                            "Stopped"
-                        };
+                        let status = if self.active { "Monitoring" } else { "Stopped" };
                         ui.label(format!("Status: {}", status));
 
                         if self.interval_count == 0 {
@@ -175,10 +171,7 @@ impl Jitter {
                         } else {
                             let avg = self.sum_pct / self.interval_count as f64;
                             ui.label(format!("Intervals recorded: {}", self.interval_count));
-                            ui.label(format!(
-                                "Max: {:.2}%    Avg: {:.2}%",
-                                self.max_pct, avg
-                            ));
+                            ui.label(format!("Max: {:.2}%    Avg: {:.2}%", self.max_pct, avg));
                         }
                     }
                 });

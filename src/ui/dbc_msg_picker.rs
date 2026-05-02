@@ -22,9 +22,12 @@ impl DbcMsgPickerState {
                 .msg_defs()
                 .iter()
                 .filter(|msg| {
-                    let id_str =
-                        format!("0x{:03X}", util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id));
-                    id_str.contains(&search_lower) || msg.name.to_lowercase().contains(&search_lower)
+                    let id_str = format!(
+                        "0x{:03X}",
+                        util::msg_id::can_dbc_to_u32_without_extid_flag(&msg.id)
+                    );
+                    id_str.contains(&search_lower)
+                        || msg.name.to_lowercase().contains(&search_lower)
                 })
                 .cloned()
                 .collect();
@@ -42,9 +45,7 @@ impl DbcMsgPickerState {
         ui.horizontal(|ui| {
             ui.label("Search:");
             if ui
-                .add(
-                    egui::TextEdit::singleline(&mut self.search_text).hint_text("Message name..."),
-                )
+                .add(egui::TextEdit::singleline(&mut self.search_text).hint_text("Message name..."))
                 .changed()
             {
                 self.refresh_results(parser);

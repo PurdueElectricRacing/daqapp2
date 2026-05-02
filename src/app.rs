@@ -193,9 +193,9 @@ impl DAQApp {
                     action::WidgetType::Dynamics => widgets::Widget::Dynamics(
                         ui::dynamics::Dynamics::new(self.next_dynamics_num),
                     ),
-                    action::WidgetType::Jitter => widgets::Widget::Jitter(ui::jitter::Jitter::new(
-                        self.next_jitter_num,
-                    )),
+                    action::WidgetType::Jitter => {
+                        widgets::Widget::Jitter(ui::jitter::Jitter::new(self.next_jitter_num))
+                    }
                 };
                 self.add_widget_to_tree(widget);
 
