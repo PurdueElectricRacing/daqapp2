@@ -83,6 +83,10 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 app.action_queue
                     .push(action::AppAction::SpawnWidget(action::WidgetType::Dynamics));
             }
+            if ui.button("Add Jitter").clicked() {
+                app.action_queue
+                    .push(action::AppAction::SpawnWidget(action::WidgetType::Jitter));
+            }
 
             ui.separator();
             ui.heading("Connection Settings");

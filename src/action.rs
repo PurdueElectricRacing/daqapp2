@@ -23,6 +23,7 @@ pub enum WidgetType {
     BatteryViewer,
     GgPlot,
     Dynamics,
+    Jitter,
 }
 
 impl AppAction {
@@ -37,6 +38,7 @@ impl AppAction {
             ("Spawn Battery Viewer", WidgetType::BatteryViewer),
             ("Spawn G-G Plot", WidgetType::GgPlot),
             ("Spawn Dynamics", WidgetType::Dynamics),
+            ("Spawn Jitter", WidgetType::Jitter),
         ]
     }
 }
