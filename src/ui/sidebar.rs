@@ -95,7 +95,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 ui.label("CAN Speed:");
                 let speed_options = connection::CanBusSpeed::options();
                 let selected_speed = app.can_bus_speed;
-                egui::ComboBox::from_label("")
+                egui::ComboBox::from_id_salt("can_speed_combo")
                     .selected_text(selected_speed.display_name())
                     .show_ui(ui, |ui| {
                         for speed in speed_options {
