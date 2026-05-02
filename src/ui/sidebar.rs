@@ -145,9 +145,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                         let ports: Vec<_> = app
                             .serial_ports
                             .iter()
-                            .map(|p| {
-                                format!("{} ({})", p.port_name, app.can_bus_speed.display_name())
-                            })
+                            .map(|p| p.port_name.clone())
                             .collect();
                         for port_name in ports {
                             let source = connection::ConnectionSource::Serial(
@@ -158,7 +156,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                                 .selectable_value(
                                     &mut app.selected_source,
                                     Some(source.clone()),
-                                    &port_name,
+                                    format!("{} ({})", port_name, app.can_bus_speed.display_name()),
                                 )
                                 .changed()
                             {
