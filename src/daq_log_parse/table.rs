@@ -7,6 +7,7 @@ pub struct TableBuilder {
     node_row: Vec<String>,
     message_row: Vec<String>,
     signal_row: Vec<String>,
+    unit_row: Vec<String>,
 
     // Key is (bus name, msg name, signal name), value is column index
     indexer: std::collections::HashMap<(String, String, String), usize>,
@@ -15,15 +16,16 @@ pub struct TableBuilder {
 
 impl TableBuilder {
     pub fn new() -> Self {
-        let mut tb = Self {
+        Self {
             bus_row: vec!["Bus".to_string()],
             node_row: vec!["Node".to_string()],
             message_row: vec!["Message".to_string()],
             signal_row: vec!["Signal".to_string()],
+            unit_row: vec!["Unit".to_string()],
+
             next_col_idx: 1,
             indexer: std::collections::HashMap::new(),
-        };
-        tb
+        }
     }
 
     pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name: &str) {
@@ -49,6 +51,7 @@ impl TableBuilder {
                     self.node_row.push(node.to_string());
                     self.message_row.push(msg.name.to_string());
                     self.signal_row.push(sig.name.to_string());
+                    self.unit_row.push(sig.unit.clone());
                     self.next_col_idx += 1;
                 }
             }
@@ -68,6 +71,7 @@ impl TableBuilder {
                 self.node_row.clone(),
                 self.message_row.clone(),
                 self.signal_row.clone(),
+                self.unit_row.clone(),
             ];
 
             let first_time = chunk.first().map(|m| m.timestamp).unwrap_or(0);
