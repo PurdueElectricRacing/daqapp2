@@ -107,6 +107,14 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                                 )
                                 .changed()
                             {
+                                if let &mut Some(connection::ConnectionSource::Serial(
+                                    _,
+                                    ref mut selected_speed,
+                                )) = &mut app.selected_source
+                                {
+                                    *selected_speed = app.can_bus_speed;
+                                }
+
                                 app.connect_can();
                                 app.save_settings();
                             }
