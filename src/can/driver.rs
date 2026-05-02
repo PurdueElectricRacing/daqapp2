@@ -1,4 +1,4 @@
-use crate::connection::ConnectionSource;
+use crate::connection::{CanBusSpeed, ConnectionSource};
 use crate::util;
 use rand::prelude::*;
 use serialport::{ClearBuffer, SerialPort};
@@ -47,7 +47,7 @@ pub struct SerialDriver {
 }
 
 impl SerialDriver {
-    pub fn new(port_path: &str) -> DriverResult<Self> {
+    pub fn new(port_path: &str, speed: CanBusSpeed) -> DriverResult<Self> {
         let port = serialport::new(port_path, SERIAL_BAUD_RATE)
             .timeout(Duration::from_millis(SERIAL_TIMEOUT_MS))
             .open()
@@ -65,7 +65,7 @@ impl SerialDriver {
             })?;
 
         socket
-            .open(NominalBitRate::Rate500Kbit)
+            .open(speed.to_slcan_bitrate())
             .map_err(|e| DriverError::ConnectionFailed(format!("Failed to open CAN: {}", e)))?;
 
         Ok(Self {
@@ -403,7 +403,7 @@ pub fn parse_udp_buffer(
 
 pub fn create_driver(source: &ConnectionSource) -> DriverResult<Box<dyn Driver>> {
     match source {
-        ConnectionSource::Serial(path) => Ok(Box::new(SerialDriver::new(path)?)),
+        ConnectionSource::Serial(path, speed) => Ok(Box::new(SerialDriver::new(path, *speed)?)),
         ConnectionSource::Udp(port) => Ok(Box::new(UdpDriver::new(*port)?)),
         ConnectionSource::Simulated(connected, dbc_path) => Ok(Box::new(SimulatedDriver::new(
             *connected,
