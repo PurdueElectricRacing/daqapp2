@@ -40,7 +40,7 @@ impl CanBusSpeed {
         }
     }
 
-    pub fn to_slcan_bitrate(&self) -> slcan::NominalBitRate {
+    pub fn to_slcan_bitrate(self) -> slcan::NominalBitRate {
         match self {
             CanBusSpeed::Kbps250 => slcan::NominalBitRate::Rate250Kbit,
             CanBusSpeed::Kbps500 => slcan::NominalBitRate::Rate500Kbit,
