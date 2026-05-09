@@ -114,6 +114,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                                 )
                                 .changed()
                             {
+                                app.serial_ports = util::get_available_serial_ports();
                                 app.save_settings();
                             }
                         }
