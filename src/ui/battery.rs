@@ -38,6 +38,7 @@ impl CellData {
     }
 }
 
+#[derive(Default)]
 struct ChargingTelemetry {
     pack_voltage: f64,
     pack_current: f64,
@@ -77,26 +78,10 @@ impl BatteryViewer {
 
                     for (_, sig) in parsed.decoded.signals.iter() {
                         match sig.name.as_str() {
-                            "module_num" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    module_num = Some(v.round() as usize);
-                                }
-                            }
-                            "cell_num" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    cell_num = Some(v.round() as usize);
-                                }
-                            }
-                            "voltage" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    voltage = Some(*v);
-                                }
-                            }
-                            "balance_status" => {
-                                if let can_decode::DecodedSignalValue::Enum(v, _) = &sig.value {
-                                    balancing = Some(*v != 0);
-                                }
-                            }
+                            "module_num" => module_num = Some(sig.value.physical.round() as usize),
+                            "cell_num" => cell_num = Some(sig.value.physical.round() as usize),
+                            "voltage" => voltage = Some(sig.value.physical),
+                            "balance_status" => balancing = Some(sig.value.physical.abs() < 0.01),
                             _ => {}
                         }
                     }
@@ -117,52 +102,22 @@ impl BatteryViewer {
                     for (_, sig) in parsed.decoded.signals.iter() {
                         match sig.name.as_str() {
                             "pack_voltage" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.charging_telemetry
-                                        .get_or_insert(ChargingTelemetry {
-                                            pack_voltage: *v,
-                                            pack_current: 0.0,
-                                            min_cell_voltage: 0.0,
-                                            max_cell_voltage: 0.0,
-                                        })
-                                        .pack_voltage = *v;
-                                }
+                                self.charging_telemetry.get_or_insert_default().pack_voltage =
+                                    sig.value.physical;
                             }
                             "pack_current" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.charging_telemetry
-                                        .get_or_insert(ChargingTelemetry {
-                                            pack_voltage: 0.0,
-                                            pack_current: *v,
-                                            min_cell_voltage: 0.0,
-                                            max_cell_voltage: 0.0,
-                                        })
-                                        .pack_current = *v;
-                                }
+                                self.charging_telemetry.get_or_insert_default().pack_current =
+                                    sig.value.physical;
                             }
                             "min_cell_voltage" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.charging_telemetry
-                                        .get_or_insert(ChargingTelemetry {
-                                            pack_voltage: 0.0,
-                                            pack_current: 0.0,
-                                            min_cell_voltage: *v,
-                                            max_cell_voltage: 0.0,
-                                        })
-                                        .min_cell_voltage = *v;
-                                }
+                                self.charging_telemetry
+                                    .get_or_insert_default()
+                                    .min_cell_voltage = sig.value.physical;
                             }
                             "max_cell_voltage" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.charging_telemetry
-                                        .get_or_insert(ChargingTelemetry {
-                                            pack_voltage: 0.0,
-                                            pack_current: 0.0,
-                                            min_cell_voltage: 0.0,
-                                            max_cell_voltage: *v,
-                                        })
-                                        .max_cell_voltage = *v;
-                                }
+                                self.charging_telemetry
+                                    .get_or_insert_default()
+                                    .max_cell_voltage = sig.value.physical;
                             }
                             _ => {}
                         }

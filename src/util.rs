@@ -45,7 +45,7 @@ pub fn hsv_to_color32(h: f64, s: f64, v: f64) -> eframe::egui::Color32 {
     eframe::egui::Color32::from_rgb(r, g, b)
 }
 
-pub mod msg_id {
+pub mod can {
     const EXTENDED_ID_FLAG: u32 = 0x80000000;
     pub const STANDARD_ID_MASK: u32 = 0x7FF;
     pub const EXTENDED_ID_MASK: u32 = 0x1FFFFFFF;
@@ -89,6 +89,15 @@ pub mod msg_id {
         match id {
             slcan::Id::Standard(sid) => sid.as_raw() as u32 & STANDARD_ID_MASK,
             slcan::Id::Extended(eid) => eid.as_raw() & EXTENDED_ID_MASK,
+        }
+    }
+
+    // Converts all arms of a can_dbc::NumericValue to an f64.
+    pub fn can_dbc_numeric_to_f64(numeric: &can_dbc::NumericValue) -> f64 {
+        match numeric {
+            can_dbc::NumericValue::Uint(v) => *v as f64,
+            can_dbc::NumericValue::Int(v) => *v as f64,
+            can_dbc::NumericValue::Double(v) => *v,
         }
     }
 }

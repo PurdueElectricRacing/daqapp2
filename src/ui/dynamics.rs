@@ -52,16 +52,8 @@ impl Dynamics {
                 "IMU_acceleration" => {
                     for (_, sig) in parsed.decoded.signals.iter() {
                         match sig.name.as_str() {
-                            "X_axis" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.accel_x = *v as f32;
-                                }
-                            }
-                            "Y_axis" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.accel_y = *v as f32;
-                                }
-                            }
+                            "X_axis" => self.accel_x = sig.value.physical as f32,
+                            "Y_axis" => self.accel_y = sig.value.physical as f32,
                             _ => {}
                         }
                     }
@@ -71,11 +63,7 @@ impl Dynamics {
                 "IMU_angular_rate" => {
                     for (_, sig) in parsed.decoded.signals.iter() {
                         match sig.name.as_str() {
-                            "Z_axis" => {
-                                if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                    self.yaw_rate_rads = v.to_radians() as f32; // DBC is in deg/s
-                                }
-                            }
+                            "Z_axis" => self.yaw_rate_rads = sig.value.physical as f32,
                             _ => {}
                         }
                     }
@@ -85,9 +73,7 @@ impl Dynamics {
                 "steering_angle" => {
                     for (_, sig) in parsed.decoded.signals.iter() {
                         if sig.name == "angle" {
-                            if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                                self.steer_angle_rad = v.to_radians() as f32;
-                            }
+                            self.steer_angle_rad = sig.value.physical.to_radians() as f32;
                         }
                     }
                     self.last_update = Instant::now();

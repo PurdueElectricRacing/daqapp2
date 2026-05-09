@@ -152,7 +152,7 @@ impl SendUi {
                             egui::RichText::new(format!(
                                 "Selected Message: {} (0x{:03X})",
                                 selected_msg.name,
-                                util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id)
+                                util::can::can_dbc_to_u32_without_extid_flag(&selected_msg.id)
                             ))
                             .strong()
                             .size(16.0),
@@ -222,7 +222,7 @@ impl SendUi {
 
                         if ui.button("Send Message").clicked() {
                             let msg_id_with_ext_flag =
-                                util::msg_id::can_dbc_to_u32_with_extid_flag(&selected_msg.id);
+                                util::can::can_dbc_to_u32_with_extid_flag(&selected_msg.id);
                             let encoded = encode_msg_from_signals(
                                 &parser.parser,
                                 msg_id_with_ext_flag,
@@ -253,7 +253,7 @@ impl SendUi {
                             };
 
                             let msg_id_u32 =
-                                util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id);
+                                util::can::can_dbc_to_u32_without_extid_flag(&selected_msg.id);
 
                             self.sending_messages.push(SendingMessage {
                                 amount: send_amount,
@@ -496,13 +496,13 @@ fn encode_msg_from_signals(
 
 fn signal_range(sig: &can_dbc::Signal) -> (f64, f64) {
     let fallback = (-1000.0, 1000.0);
-    let mut min = sig.min;
-    let mut max = sig.max;
+
+    let min = util::can::can_dbc_numeric_to_f64(&sig.min);
+    let max = util::can::can_dbc_numeric_to_f64(&sig.max);
 
     if !min.is_finite() || !max.is_finite() || min >= max {
-        min = fallback.0;
-        max = fallback.1;
+        fallback
+    } else {
+        (min, max)
     }
-
-    (min, max)
 }

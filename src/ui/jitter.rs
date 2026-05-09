@@ -48,7 +48,7 @@ impl Jitter {
     fn selected_msg_id(&self) -> Option<u32> {
         self.selected_msg
             .as_ref()
-            .map(|m| util::msg_id::can_dbc_to_u32_without_extid_flag(&m.id))
+            .map(|m| util::can::can_dbc_to_u32_without_extid_flag(&m.id))
     }
 
     pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
@@ -112,7 +112,7 @@ impl Jitter {
                             egui::RichText::new(format!(
                                 "Selected Message: {} (0x{:03X})",
                                 selected_msg.name,
-                                util::msg_id::can_dbc_to_u32_without_extid_flag(&selected_msg.id)
+                                util::can::can_dbc_to_u32_without_extid_flag(&selected_msg.id)
                             ))
                             .strong()
                             .size(16.0),
