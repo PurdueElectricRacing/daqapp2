@@ -47,6 +47,13 @@ impl CanBusSpeed {
         }
     }
 
+    pub fn to_bps(self) -> u32 {
+        match self {
+            CanBusSpeed::Kbps250 => 250_000,
+            CanBusSpeed::Kbps500 => 500_000,
+        }
+    }
+
     pub fn options() -> Vec<CanBusSpeed> {
         vec![CanBusSpeed::Kbps250, CanBusSpeed::Kbps500]
     }

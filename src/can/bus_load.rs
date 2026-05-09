@@ -1,4 +1,4 @@
-const CAN_BUS_SPEED: f32 = 500_000.0; // 500 kbps
+use crate::{connection};
 
 // SOF	1
 // ID	11
@@ -34,7 +34,7 @@ impl BusLoadTracker {
     }
 
     // Returns bus load percentage for the given window in seconds
-    pub fn get_load(&self, window_secs: u64) -> f32 {
+    pub fn get_load(&self, window_secs: u64, can_bus_speed: connection::CanBusSpeed) -> f32 {
         let now = chrono::Local::now();
         let window_duration = chrono::Duration::seconds(window_secs as i64);
         let cutoff_time = now - window_duration;
@@ -46,7 +46,7 @@ impl BusLoadTracker {
             .map(|&(_, bits)| bits)
             .sum();
 
-        let max_bits_in_window = CAN_BUS_SPEED * window_secs as f32;
+        let max_bits_in_window = can_bus_speed.to_bps() as f32 * window_secs as f32;
         (total_bits as f32 / max_bits_in_window) * 100.0
     }
 

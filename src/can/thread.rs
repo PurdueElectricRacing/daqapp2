@@ -216,10 +216,19 @@ pub fn start_can_thread(
                     // Send bus load updates periodically
                     if state.last_bus_load_update.elapsed().as_millis() >= BUS_LOAD_UPDATE_MS {
                         state.bus_load_tracker.cleanup();
-                        let load_1s = state.bus_load_tracker.get_load(1);
-                        let load_5s = state.bus_load_tracker.get_load(5);
-                        let load_10s = state.bus_load_tracker.get_load(10);
-                        let load_30s = state.bus_load_tracker.get_load(30);
+                        let can_bus_speed = state
+                            .current_source
+                            .as_ref()
+                            .and_then(|src| match src {
+                                connection::ConnectionSource::Serial(_, speed) => Some(*speed),
+                                _ => None,
+                            })
+                            .unwrap_or(connection::CanBusSpeed::Kbps500);
+
+                        let load_1s = state.bus_load_tracker.get_load(1, can_bus_speed);
+                        let load_5s = state.bus_load_tracker.get_load(5, can_bus_speed);
+                        let load_10s = state.bus_load_tracker.get_load(10, can_bus_speed);
+                        let load_30s = state.bus_load_tracker.get_load(30, can_bus_speed);
 
                         state
                             .can_to_ui_tx
