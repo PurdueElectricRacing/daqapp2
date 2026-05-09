@@ -81,7 +81,14 @@ impl BatteryViewer {
                             "module_num" => module_num = Some(sig.value.physical.round() as usize),
                             "cell_num" => cell_num = Some(sig.value.physical.round() as usize),
                             "voltage" => voltage = Some(sig.value.physical),
-                            "balance_status" => balancing = Some(sig.value.physical.abs() < 0.01),
+                            "balance_status" => {
+                                balancing = Some(
+                                    sig.value
+                                        .raw
+                                        .map(|v| v != 0)
+                                        .unwrap_or(sig.value.physical > 0.5),
+                                )
+                            }
                             _ => {}
                         }
                     }
