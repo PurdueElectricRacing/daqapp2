@@ -82,7 +82,10 @@ impl TableBuilder {
                 let row_time = first_row_time + row_idx * consts::BIN_WIDTH_MS;
                 let row_time_sec = row_time as f32 / 1000.0;
                 let mut row = vec!["".to_string(); self.bus_row.len()];
-                let correlated_time = chunk.correlation_fn.as_ref().map(|cf| cf.correlate(row_time));
+                let correlated_time = chunk
+                    .correlation_fn
+                    .as_ref()
+                    .map(|cf| cf.correlate(row_time));
                 if let Some(ct) = correlated_time {
                     row[0] = ct.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
                 }
@@ -108,10 +111,14 @@ impl TableBuilder {
                 }
             }
 
-            let first_correlated_time: Option<String> = chunk
-                .correlation_fn
-                .as_ref()
-                .and_then(|cf| cf.correlate(first_time).format("%Y_%m_%d_%H_%M_%S%.3f").to_string().parse().ok());
+            let first_correlated_time: Option<String> =
+                chunk.correlation_fn.as_ref().and_then(|cf| {
+                    cf.correlate(first_time)
+                        .format("%Y_%m_%d_%H_%M_%S%.3f")
+                        .to_string()
+                        .parse()
+                        .ok()
+                });
 
             let out_file = match first_correlated_time {
                 Some(t) => out_folder.join(format!("out_{:03}_{}.csv", chunk_idx, t)),
