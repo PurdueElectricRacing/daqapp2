@@ -87,7 +87,7 @@ impl TableBuilder {
                     .as_ref()
                     .map(|cf| cf.correlate(row_time));
                 if let Some(ct) = correlated_time {
-                    row[0] = ct.format("%Y-%m-%d %H:%M:%S%.3f").to_string();
+                    row[0] = ct.format("%H:%M:%S%.3f").to_string();
                 }
                 row[1] = format!("{:.3}", row_time_sec);
                 csv_table.push(row);
@@ -114,7 +114,7 @@ impl TableBuilder {
             let first_correlated_time: Option<String> =
                 chunk.correlation_fn.as_ref().and_then(|cf| {
                     cf.correlate(first_time)
-                        .format("%H_%M_%S%.3f")
+                        .format("%Y_%m_%d_%H_%M_%S%_3f")
                         .to_string()
                         .parse()
                         .ok()
