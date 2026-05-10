@@ -9,7 +9,7 @@ pub struct CorrelationFunction {
     avg_offset: chrono::Duration,
 }
 impl CorrelationFunction {
-    pub fn correlate(&self, log_ts: u64) -> chrono::DateTime<chrono::Local> {
+    pub fn correlate(&self, log_ts: u32) -> chrono::DateTime<chrono::Local> {
         self.ref_real_ts
             + chrono::Duration::milliseconds(log_ts as i64 - self.ref_log_ts as i64)
             + self.avg_offset
@@ -17,8 +17,8 @@ impl CorrelationFunction {
 }
 
 pub struct CorrelationChunkResult {
-    parsed_msgs: Vec<ParsedMessage>,
-    correlation_fn: Option<CorrelationFunction>,
+    pub parsed_msgs: Vec<ParsedMessage>,
+    pub correlation_fn: Option<CorrelationFunction>,
 }
 
 pub fn time_correlate_chunks(chunks: Vec<Vec<ParsedMessage>>) -> Vec<CorrelationChunkResult> {
