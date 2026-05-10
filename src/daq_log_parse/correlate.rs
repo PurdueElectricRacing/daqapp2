@@ -1,5 +1,5 @@
-use chrono::TimeZone as _;
 use chrono::Datelike as _;
+use chrono::TimeZone as _;
 
 use crate::daq_log_parse::parse::ParsedMessage;
 
@@ -28,10 +28,7 @@ pub struct CorrelationChunkResult {
 }
 
 pub fn time_correlate_chunks(chunks: Vec<Vec<ParsedMessage>>) -> Vec<CorrelationChunkResult> {
-    chunks
-        .into_iter()
-        .map(time_correlate_chunk)
-        .collect()
+    chunks.into_iter().map(time_correlate_chunk).collect()
 }
 
 impl CorrelationChunkResult {
@@ -122,7 +119,8 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
                     if dt_local.year() < current_year - 1 || dt_local.year() > current_year + 1 {
                         log::warn!(
                             "GPS message at {} ms has suspicious year value {}, skipping",
-                            msg.timestamp, dt_local.year()
+                            msg.timestamp,
+                            dt_local.year()
                         );
                         continue;
                     }
@@ -170,7 +168,7 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
         }
     };
 
-        let rms_error_ms = {
+    let rms_error_ms = {
         let mse = points
             .iter()
             .map(|p| {
@@ -192,7 +190,6 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
         points.len()
     );
 
-
     CorrelationChunkResult::correlated_new(
         chunk,
         CorrelationFunction {
@@ -201,7 +198,6 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
         },
     )
 }
-
 
 struct Point {
     x: f64, // log timestamp ms
