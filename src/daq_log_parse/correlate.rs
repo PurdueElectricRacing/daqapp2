@@ -17,7 +17,7 @@ impl CorrelationFunction {
 }
 
 pub struct CorrelationChunkResult {
-    chunk: Vec<ParsedMessage>,
+    parsed_msgs: Vec<ParsedMessage>,
     correlation_fn: Option<CorrelationFunction>,
 }
 
@@ -31,14 +31,14 @@ pub fn time_correlate_chunks(chunks: Vec<Vec<ParsedMessage>>) -> Vec<Correlation
 impl CorrelationChunkResult {
     pub fn uncorrelated_new(chunk: Vec<ParsedMessage>) -> Self {
         Self {
-            chunk,
+            parsed_msgs: chunk,
             correlation_fn: None,
         }
     }
 
     pub fn correlated_new(chunk: Vec<ParsedMessage>, correlation_fn: CorrelationFunction) -> Self {
         Self {
-            chunk,
+            parsed_msgs: chunk,
             correlation_fn: Some(correlation_fn),
         }
     }
