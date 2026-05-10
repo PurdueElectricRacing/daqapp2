@@ -1,20 +1,47 @@
-use std::ops::Sub as _;
 use chrono::TimeZone as _;
+use std::ops::Sub as _;
 
 use crate::daq_log_parse::parse::ParsedMessage;
 
-
 pub struct CorrelationFunction {
-	ref_real_ts: chrono::DateTime<chrono::Local>,
-	ref_log_ts: u32,
-	avg_offset: chrono::Duration,
+    ref_real_ts: chrono::DateTime<chrono::Local>,
+    ref_log_ts: u32,
+    avg_offset: chrono::Duration,
 }
 impl CorrelationFunction {
-	pub fn correlate(&self, log_ts: u64) -> chrono::DateTime<chrono::Local> {
-		self.ref_real_ts
-			+ chrono::Duration::milliseconds(log_ts as i64 - self.ref_log_ts as i64)
-			+ self.avg_offset
-	}
+    pub fn correlate(&self, log_ts: u64) -> chrono::DateTime<chrono::Local> {
+        self.ref_real_ts
+            + chrono::Duration::milliseconds(log_ts as i64 - self.ref_log_ts as i64)
+            + self.avg_offset
+    }
+}
+
+pub struct CorrelationChunkResult {
+    chunk: Vec<ParsedMessage>,
+    correlation_fn: Option<CorrelationFunction>,
+}
+
+pub fn time_correlate_chunks(chunks: Vec<Vec<ParsedMessage>>) -> Vec<CorrelationChunkResult> {
+    chunks
+        .into_iter()
+        .map(|chunk| time_correlate_chunk(chunk))
+        .collect()
+}
+
+impl CorrelationChunkResult {
+    pub fn uncorrelated_new(chunk: Vec<ParsedMessage>) -> Self {
+        Self {
+            chunk,
+            correlation_fn: None,
+        }
+    }
+
+    pub fn correlated_new(chunk: Vec<ParsedMessage>, correlation_fn: CorrelationFunction) -> Self {
+        Self {
+            chunk,
+            correlation_fn: Some(correlation_fn),
+        }
+    }
 }
 
 pub fn sig_to_value(dsv: &can_decode::DecodedSignalValue) -> u64 {
@@ -24,7 +51,7 @@ pub fn sig_to_value(dsv: &can_decode::DecodedSignalValue) -> u64 {
     }
 }
 
-pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> Option<CorrelationFunction> {
+pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult {
     // Idea: in the chunk, look for GPS messages which have both a timestamp and a corresponding real time
     // Use those to create a mapping from the log's timestamps to real time, and use that mapping to convert
     // all messages in the chunk to have real timestamps.
@@ -102,7 +129,7 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> Option<CorrelationFunc
 
     if gps_points.is_empty() {
         // No GPS points found, can't correlate
-        return None;
+        return CorrelationChunkResult::uncorrelated_new(chunk);
     }
 
     // Attempt to correlate. Use the first GPS point as a reference, and calculate the offset for
@@ -128,7 +155,7 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> Option<CorrelationFunc
             max_offset,
             min_offset
         );
-        return None;
+        return CorrelationChunkResult::uncorrelated_new(chunk);
     }
 
     // Use the average offset for correlation
@@ -137,9 +164,12 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> Option<CorrelationFunc
         .fold(chrono::Duration::zero(), |acc, x| acc + *x)
         / (offsets.len() as i32);
 
-    Some(CorrelationFunction {
-		ref_real_ts,
-		ref_log_ts,
-		avg_offset,
-	})
+    CorrelationChunkResult::correlated_new(
+        chunk,
+        CorrelationFunction {
+            ref_real_ts,
+            ref_log_ts,
+            avg_offset,
+        },
+    )
 }
