@@ -15,11 +15,15 @@ pub struct TableBuilder {
 impl TableBuilder {
     pub fn new() -> Self {
         Self {
-            bus_row: vec!["".to_string(), "Bus".to_string()],
-            node_row: vec!["".to_string(), "Node".to_string()],
-            message_row: vec!["".to_string(), "Message".to_string()],
-            signal_row: vec!["".to_string(), "Signal".to_string()],
-            next_col_idx: 2, // real time and then daq time columns
+            bus_row: vec!["".to_string(), "".to_string(), "Bus".to_string()],
+            node_row: vec!["".to_string(), "".to_string(), "Node".to_string()],
+            message_row: vec!["".to_string(), "".to_string(), "Message".to_string()],
+            signal_row: vec![
+                "Real Time".to_string(),
+                "DAQ Timestamp".to_string(),
+                "Signal".to_string(),
+            ],
+            next_col_idx: 3, // real time, daq timestamp, then row headers columns
             indexer: std::collections::HashMap::new(),
         }
     }
@@ -120,12 +124,12 @@ impl TableBuilder {
                 Some(t) => out_folder.join(format!("out_{:03}_{}.csv", chunk_idx, t)),
                 None => out_folder.join(format!("out_{:03}.csv", chunk_idx)),
             };
-            let mut wtr = csv::Writer::from_path(out_file).unwrap();
+            let mut wtr = csv::Writer::from_path(out_file.clone()).unwrap();
             for row in csv_table {
                 wtr.write_record(&row).unwrap();
             }
             wtr.flush().unwrap();
-            println!("Wrote chunk {} to CSV", chunk_idx);
+            println!("Wrote chunk {} to CSV ({})", chunk_idx, out_file.display());
         }
     }
 }
