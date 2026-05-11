@@ -124,7 +124,7 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
                     let dt_local = chrono::DateTime::<chrono::Local>::from(dt_utc);
 
                     let current_year = chrono::Local::now().year();
-                    if dt_local.year() < current_year - 1 || dt_local.year() > current_year + 1 {
+                    if dt_local.year() < current_year - 2 || dt_local.year() > current_year + 2 {
                         log::warn!(
                             "GPS message at {} ms has suspicious year value {}, skipping",
                             msg.timestamp,
