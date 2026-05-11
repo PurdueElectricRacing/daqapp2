@@ -134,11 +134,6 @@ pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult
                     }
 
                     gps_points.push((msg.timestamp, dt_local));
-                    println!(
-                        "Found GPS point: log timestamp = {} ms, real timestamp = {}",
-                        msg.timestamp,
-                        dt_local.format("%Y-%m-%d %H:%M:%S%.3f")
-                    );
                 } else {
                     log::error!(
                         "GPS message at {} ms has invalid date/time values, skipping",
