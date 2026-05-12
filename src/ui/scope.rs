@@ -10,6 +10,8 @@ pub struct Scope {
     signal_name: String,
     window: VecDeque<(f64, f64)>, // (time, value)
     window_duration_seconds: f64,
+    decimation_factor: u64,
+    decimation_counter: u64,
     reference_time: Option<chrono::DateTime<chrono::Local>>,
     is_paused: bool,
 }
@@ -24,6 +26,8 @@ impl Scope {
             signal_name,
             window: VecDeque::new(),
             window_duration_seconds: 10.0, // Default 10 seconds
+            decimation_factor: 0,
+            decimation_counter: 0,
             reference_time: None,
             is_paused: false,
         }
@@ -34,7 +38,14 @@ impl Scope {
             return;
         }
 
-        // Initialize reference time on first sample
+        let next_counter = self.decimation_counter + 1;
+        if next_counter < self.decimation_factor {
+            self.decimation_counter = next_counter;
+            return;
+        }
+        self.decimation_counter = 0;
+
+        // Initialize reference time on first accepted sample
         let reference = *self.reference_time.get_or_insert(timestamp);
 
         // Calculate relative time in seconds
@@ -97,9 +108,15 @@ impl Scope {
             // Window duration slider
             ui.label("Window Duration:");
             ui.add(
-                egui::Slider::new(&mut self.window_duration_seconds, 1.0..=900.0)
+                egui::Slider::new(&mut self.window_duration_seconds, 1.0..=3000.0)
                     .suffix(" seconds"),
             );
+
+            ui.separator();
+
+            // Decimation factor slider
+            ui.label("Decimation:");
+            ui.add(egui::Slider::new(&mut self.decimation_factor, 0..=500));
 
             ui.separator();
 
