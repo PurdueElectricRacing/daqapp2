@@ -1,10 +1,16 @@
-use crate::{daq_log_parse::{consts, correlate}, util};
+use crate::{
+    daq_log_parse::{consts, correlate},
+    util,
+};
 
 pub struct TableBuilder {
     bus_row: Vec<String>,
     node_row: Vec<String>,
     message_row: Vec<String>,
+    message_desc_row: Vec<String>,
     signal_row: Vec<String>,
+    signal_desc_row: Vec<String>,
+    signal_unit_row: Vec<String>,
 
     // Key is (bus name, msg name, signal name), value is column index
     indexer: std::collections::HashMap<(String, String, String), usize>,
@@ -17,11 +23,22 @@ impl TableBuilder {
             bus_row: vec!["".to_string(), "".to_string(), "Bus".to_string()],
             node_row: vec!["".to_string(), "".to_string(), "Node".to_string()],
             message_row: vec!["".to_string(), "".to_string(), "Message".to_string()],
+            message_desc_row: vec![
+                "".to_string(),
+                "".to_string(),
+                "Message Description".to_string(),
+            ],
             signal_row: vec![
                 "Real Time".to_string(),
                 "DAQ Timestamp".to_string(),
                 "Signal".to_string(),
             ],
+            signal_desc_row: vec![
+                "".to_string(),
+                "".to_string(),
+                "Signal Description".to_string(),
+            ],
+            signal_unit_row: vec!["".to_string(), "".to_string(), "Signal Unit".to_string()],
             next_col_idx: 3, // real time, daq timestamp, then row headers columns
             indexer: std::collections::HashMap::new(),
         }
@@ -43,10 +60,24 @@ impl TableBuilder {
                 if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
                     e.insert(self.next_col_idx);
 
+                    let msg_id_u32 = util::can::can_dbc_to_u32_with_extid_flag(&msg.id);
+
+                    let msg_desc = parser
+                        .msg_desc(msg_id_u32)
+                        .map(|d| d.to_string())
+                        .unwrap_or("".to_string());
+                    let sig_desc = parser
+                        .signal_desc(msg_id_u32, &sig.name)
+                        .map(|d| d.to_string())
+                        .unwrap_or("".to_string());
+
                     self.bus_row.push(bus_id.to_string());
                     self.node_row.push(node.to_string());
                     self.message_row.push(msg.name.to_string());
+                    self.message_desc_row.push(msg_desc);
                     self.signal_row.push(sig.name.to_string());
+                    self.signal_desc_row.push(sig_desc);
+                    self.signal_unit_row.push(sig.unit.to_string());
                     self.next_col_idx += 1;
                 }
             }
@@ -65,7 +96,10 @@ impl TableBuilder {
                 self.bus_row.clone(),
                 self.node_row.clone(),
                 self.message_row.clone(),
-                self.signal_row.clone(),
+                self.message_desc_row.clone(),
+                self.signal_desc_row.clone(),
+                self.signal_unit_row.clone(),
+                self.signal_unit_row.clone(),
             ];
 
             let first_time = chunk.parsed_msgs.first().map(|m| m.timestamp).unwrap_or(0);
