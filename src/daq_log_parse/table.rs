@@ -3,14 +3,45 @@ use crate::{
     util,
 };
 
+const HEADER_ROW_COUNT: usize = 7;
+const HEADER_COLUMMN_COUNT: usize = 3; // real time, daq timestamp, then table columns
+const HEADER_LABELS: [&str; HEADER_ROW_COUNT] = [
+    "Bus",
+    "Node",
+    "Message",
+    "Message Description",
+    "Signal",
+    "Signal Description",
+    "Signal Unit",
+];
+
+#[derive(Clone, Default)]
+struct TableColumn {
+    bus: String,
+    node: String,
+    message: String,
+    message_desc: String,
+    signal: String,
+    signal_desc: String,
+    signal_unit: String,
+}
+
+impl TableColumn {
+    fn cells(&self) -> [&str; HEADER_ROW_COUNT] {
+        [
+            &self.bus,
+            &self.node,
+            &self.message,
+            &self.message_desc,
+            &self.signal,
+            &self.signal_desc,
+            &self.signal_unit,
+        ]
+    }
+}
+
 pub struct TableBuilder {
-    bus_row: Vec<String>,
-    node_row: Vec<String>,
-    message_row: Vec<String>,
-    message_desc_row: Vec<String>,
-    signal_row: Vec<String>,
-    signal_desc_row: Vec<String>,
-    signal_unit_row: Vec<String>,
+    header_columns: Vec<TableColumn>,
 
     // Key is (bus name, msg name, signal name), value is column index
     indexer: std::collections::HashMap<(String, String, String), usize>,
@@ -20,28 +51,42 @@ pub struct TableBuilder {
 impl TableBuilder {
     pub fn new() -> Self {
         Self {
-            bus_row: vec!["".to_string(), "".to_string(), "Bus".to_string()],
-            node_row: vec!["".to_string(), "".to_string(), "Node".to_string()],
-            message_row: vec!["".to_string(), "".to_string(), "Message".to_string()],
-            message_desc_row: vec![
-                "".to_string(),
-                "".to_string(),
-                "Message Description".to_string(),
-            ],
-            signal_row: vec![
-                "Real Time".to_string(),
-                "DAQ Timestamp".to_string(),
-                "Signal".to_string(),
-            ],
-            signal_desc_row: vec![
-                "".to_string(),
-                "".to_string(),
-                "Signal Description".to_string(),
-            ],
-            signal_unit_row: vec!["".to_string(), "".to_string(), "Signal Unit".to_string()],
-            next_col_idx: 3, // real time, daq timestamp, then row headers columns
+            header_columns: Vec::new(),
+            next_col_idx: HEADER_COLUMMN_COUNT,
             indexer: std::collections::HashMap::new(),
         }
+    }
+
+    fn push_column(&mut self, key: (String, String, String), column: TableColumn) {
+        self.indexer.insert(key, self.next_col_idx);
+        self.header_columns.push(column);
+        self.next_col_idx += 1;
+    }
+
+    fn build_header_rows(&self) -> Vec<Vec<String>> {
+        let mut rows = vec![
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[0].to_string()],
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[1].to_string()],
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[2].to_string()],
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[3].to_string()],
+            vec![
+                "Real Time".to_string(),
+                "DAQ Timestamp".to_string(),
+                HEADER_LABELS[4].to_string(),
+            ],
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[5].to_string()],
+            vec!["".to_string(), "".to_string(), HEADER_LABELS[6].to_string()],
+        ];
+        assert!(rows.len() == HEADER_ROW_COUNT);
+        assert!(rows.iter().all(|r| r.len() == HEADER_COLUMMN_COUNT));
+
+        for column in &self.header_columns {
+            for (row, cell) in rows.iter_mut().zip(column.cells()) {
+                row.push(cell.to_string());
+            }
+        }
+
+        rows
     }
 
     pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name: &str) {
@@ -55,38 +100,36 @@ impl TableBuilder {
                 can_dbc::Transmitter::VectorXXX => "N/A".to_string(),
             };
 
+            let msg_id_u32 = util::can::can_dbc_to_u32_with_extid_flag(&msg.id);
+            let msg_desc = parser
+                .msg_desc(msg_id_u32)
+                .map(|d| d.to_string())
+                .unwrap_or_default();
+
             for (i, sig) in msg.signals.iter().enumerate() {
                 let key = (bus_id.to_string(), msg.name.clone(), sig.name.clone());
-                if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
-                    e.insert(self.next_col_idx);
-
-                    let msg_id_u32 = util::can::can_dbc_to_u32_with_extid_flag(&msg.id);
-
-                    self.bus_row.push(bus_id.to_string());
-                    self.node_row.push(node.to_string());
-                    self.message_row.push(msg.name.to_string());
-
-                    // Only fill in the message description for the first signal of the message
-                    let msg_desc = if i == 0 {
-                        parser
-                            .msg_desc(msg_id_u32)
-                            .map(|d| d.to_string())
-                            .unwrap_or("".to_string())
-                    } else {
-                        "".to_string()
-                    };
-                    self.message_desc_row.push(msg_desc);
-
-                    self.signal_row.push(sig.name.to_string());
-
+                if !self.indexer.contains_key(&key) {
                     let sig_desc = parser
                         .signal_desc(msg_id_u32, &sig.name)
                         .map(|d| d.to_string())
-                        .unwrap_or("".to_string());
-                    self.signal_desc_row.push(sig_desc);
+                        .unwrap_or_default();
 
-                    self.signal_unit_row.push(sig.unit.to_string());
-                    self.next_col_idx += 1;
+                    self.push_column(
+                        key,
+                        TableColumn {
+                            bus: bus_id.to_string(),
+                            node: node.clone(),
+                            message: msg.name.clone(),
+                            message_desc: if i == 0 {
+                                msg_desc.clone()
+                            } else {
+                                String::new()
+                            },
+                            signal: sig.name.clone(),
+                            signal_desc: sig_desc,
+                            signal_unit: sig.unit.to_string(),
+                        },
+                    );
                 }
             }
         }
@@ -100,15 +143,7 @@ impl TableBuilder {
         std::fs::create_dir_all(out_folder).unwrap();
 
         for (chunk_idx, chunk) in correlated_chunks.iter().enumerate() {
-            let mut csv_table = vec![
-                self.bus_row.clone(),
-                self.node_row.clone(),
-                self.message_row.clone(),
-                self.message_desc_row.clone(),
-                self.signal_desc_row.clone(),
-                self.signal_unit_row.clone(),
-                self.signal_unit_row.clone(),
-            ];
+            let mut csv_table = self.build_header_rows();
 
             let first_time = chunk.parsed_msgs.first().map(|m| m.timestamp).unwrap_or(0);
             let last_time = chunk.parsed_msgs.last().map(|m| m.timestamp).unwrap_or(0);
@@ -117,12 +152,13 @@ impl TableBuilder {
             let last_row_time = last_time.div_ceil(consts::BIN_WIDTH_MS) * consts::BIN_WIDTH_MS;
             let num_rows = ((last_row_time - first_row_time) / consts::BIN_WIDTH_MS) + 1;
 
-            csv_table.reserve(num_rows as usize);
+            csv_table.reserve(HEADER_ROW_COUNT + num_rows as usize);
 
             for row_idx in 0..num_rows {
                 let row_time = first_row_time + row_idx * consts::BIN_WIDTH_MS;
                 let row_time_sec = row_time as f32 / 1000.0;
-                let mut row = vec!["".to_string(); self.bus_row.len()];
+                let mut row =
+                    vec!["".to_string(); HEADER_COLUMMN_COUNT - 1 + self.header_columns.len()];
                 let correlated_time = chunk
                     .correlation_fn
                     .as_ref()
@@ -139,8 +175,9 @@ impl TableBuilder {
                 for (sig_name, sig_value) in &decoded.signals {
                     let key = (msg.bus_name.clone(), decoded.name.clone(), sig_name.clone());
                     if let Some(&col_idx) = self.indexer.get(&key) {
-                        let row_idx = (msg.timestamp - first_row_time) / consts::BIN_WIDTH_MS;
-                        if let Some(row) = csv_table.get_mut(row_idx as usize + 4)
+                        let row_idx =
+                            ((msg.timestamp - first_row_time) / consts::BIN_WIDTH_MS) as usize;
+                        if let Some(row) = csv_table.get_mut(HEADER_ROW_COUNT + row_idx)
                             && let Some(cell) = row.get_mut(col_idx)
                         {
                             *cell = if let Some(enum_label) = &sig_value.value.enum_label {
