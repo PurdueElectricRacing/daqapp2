@@ -56,10 +56,7 @@ impl CorrelationChunkResult {
 }
 
 pub fn sig_to_value(dsv: &can_decode::DecodedSignalValue) -> u64 {
-    match &dsv {
-        can_decode::DecodedSignalValue::Numeric(v) => v.round() as u64,
-        can_decode::DecodedSignalValue::Enum(v, _) => *v as u64,
-    }
+    dsv.physical.round() as u64
 }
 
 pub fn time_correlate_chunk(chunk: Vec<ParsedMessage>) -> CorrelationChunkResult {
