@@ -1,4 +1,4 @@
-use crate::daq_log_parse::{consts, correlate};
+use crate::{daq_log_parse::{consts, correlate}, util};
 
 pub struct TableBuilder {
     bus_row: Vec<String>,
@@ -29,10 +29,7 @@ impl TableBuilder {
 
     pub fn create_header(&mut self, parser: &can_decode::Parser, bus_name: &str) {
         let mut message_defs = parser.msg_defs();
-        message_defs.sort_by_key(|m| match m.id {
-            can_dbc::MessageId::Standard(id) => id as u32,
-            can_dbc::MessageId::Extended(id) => id,
-        });
+        message_defs.sort_by_key(|m| util::can::can_dbc_to_u32_without_extid_flag(&m.id));
 
         for msg in message_defs {
             let bus_id = bus_name;
