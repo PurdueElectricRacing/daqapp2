@@ -105,7 +105,7 @@ impl TableBuilder {
                             && let Some(cell) = row.get_mut(col_idx)
                         {
                             *cell = if let Some(enum_label) = &sig_value.value.enum_label {
-                                format!("{} ({:.0})", enum_label, sig_value.value.physical)
+                                format!("{} ({})", enum_label, sig_value.value.int_rounded())
                             } else {
                                 sig_value.value.physical.to_string()
                             };

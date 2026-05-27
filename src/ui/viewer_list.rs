@@ -80,8 +80,8 @@ impl ViewerList {
                             row.col(|ui| {
                                 if let Some(ref enum_label) = signal.value.enum_label {
                                     ui.label(format!(
-                                        "{} ({:.2})",
-                                        enum_label, signal.value.physical
+                                        "{} ({})",
+                                        enum_label, signal.value.int_rounded()
                                     ));
                                 } else if signal.unit.is_empty() {
                                     ui.label(format!("{:.2}", signal.value.physical));
