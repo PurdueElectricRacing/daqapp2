@@ -81,7 +81,8 @@ impl ViewerList {
                                 if let Some(ref enum_label) = signal.value.enum_label {
                                     ui.label(format!(
                                         "{} ({})",
-                                        enum_label, signal.value.int_rounded()
+                                        enum_label,
+                                        signal.value.int_rounded()
                                     ));
                                 } else if signal.unit.is_empty() {
                                     ui.label(format!("{:.2}", signal.value.physical));
