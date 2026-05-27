@@ -1,5 +1,4 @@
 use crate::daq_log_parse::{consts, correlate};
-use can_decode::DecodedSignalValue;
 
 pub struct TableBuilder {
     bus_row: Vec<String>,
@@ -105,9 +104,10 @@ impl TableBuilder {
                         if let Some(row) = csv_table.get_mut(row_idx as usize + 4)
                             && let Some(cell) = row.get_mut(col_idx)
                         {
-                            *cell = match &sig_value.value {
-                                DecodedSignalValue::Numeric(v) => v.to_string(),
-                                DecodedSignalValue::Enum(_, label) => label.clone(),
+                            *cell = if let Some(enum_label) = &sig_value.value.enum_label {
+                                format!("{} ({})", enum_label, sig_value.value.int_rounded())
+                            } else {
+                                sig_value.value.physical.to_string()
                             };
                         }
                     }

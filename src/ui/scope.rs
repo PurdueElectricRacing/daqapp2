@@ -177,12 +177,7 @@ impl Scope {
                 return;
             };
 
-            let value = match signal.value {
-                can_decode::DecodedSignalValue::Numeric(f) => f,
-                can_decode::DecodedSignalValue::Enum(i, _) => i as f64,
-            };
-
-            self.add_point(parsed_msg.timestamp, value);
+            self.add_point(parsed_msg.timestamp, signal.value.physical);
         }
     }
 }

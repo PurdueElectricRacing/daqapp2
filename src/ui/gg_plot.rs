@@ -78,16 +78,8 @@ impl GgPlot {
         let mut left_g = None;
         for (_, sig) in &parsed.decoded.signals {
             match sig.name.as_str() {
-                "X_axis" => {
-                    if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                        forward_g = Some(*v as f32);
-                    }
-                }
-                "Y_axis" => {
-                    if let can_decode::DecodedSignalValue::Numeric(v) = &sig.value {
-                        left_g = Some(*v as f32);
-                    }
-                }
+                "X_axis" => forward_g = Some(sig.value.physical as f32),
+                "Y_axis" => left_g = Some(sig.value.physical as f32),
                 _ => {}
             }
         }

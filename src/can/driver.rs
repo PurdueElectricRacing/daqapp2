@@ -244,7 +244,7 @@ impl Driver for SimulatedDriver {
                 Ok(vec![can_frame.into()])
             } else {
                 // If no DBC is loaded, just return random frames with random IDs and data
-                let id = rng.random_range(0..=util::msg_id::STANDARD_ID_MASK) as u16;
+                let id = rng.random_range(0..=util::can::STANDARD_ID_MASK) as u16;
                 let sid = slcan::StandardId::new(id).expect("invalid standard id");
                 let mut data = [0u8; 8];
                 rng.fill_bytes(&mut data);

@@ -8,8 +8,8 @@ const BUS_LOAD_UPDATE_MS: u128 = 200;
 fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize {
     match frame {
         slcan::CanFrame::Can2(frame2) => {
-            let decode_msg_id = util::msg_id::slcan_to_u32_with_extid_flag(&frame2.id());
-            let raw_msg_id = util::msg_id::slcan_to_u32_without_extid_flag(&frame2.id());
+            let decode_msg_id = util::can::slcan_to_u32_with_extid_flag(&frame2.id());
+            let raw_msg_id = util::can::slcan_to_u32_without_extid_flag(&frame2.id());
 
             let data = frame2.data().unwrap_or(&[]);
 
@@ -44,7 +44,7 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
             data.len()
         }
         slcan::CanFrame::CanFd(frame_fd) => {
-            let msg_id_raw = util::msg_id::slcan_to_u32_without_extid_flag(&frame_fd.id());
+            let msg_id_raw = util::can::slcan_to_u32_without_extid_flag(&frame_fd.id());
             log::warn!(
                 "Received CAN FD frame id=0x{:X} len={}",
                 msg_id_raw,
@@ -103,9 +103,9 @@ pub fn start_can_thread(
             for msg in msgs_to_send {
                 if let Some(ref mut active_driver) = state.driver {
                     let id = if msg.is_msg_id_extended {
-                        slcan::ExtendedId::new(msg.msg_id & util::msg_id::EXTENDED_ID_MASK)
+                        slcan::ExtendedId::new(msg.msg_id & util::can::EXTENDED_ID_MASK)
                             .map(slcan::Id::Extended)
-                    } else if msg.msg_id <= util::msg_id::STANDARD_ID_MASK {
+                    } else if msg.msg_id <= util::can::STANDARD_ID_MASK {
                         slcan::StandardId::new(msg.msg_id as u16).map(slcan::Id::Standard)
                     } else {
                         log::warn!(

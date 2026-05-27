@@ -77,16 +77,20 @@ impl ViewerList {
                             row.col(|ui| {
                                 ui.label(sig_name.to_string());
                             });
-                            row.col(|ui| match signal.value {
-                                can_decode::DecodedSignalValue::Numeric(f) => {
-                                    if signal.unit.is_empty() {
-                                        ui.label(format!("{:.2}", f));
-                                    } else {
-                                        ui.label(format!("{:.2} {}", f, signal.unit));
-                                    }
-                                }
-                                can_decode::DecodedSignalValue::Enum(raw_value, ref enum_str) => {
-                                    ui.label(format!("{} ({})", enum_str, raw_value));
+                            row.col(|ui| {
+                                if let Some(ref enum_label) = signal.value.enum_label {
+                                    ui.label(format!(
+                                        "{} ({})",
+                                        enum_label,
+                                        signal.value.int_rounded()
+                                    ));
+                                } else if signal.unit.is_empty() {
+                                    ui.label(format!("{:.2}", signal.value.physical));
+                                } else {
+                                    ui.label(format!(
+                                        "{:.2} {}",
+                                        signal.value.physical, signal.unit
+                                    ));
                                 }
                             });
                         });

@@ -83,9 +83,9 @@ fn parse_log_file(
         }
 
         let arb_id = if (frame.identity & consts::IS_EID_MASK) != 0 {
-            frame.identity & util::msg_id::EXTENDED_ID_MASK
+            frame.identity & util::can::EXTENDED_ID_MASK
         } else {
-            frame.identity & util::msg_id::STANDARD_ID_MASK
+            frame.identity & util::can::STANDARD_ID_MASK
         };
 
         let bus_id = if (frame.identity & consts::BUS_ID_MASK) != 0 {
