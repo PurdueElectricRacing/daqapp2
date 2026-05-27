@@ -1,5 +1,4 @@
-use crate::daq_log_parse::{consts, parse, correlate};
-use can_decode::DecodedSignalValue;
+use crate::daq_log_parse::{consts, correlate};
 
 pub struct TableBuilder {
     bus_row: Vec<String>,
