@@ -11,7 +11,7 @@ egui_extras = "0.33.3"
 
 rfd = "0.17.2"
 
-can_decode = "0.7.0"
+can_decode = "0.7.2"
 can-dbc = "9.0.0"
 
 chrono = "0.4.44"
