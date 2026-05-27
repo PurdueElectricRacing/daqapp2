@@ -55,28 +55,36 @@ impl TableBuilder {
                 can_dbc::Transmitter::VectorXXX => "N/A".to_string(),
             };
 
-            for sig in msg.signals {
+            for (i, sig) in msg.signals.iter().enumerate() {
                 let key = (bus_id.to_string(), msg.name.clone(), sig.name.clone());
                 if let std::collections::hash_map::Entry::Vacant(e) = self.indexer.entry(key) {
                     e.insert(self.next_col_idx);
 
                     let msg_id_u32 = util::can::can_dbc_to_u32_with_extid_flag(&msg.id);
 
-                    let msg_desc = parser
-                        .msg_desc(msg_id_u32)
-                        .map(|d| d.to_string())
-                        .unwrap_or("".to_string());
+                    self.bus_row.push(bus_id.to_string());
+                    self.node_row.push(node.to_string());
+                    self.message_row.push(msg.name.to_string());
+
+                    // Only fill in the message description for the first signal of the message
+                    let msg_desc = if i == 0 {
+                        parser
+                            .msg_desc(msg_id_u32)
+                            .map(|d| d.to_string())
+                            .unwrap_or("".to_string())
+                    } else {
+                        "".to_string()
+                    };
+                    self.message_desc_row.push(msg_desc);
+
+                    self.signal_row.push(sig.name.to_string());
+
                     let sig_desc = parser
                         .signal_desc(msg_id_u32, &sig.name)
                         .map(|d| d.to_string())
                         .unwrap_or("".to_string());
-
-                    self.bus_row.push(bus_id.to_string());
-                    self.node_row.push(node.to_string());
-                    self.message_row.push(msg.name.to_string());
-                    self.message_desc_row.push(msg_desc);
-                    self.signal_row.push(sig.name.to_string());
                     self.signal_desc_row.push(sig_desc);
+
                     self.signal_unit_row.push(sig.unit.to_string());
                     self.next_col_idx += 1;
                 }
