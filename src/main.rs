@@ -1,5 +1,6 @@
 mod action;
 mod app;
+mod assets;
 mod can;
 mod connection;
 mod daq_log_parse;
@@ -35,9 +36,16 @@ fn main() -> eframe::Result<()> {
     let _can_thread =
         can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, settings.selected_source.clone());
 
+    let per_img = eframe::icon_data::from_png_bytes(assets::PER_LOGO_BYTES)
+        .expect("Failed to load logo image");
+    let native_options = eframe::NativeOptions {
+        viewport: eframe::egui::ViewportBuilder::default().with_icon(per_img),
+        ..Default::default()
+    };
+
     eframe::run_native(
-        "DaqApp2",
-        eframe::NativeOptions::default(),
+        "PER - DaqApp2",
+        native_options,
         Box::new(|cc| {
             Ok(Box::new(app::DAQApp::new(
                 can_to_ui_rx,
