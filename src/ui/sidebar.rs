@@ -26,6 +26,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             ui.horizontal(|ui| {
                 ui.add(
                     egui::Image::from_bytes(assets::PER_LOGO_PATH, assets::PER_LOGO_BYTES)
+                        .show_loading_spinner(true)
                         .corner_radius(5),
                 );
                 ui.heading("Side bar");
