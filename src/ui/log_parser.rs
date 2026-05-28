@@ -7,6 +7,8 @@ pub struct LogParser {
     pub logs_dir: Option<std::path::PathBuf>,
     pub output_dir: Option<std::path::PathBuf>,
 
+    output_prefix: String,
+
     bus_0_dbc: Option<std::path::PathBuf>,
     bus_0_use_override: bool,
     bus_1_dbc: Option<std::path::PathBuf>,
@@ -28,6 +30,7 @@ impl LogParser {
             title: format!("Log Parser #{}", instance_num),
             logs_dir: None,
             output_dir: None,
+            output_prefix: "out".to_string(),
             bus_0_dbc: None,
             bus_0_use_override: false,
             bus_1_dbc: None,
@@ -202,6 +205,12 @@ impl LogParser {
                 Some(p) => ui.label(format!("Output: {}", p.display())),
                 None => ui.label("Output: None selected"),
             };
+        });
+
+        // Prefix for output files
+        ui.horizontal(|ui| {
+            ui.label("Output Prefix:");
+            ui.text_edit_singleline(&mut self.output_prefix);
         });
 
         ui.separator();
