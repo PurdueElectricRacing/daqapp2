@@ -121,8 +121,8 @@ impl Formatter {
                 for (signal_glob, formatting) in signal_vec {
                     if signal_glob.is_match(signal_name) {
                         return match formatting {
-                            Formatting::Hex => format!("0x{:X}", value.int_rounded()),
-                            Formatting::Binary => format!("0b{:b}", value.int_rounded()),
+                            Formatting::Hex => format_hex(&sig_def, value),
+                            Formatting::Binary => format_binary(&sig_def, value),
                             Formatting::Decimal(places) => {
                                 format!("{:.*}", *places as usize, value.physical)
                             }
@@ -133,5 +133,62 @@ impl Formatter {
         }
         // Default formatting if no match: 2 decimal places
         format!("{:.2}", value.physical)
+    }
+}
+
+fn format_hex(sig_def: &can_dbc::Signal, value: &can_decode::DecodedSignalValue) -> String {
+    let bits = sig_def.size.clamp(1, 64) as u32;
+    let nybbles = bits.div_ceil(4) as usize;
+
+    match sig_def.value_type {
+        can_dbc::ValueType::Unsigned => {
+            let mask = if bits == 64 {
+                u64::MAX
+            } else {
+                (1u64 << bits) - 1
+            };
+
+            let val = value.int_rounded() as u64 & mask;
+
+            format!("0x{:0width$X}", val, width = nybbles)
+        }
+
+        can_dbc::ValueType::Signed => {
+            let val = value.int_rounded();
+
+            if val < 0 {
+                format!("-0x{:0width$X}", (-val) as u64, width = nybbles)
+            } else {
+                format!("0x{:0width$X}", val as u64, width = nybbles)
+            }
+        }
+    }
+}
+
+fn format_binary(sig_def: &can_dbc::Signal, value: &can_decode::DecodedSignalValue) -> String {
+    let bits = sig_def.size.clamp(1, 64) as usize;
+
+    match sig_def.value_type {
+        can_dbc::ValueType::Unsigned => {
+            let mask = if bits == 64 {
+                u64::MAX
+            } else {
+                (1u64 << bits) - 1
+            };
+
+            let val = value.int_rounded() as u64 & mask;
+
+            format!("0b{:0width$b}", val, width = bits)
+        }
+
+        can_dbc::ValueType::Signed => {
+            let val = value.int_rounded();
+
+            if val < 0 {
+                format!("-0b{:0width$b}", (-val) as u64, width = bits)
+            } else {
+                format!("0b{:0width$b}", val as u64, width = bits)
+            }
+        }
     }
 }
