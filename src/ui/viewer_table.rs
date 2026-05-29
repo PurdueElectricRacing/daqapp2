@@ -1,4 +1,4 @@
-use crate::{action, app, formatter, messages, frozen};
+use crate::{action, app, formatter, frozen, messages};
 use eframe::egui;
 
 type DecodedMsgMap = hashbrown::HashMap<u32, messages::ParsedMessage>;
