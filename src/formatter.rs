@@ -161,7 +161,7 @@ impl Formatter {
                                 }
                             };
                             let maybe_unit = unit
-                                .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+                                .or_else(|| sig_def.map(|s| s.unit.as_str()))
                                 .filter(|u| !u.is_empty());
                             if let Some(u) = maybe_unit
                                 && !u.is_empty()
@@ -177,7 +177,7 @@ impl Formatter {
         }
 
         let maybe_unit = unit
-            .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+            .or_else(|| sig_def.map(|s| s.unit.as_str()))
             .filter(|u| !u.is_empty());
         default_format(maybe_unit, value)
     }
@@ -195,7 +195,7 @@ pub fn try_format(
         fmt.format(msg_name, signal_name, sig_def, unit, value)
     } else {
         let maybe_unit = unit
-            .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+            .or_else(|| sig_def.map(|s| s.unit.as_str()))
             .filter(|u| !u.is_empty());
         default_format(maybe_unit, value)
     }
