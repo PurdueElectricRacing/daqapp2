@@ -160,7 +160,10 @@ impl Formatter {
                                     format!("{:.*}", *places, value.physical)
                                 }
                             };
-                            if let Some(u) = unit
+                            let maybe_unit = unit
+                                .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+                                .filter(|u| !u.is_empty());
+                            if let Some(u) = maybe_unit
                                 && !u.is_empty()
                             {
                                 return format!("{} {}", raw, u);
@@ -173,12 +176,10 @@ impl Formatter {
             }
         }
 
-        let u = if unit.is_some() {
-            unit
-        } else {
-            sig_def.as_ref().map(|s| s.unit.as_str())
-        };
-        default_format(u, value)
+        let maybe_unit = unit
+            .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+            .filter(|u| !u.is_empty());
+        default_format(maybe_unit, value)
     }
 }
 
@@ -193,12 +194,10 @@ pub fn try_format(
     if let Some(fmt) = formatter {
         fmt.format(msg_name, signal_name, sig_def, unit, value)
     } else {
-        let u = if unit.is_some() {
-            unit
-        } else {
-            sig_def.as_ref().map(|s| s.unit.as_str())
-        };
-        default_format(u, value)
+        let maybe_unit = unit
+            .or_else(|| sig_def.and_then(|s| Some(s.unit.as_str())))
+            .filter(|u| !u.is_empty());
+        default_format(maybe_unit, value)
     }
 }
 
