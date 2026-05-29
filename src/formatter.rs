@@ -118,6 +118,9 @@ impl Formatter {
             .ok()
     }
 
+    /// Formats a signal value based on the message and signal name, using the first matching pattern in the config.
+    /// If no pattern matches, returns a default formatted string (enum label if available, otherwise physical value with 2 decimal places).
+    /// If there is a unit associated with the signal, it will be appended to the formatted value.
     pub fn format(
         &self,
         msg_name: &str,
@@ -129,7 +132,7 @@ impl Formatter {
             if msg_glob.is_match(msg_name) {
                 for (signal_glob, formatting) in signal_vec {
                     if signal_glob.is_match(signal_name) {
-                        return match formatting {
+                        let raw = match formatting {
                             Formatting::Hex => format_hex(&sig_def, value),
                             Formatting::Binary => format_binary(&sig_def, value),
                             Formatting::Decimal(places) => {
@@ -137,12 +140,17 @@ impl Formatter {
                                 format!("{:.*}", precision, value.physical)
                             }
                         };
+                        if sig_def.unit.is_empty() {
+                            return raw;
+                        } else {
+                            return format!("{} {}", raw, sig_def.unit);
+                        }
                     }
                 }
             }
         }
-        // Default formatting if no match: 2 decimal places
-        format!("{:.2}", value.physical)
+
+        default_format(&sig_def.unit, value)
     }
 }
 
@@ -156,8 +164,17 @@ pub fn try_format(
     if let Some(fmt) = formatter {
         fmt.format(msg_name, signal_name, sig_def, value)
     } else {
-        // Default formatting if no formatter loaded: 2 decimal places
+        default_format(&sig_def.unit, value)
+    }
+}
+
+pub fn default_format(unit: &str, value: &can_decode::DecodedSignalValue) -> String {
+    if let Some(enum_label) = &value.enum_label {
+        format!("{} ({})", enum_label, value.int_rounded())
+    } else if unit.is_empty() {
         format!("{:.2}", value.physical)
+    } else {
+        format!("{:.2} {}", value.physical, unit)
     }
 }
 

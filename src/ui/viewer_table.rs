@@ -111,30 +111,24 @@ impl ViewerTable {
                             .signals
                             .iter()
                             .map(|(sig_name, signal)| {
-                                if let Some(ref enum_label) = signal.value.enum_label {
+                                if let Some(sig_def) = msg_def
+                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name))
+                                {
                                     (
                                         sig_name.as_str(),
-                                        format!("{} ({})", enum_label, signal.value.int_rounded()),
-                                    )
-                                } else {
-                                    let raw = if let Some(sig_def) = msg_def.and_then(|md| {
-                                        md.signals.iter().find(|s| s.name == *sig_name)
-                                    }) {
                                         formatter::try_format(
                                             formatter,
                                             &msg.decoded.name,
                                             sig_name,
                                             sig_def,
                                             &signal.value,
-                                        )
-                                    } else {
-                                        format!("{:.2}", signal.value.physical)
-                                    };
-                                    if signal.unit.is_empty() {
-                                        (sig_name.as_str(), raw)
-                                    } else {
-                                        (sig_name.as_str(), format!("{} {}", raw, signal.unit))
-                                    }
+                                        ),
+                                    )
+                                } else {
+                                    (
+                                        sig_name.as_str(),
+                                        formatter::default_format(&signal.unit, &signal.value),
+                                    )
                                 }
                             })
                             .collect();

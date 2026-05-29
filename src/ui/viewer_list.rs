@@ -88,31 +88,21 @@ impl ViewerList {
                                 ui.label(sig_name.to_string());
                             });
                             row.col(|ui| {
-                                if let Some(ref enum_label) = signal.value.enum_label {
-                                    ui.label(format!(
-                                        "{} ({})",
-                                        enum_label,
-                                        signal.value.int_rounded()
+                                if let Some(sig_def) = msg_def
+                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name))
+                                {
+                                    ui.label(formatter::try_format(
+                                        formatter,
+                                        &msg.decoded.name,
+                                        sig_name,
+                                        sig_def,
+                                        &signal.value,
                                     ));
                                 } else {
-                                    let raw = if let Some(sig_def) = msg_def.and_then(|md| {
-                                        md.signals.iter().find(|s| s.name == *sig_name)
-                                    }) {
-                                        formatter::try_format(
-                                            formatter,
-                                            &msg.decoded.name,
-                                            sig_name,
-                                            sig_def,
-                                            &signal.value,
-                                        )
-                                    } else {
-                                        format!("{:.2}", signal.value.physical)
-                                    };
-                                    if signal.unit.is_empty() {
-                                        ui.label(raw);
-                                    } else {
-                                        ui.label(format!("{} {}", raw, signal.unit));
-                                    }
+                                    ui.label(formatter::default_format(
+                                        &signal.unit,
+                                        &signal.value,
+                                    ));
                                 }
                             });
                         });
