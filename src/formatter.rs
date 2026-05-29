@@ -124,7 +124,7 @@ impl Formatter {
         &self,
         msg_name: &str,
         signal_name: &str,
-        sig_def: can_dbc::Signal,
+        sig_def: &can_dbc::Signal,
         value: &can_decode::DecodedSignalValue,
     ) -> String {
         for (msg_glob, signal_vec) in &self.compiled_config {
@@ -152,7 +152,7 @@ pub fn try_format(
     formatter: &Option<Formatter>,
     msg_name: &str,
     signal_name: &str,
-    sig_def: can_dbc::Signal,
+    sig_def: &can_dbc::Signal,
     value: &can_decode::DecodedSignalValue,
 ) -> String {
     if let Some(fmt) = formatter {
