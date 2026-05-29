@@ -96,9 +96,7 @@ impl Formatter {
             }
             compiled_config.push((msg_glob, compiled_signal_map));
         }
-        Ok(Self {
-            compiled_config,
-        })
+        Ok(Self { compiled_config })
     }
 
     pub fn new_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
