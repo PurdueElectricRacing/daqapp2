@@ -137,7 +137,8 @@ impl Formatter {
                             Formatting::Hex => format_hex(&sig_def, value),
                             Formatting::Binary => format_binary(&sig_def, value),
                             Formatting::Decimal(places) => {
-                                format!("{:.*}", *places as usize, value.physical)
+                                let precision = (*places).max(0) as usize;
+                                format!("{:.*}", precision, value.physical)
                             }
                         };
                     }
