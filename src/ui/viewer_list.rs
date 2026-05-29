@@ -146,8 +146,9 @@ impl ViewerList {
     }
 
     fn make_space_for_new_message(&mut self) {
-        while self.msgs.get().len() >= MAX_MESSAGES - 1 {
-            self.msgs.get_mut().pop_front();
+        let msgs = self.msgs.get_mut();
+        while msgs.len() >= MAX_MESSAGES - 1 {
+            msgs.pop_front();
         }
     }
 
