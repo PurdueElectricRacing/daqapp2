@@ -138,10 +138,6 @@ impl Formatter {
             if msg_glob.is_match(msg_name) {
                 for (signal_glob, formatting) in signal_vec {
                     if signal_glob.is_match(signal_name) {
-                        println!(
-                            "Matched formatter pattern: msg '{}', signal '{}', formatting {:?}",
-                            msg_name, signal_name, formatting
-                        );
                         let have_enough_info = match formatting {
                             Formatting::Hex | Formatting::Binary => sig_def.is_some(),
                             Formatting::Decimal(_) => true,
@@ -153,10 +149,6 @@ impl Formatter {
                                     format_binary(sig_def.as_ref().unwrap(), value)
                                 }
                                 Formatting::Decimal(places) => {
-                                    println!(
-                                        "Formatting as decimal with {} places: physical value = {}",
-                                        places, value.physical
-                                    );
                                     format!("{:.*}", *places, value.physical)
                                 }
                             };
