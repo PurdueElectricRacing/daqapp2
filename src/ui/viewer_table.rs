@@ -45,6 +45,8 @@ impl ViewerTable {
             }
         }
 
+        self.clean_undecoded();
+
         ui.separator();
 
         ui.add_space(4.0);
@@ -206,6 +208,19 @@ impl ViewerTable {
             }
             _ => {}
         }
+    }
+
+    fn clean_undecoded(&mut self) {
+        // Remove any undecoded messages that have a decoded message with a newer timestamp
+        let decoded = &self.decoded_msgs.rt_data;
+        let undecoded = self.undecoded_msgs.get_mut();
+        undecoded.retain(|&msg_id, unparsed_msg| {
+            if let Some(parsed_msg) = decoded.get(&msg_id) {
+                parsed_msg.timestamp <= unparsed_msg.timestamp
+            } else {
+                true
+            }
+        });
     }
 }
 
