@@ -2,7 +2,7 @@
     "*_version": {
         "git_hash": "hex"
     },
-    "*_module_fault_event": {
+    "*_fault_event": {
         "val": 0,
         "idx": 0
     },

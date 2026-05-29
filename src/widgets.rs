@@ -55,7 +55,7 @@ impl Widget {
 
         match self {
             Widget::ViewerTable(w) => w.show(ui, action_queue, formatter, parser),
-            Widget::ViewerList(w) => w.show(ui),
+            Widget::ViewerList(w) => w.show(ui, formatter, parser),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, parser),
