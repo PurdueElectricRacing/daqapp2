@@ -7,7 +7,7 @@ pub const FORMATTER_CONFIG_FILE: &str = "formatter_config.json";
 pub enum Formatting {
     Hex,
     Binary,
-    Decimal(i32), // Number of decimal places
+    Decimal(usize), // Number of decimal places
 }
 
 // Message name/pattern -> signal name/pattern -> formatting
@@ -25,7 +25,7 @@ impl Serialize for Formatting {
         match self {
             Formatting::Hex => serializer.serialize_str("hex"),
             Formatting::Binary => serializer.serialize_str("binary"),
-            Formatting::Decimal(places) => serializer.serialize_i32(*places),
+            Formatting::Decimal(places) => serializer.serialize_u64(*places as u64),
         }
     }
 }
@@ -41,15 +41,19 @@ impl<'de> Deserialize<'de> for Formatting {
             type Value = Formatting;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(r#"an integer, "hex", or "binary""#)
+                formatter.write_str(r#"a non-negative integer, "hex", or "binary""#)
             }
 
             fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
             where
                 E: serde::de::Error,
             {
+                if value < 0 {
+                    return Err(E::custom("decimal places must be non-negative"));
+                }
+
                 let value =
-                    i32::try_from(value).map_err(|_| E::custom("decimal places out of range"))?;
+                    usize::try_from(value).map_err(|_| E::custom("decimal places out of range"))?;
 
                 Ok(Formatting::Decimal(value))
             }
@@ -59,7 +63,7 @@ impl<'de> Deserialize<'de> for Formatting {
                 E: serde::de::Error,
             {
                 let value =
-                    i32::try_from(value).map_err(|_| E::custom("decimal places out of range"))?;
+                    usize::try_from(value).map_err(|_| E::custom("decimal places out of range"))?;
 
                 Ok(Formatting::Decimal(value))
             }
@@ -136,8 +140,7 @@ impl Formatter {
                             Formatting::Hex => format_hex(&sig_def, value),
                             Formatting::Binary => format_binary(&sig_def, value),
                             Formatting::Decimal(places) => {
-                                let precision = (*places).max(0) as usize;
-                                format!("{:.*}", precision, value.physical)
+                                format!("{:.*}", *places, value.physical)
                             }
                         };
                         if sig_def.unit.is_empty() {
