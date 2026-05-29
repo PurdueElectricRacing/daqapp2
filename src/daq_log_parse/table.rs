@@ -207,7 +207,7 @@ impl TableBuilder {
                 wtr.write_record(&row).unwrap();
             }
             wtr.flush().unwrap();
-            println!("Wrote chunk {} to CSV ({})", chunk_idx, out_file.display());
+            log::info!("Wrote chunk {} to CSV ({})", chunk_idx, out_file.display());
         }
     }
 }
