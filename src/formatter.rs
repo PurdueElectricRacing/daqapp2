@@ -80,3 +80,31 @@ impl<'de> Deserialize<'de> for Formatting {
     }
 }
 
+pub struct Formatter {
+    config: FormatterConfig,
+    compiled_config: CompiledFormatterConfig,
+}
+
+impl Formatter {
+    pub fn new(config: FormatterConfig) -> Result<Self, globset::Error> {
+        let mut compiled_config = Vec::new();
+        for (msg_pattern, signal_map) in &config {
+            let msg_glob = globset::Glob::new(msg_pattern)?.compile_matcher();
+            let mut compiled_signal_map = Vec::new();
+            for (signal_pattern, formatting) in signal_map {
+                let signal_glob = globset::Glob::new(signal_pattern)?.compile_matcher();
+                compiled_signal_map.push((signal_glob, formatting.clone()));
+            }
+            compiled_config.push((msg_glob, compiled_signal_map));
+        }
+        Ok(Self {
+            config,
+            compiled_config,
+        })
+    }
+
+    pub fn new_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let config_str = std::fs::read_to_string(path)?;
+        let config: FormatterConfig = serde_json::from_str(&config_str)?;
+        Self::new(config).map_err(|e| e.into())
+    }
