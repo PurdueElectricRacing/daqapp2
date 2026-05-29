@@ -1,5 +1,5 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
 
 pub const FORMATTER_CONFIG_FILE: &str = "formatter_config.json";
 
@@ -11,7 +11,7 @@ pub enum Formatting {
 }
 
 // Message name/pattern -> signal name/pattern -> formatting
-type FormatterConfig = HashMap<String, HashMap<String, Formatting>>;
+type FormatterConfig = IndexMap<String, IndexMap<String, Formatting>>;
 type CompiledFormatterConfig = Vec<(
     globset::GlobMatcher,
     Vec<(globset::GlobMatcher, Formatting)>,
