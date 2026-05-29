@@ -31,6 +31,15 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
                         raw_msg_id,
                         data
                     );
+                    let unparsed_msg = messages::UnparsedMessage {
+                        timestamp: chrono::Local::now(),
+                        raw_bytes: data.to_vec(),
+                        msg_id: raw_msg_id,
+                    };
+                    state
+                        .can_to_ui_tx
+                        .send(messages::MsgFromCan::UnparsedMessage(unparsed_msg))
+                        .expect("Failed to send unparsed CAN message");
                 }
             } else {
                 log::warn!(
@@ -39,6 +48,15 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
                     raw_msg_id,
                     data
                 );
+                let unparsed_msg = messages::UnparsedMessage {
+                    timestamp: chrono::Local::now(),
+                    raw_bytes: data.to_vec(),
+                    msg_id: raw_msg_id,
+                };
+                state
+                    .can_to_ui_tx
+                    .send(messages::MsgFromCan::UnparsedMessage(unparsed_msg))
+                    .expect("Failed to send unparsed CAN message");
             }
 
             data.len()
