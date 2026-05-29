@@ -964,6 +964,7 @@ dependencies = [
  "env_logger",
  "globset",
  "hashbrown 0.16.1",
+ "indexmap",
  "log",
  "rand 0.10.1",
  "rfd",
