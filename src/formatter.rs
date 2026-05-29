@@ -81,7 +81,6 @@ impl<'de> Deserialize<'de> for Formatting {
 }
 
 pub struct Formatter {
-    config: FormatterConfig,
     compiled_config: CompiledFormatterConfig,
 }
 
@@ -98,7 +97,6 @@ impl Formatter {
             compiled_config.push((msg_glob, compiled_signal_map));
         }
         Ok(Self {
-            config,
             compiled_config,
         })
     }
