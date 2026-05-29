@@ -14,6 +14,8 @@ rfd = "0.17.2"
 can_decode = "0.7.2"
 can-dbc = "9.0.0"
 
+globset = "0.4.18"
+
 chrono = "0.4.44"
 
 hashbrown = "0.16.1"
