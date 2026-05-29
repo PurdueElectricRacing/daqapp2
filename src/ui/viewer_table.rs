@@ -124,7 +124,7 @@ impl ViewerTable {
                                             formatter,
                                             &msg.decoded.name,
                                             sig_name,
-                                            sig_def.clone(),
+                                            sig_def,
                                             &signal.value,
                                         )
                                     } else {
