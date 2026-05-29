@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for Formatting {
                 match value {
                     "hex" => Ok(Formatting::Hex),
                     "binary" => Ok(Formatting::Binary),
-                    _ => Err(E::unknown_variant(value, &["hex", "binary"])),
+                    _ => Err(E::unknown_variant(value, &["<integer>", "hex", "binary"])),
                 }
             }
         }
