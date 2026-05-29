@@ -1,3 +1,4 @@
+use crate::ui::log_parser::LogParser;
 use crate::{can, connection, ui};
 use chrono::{DateTime, Local};
 use log::logger;
@@ -209,7 +210,7 @@ pub fn start_can_thread(
 }
 
 // Log every CAN frame within a certain amount of time
-pub fn log_frame(frame: &CanFrame, last_log: &mut Logger) {
+pub fn log_frame(frame: &CanFrame, last_log: &mut Logger, output_file: LogParser) {
     match create_dir_all("./logs/") {
         Ok(_) => {}
         Err(e) => {log::error!("Error with logs directory: {}", e)}
