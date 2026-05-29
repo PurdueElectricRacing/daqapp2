@@ -123,7 +123,7 @@ impl ViewerList {
                                     ui.label(format!("0x{:X}", unparsed_msg.msg_id));
                                 });
                                 row.col(|ui| {
-                                    ui.label("(unparsed)");
+                                    ui.label("(Error: Unknown)");
                                 });
                                 row.col(|ui| {
                                     let hex_bytes = unparsed_msg

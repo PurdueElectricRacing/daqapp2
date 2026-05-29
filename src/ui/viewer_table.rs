@@ -86,7 +86,7 @@ impl ViewerTable {
                                     || format!("{:03X}", msg.msg_id)
                                         .to_lowercase()
                                         .contains(&low_search)
-                                    || "unknown".contains(&low_search)
+                                    || "error: unknown".contains(&low_search)
                                     || "unparsed".contains(&low_search)
                                 {
                                     Some(msg_id)
@@ -105,9 +105,9 @@ impl ViewerTable {
                                 .collect::<Vec<_>>()
                                 .join(" ");
                             MessageCard {
-                                msg_name: "Unknown",
+                                msg_name: "Error: Unknown",
                                 msg_id: msg.msg_id,
-                                tx_node: "Unknown",
+                                tx_node: "Unparsed",
                                 raw_bytes: &raw_bytes_str,
                                 timestamp: &msg.timestamp.format("%-I:%M:%S%.3f").to_string(),
                                 signals: Vec::new(),
