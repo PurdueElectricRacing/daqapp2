@@ -1,4 +1,4 @@
-use crate::{app, messages, util};
+use crate::{app, formatter, messages, util};
 use eframe::egui;
 
 use super::dbc_msg_picker::{DbcMsgPickerState, no_dbc_placeholder};
@@ -109,6 +109,7 @@ impl SendUi {
         &mut self,
         ui: &mut egui::Ui,
         parser: Option<&app::ParserInfo>,
+        formatter: &Option<formatter::Formatter>,
     ) -> egui_tiles::UiResponse {
         let Some(parser) = parser else {
             no_dbc_placeholder(ui);
@@ -207,11 +208,16 @@ impl SendUi {
                             ui.horizontal(|ui| {
                                 let signal = &mut self.signal_values[i];
                                 ui.label(signal.name.as_str());
+                                let expected_decimals = formatter
+                                    .as_ref()
+                                    .map(|f| f.expected_decimals(&selected_msg.name, &signal.name))
+                                    .unwrap_or(2);
+                                let speed = 10f64.powi(-(expected_decimals as i32));
                                 if ui
                                     .add(
                                         egui::DragValue::new(&mut signal.value)
                                             .range(signal.min..=signal.max)
-                                            .speed(0.1),
+                                            .speed(speed),
                                     )
                                     .changed()
                                 {

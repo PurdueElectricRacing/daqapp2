@@ -84,6 +84,15 @@ impl<'de> Deserialize<'de> for Formatting {
     }
 }
 
+impl Formatting {
+    pub fn expected_decimals(&self) -> usize {
+        match self {
+            Formatting::Hex | Formatting::Binary => 0,
+            Formatting::Decimal(places) => *places,
+        }
+    }
+}
+
 pub struct Formatter {
     compiled_config: CompiledFormatterConfig,
 }
@@ -172,6 +181,19 @@ impl Formatter {
             .or_else(|| sig_def.map(|s| s.unit.as_str()))
             .filter(|u| !u.is_empty());
         default_format(maybe_unit, value)
+    }
+
+    pub fn expected_decimals(&self, msg_name: &str, signal_name: &str) -> usize {
+        for (msg_glob, signal_vec) in &self.compiled_config {
+            if msg_glob.is_match(msg_name) {
+                for (signal_glob, formatting) in signal_vec {
+                    if signal_glob.is_match(signal_name) {
+                        return formatting.expected_decimals();
+                    }
+                }
+            }
+        }
+        2 // Default to 2 decimal places if no match is found
     }
 }
 

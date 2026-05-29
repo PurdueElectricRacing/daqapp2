@@ -59,7 +59,7 @@ impl Widget {
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),
             Widget::LogParser(w) => w.show(ui, parser),
-            Widget::SendUi(w) => w.show(ui, parser),
+            Widget::SendUi(w) => w.show(ui, parser, formatter),
             Widget::BusLoad(w) => w.show(ui),
             Widget::BatteryViewer(w) => w.show(ui),
             Widget::GgPlot(w) => w.show(ui),
