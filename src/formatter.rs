@@ -149,6 +149,21 @@ impl Formatter {
     }
 }
 
+pub fn try_format(
+    formatter: Option<&Formatter>,
+    msg_name: &str,
+    signal_name: &str,
+    sig_def: can_dbc::Signal,
+    value: &can_decode::DecodedSignalValue,
+) -> String {
+    if let Some(fmt) = formatter {
+        fmt.format(msg_name, signal_name, sig_def, value)
+    } else {
+        // Default formatting if no formatter loaded: 2 decimal places
+        format!("{:.2}", value.physical)
+    }
+}
+
 fn format_hex(sig_def: &can_dbc::Signal, value: &can_decode::DecodedSignalValue) -> String {
     let bits = sig_def.size.clamp(1, 64) as u32;
     let nybbles = bits.div_ceil(4) as usize;
