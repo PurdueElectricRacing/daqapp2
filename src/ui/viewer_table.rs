@@ -111,25 +111,19 @@ impl ViewerTable {
                             .signals
                             .iter()
                             .map(|(sig_name, signal)| {
-                                if let Some(sig_def) = msg_def
-                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name))
-                                {
-                                    (
-                                        sig_name.as_str(),
-                                        formatter::try_format(
-                                            formatter,
-                                            &msg.decoded.name,
-                                            sig_name,
-                                            sig_def,
-                                            &signal.value,
-                                        ),
-                                    )
-                                } else {
-                                    (
-                                        sig_name.as_str(),
-                                        formatter::default_format(&signal.unit, &signal.value),
-                                    )
-                                }
+                                let sig_def = msg_def
+                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name));
+                                (
+                                    sig_name.as_str(),
+                                    formatter::try_format(
+                                        formatter,
+                                        &msg.decoded.name,
+                                        sig_name,
+                                        sig_def,
+                                        Some(&signal.unit),
+                                        &signal.value,
+                                    ),
+                                )
                             })
                             .collect();
                         let raw_bytes_str = msg

@@ -88,19 +88,15 @@ impl ViewerList {
                                 ui.label(sig_name.to_string());
                             });
                             row.col(|ui| {
-                                if let Some(sig_def) = msg_def
-                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name))
+                                let sig_def = msg_def
+                                    .and_then(|md| md.signals.iter().find(|s| s.name == *sig_name));
                                 {
                                     ui.label(formatter::try_format(
                                         formatter,
                                         &msg.decoded.name,
                                         sig_name,
                                         sig_def,
-                                        &signal.value,
-                                    ));
-                                } else {
-                                    ui.label(formatter::default_format(
-                                        &signal.unit,
+                                        Some(&signal.unit),
                                         &signal.value,
                                     ));
                                 }

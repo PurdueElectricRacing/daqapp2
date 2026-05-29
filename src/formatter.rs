@@ -129,31 +129,55 @@ impl Formatter {
         &self,
         msg_name: &str,
         signal_name: &str,
-        sig_def: &can_dbc::Signal,
+        sig_def: Option<&can_dbc::Signal>,
+        unit: Option<&str>,
         value: &can_decode::DecodedSignalValue,
     ) -> String {
         for (msg_glob, signal_vec) in &self.compiled_config {
             if msg_glob.is_match(msg_name) {
                 for (signal_glob, formatting) in signal_vec {
                     if signal_glob.is_match(signal_name) {
-                        let raw = match formatting {
-                            Formatting::Hex => format_hex(&sig_def, value),
-                            Formatting::Binary => format_binary(&sig_def, value),
-                            Formatting::Decimal(places) => {
-                                format!("{:.*}", *places, value.physical)
-                            }
+                        println!(
+                            "Matched formatter pattern: msg '{}', signal '{}', formatting {:?}",
+                            msg_name, signal_name, formatting
+                        );
+                        let have_enough_info = match formatting {
+                            Formatting::Hex | Formatting::Binary => sig_def.is_some(),
+                            Formatting::Decimal(_) => true,
                         };
-                        if sig_def.unit.is_empty() {
-                            return raw;
-                        } else {
-                            return format!("{} {}", raw, sig_def.unit);
+                        if have_enough_info {
+                            let raw = match formatting {
+                                Formatting::Hex => format_hex(sig_def.as_ref().unwrap(), value),
+                                Formatting::Binary => {
+                                    format_binary(sig_def.as_ref().unwrap(), value)
+                                }
+                                Formatting::Decimal(places) => {
+                                    println!(
+                                        "Formatting as decimal with {} places: physical value = {}",
+                                        places, value.physical
+                                    );
+                                    format!("{:.*}", *places, value.physical)
+                                }
+                            };
+                            if let Some(u) = unit
+                                && !u.is_empty()
+                            {
+                                return format!("{} {}", raw, u);
+                            } else {
+                                return raw;
+                            }
                         }
                     }
                 }
             }
         }
 
-        default_format(&sig_def.unit, value)
+        let u = if unit.is_some() {
+            unit
+        } else {
+            sig_def.as_ref().map(|s| s.unit.as_str())
+        };
+        default_format(u, value)
     }
 }
 
@@ -161,23 +185,31 @@ pub fn try_format(
     formatter: &Option<Formatter>,
     msg_name: &str,
     signal_name: &str,
-    sig_def: &can_dbc::Signal,
+    sig_def: Option<&can_dbc::Signal>,
+    unit: Option<&str>,
     value: &can_decode::DecodedSignalValue,
 ) -> String {
     if let Some(fmt) = formatter {
-        fmt.format(msg_name, signal_name, sig_def, value)
+        fmt.format(msg_name, signal_name, sig_def, unit, value)
     } else {
-        default_format(&sig_def.unit, value)
+        let u = if unit.is_some() {
+            unit
+        } else {
+            sig_def.as_ref().map(|s| s.unit.as_str())
+        };
+        default_format(u, value)
     }
 }
 
-pub fn default_format(unit: &str, value: &can_decode::DecodedSignalValue) -> String {
+pub fn default_format(unit: Option<&str>, value: &can_decode::DecodedSignalValue) -> String {
     if let Some(enum_label) = &value.enum_label {
         format!("{} ({})", enum_label, value.int_rounded())
-    } else if unit.is_empty() {
-        format!("{:.2}", value.physical)
+    } else if let Some(u) = unit
+        && !u.is_empty()
+    {
+        format!("{:.2} {}", value.physical, u)
     } else {
-        format!("{:.2} {}", value.physical, unit)
+        format!("{:.2}", value.physical)
     }
 }
 
