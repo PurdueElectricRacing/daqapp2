@@ -1,4 +1,4 @@
-use crate::{action, messages, formatter};
+use crate::{action, app, formatter, messages};
 use eframe::egui;
 
 type MsgMap = hashbrown::HashMap<u32, messages::ParsedMessage>;
@@ -27,6 +27,7 @@ impl ViewerTable {
         ui: &mut egui::Ui,
         action_queue: &mut Vec<action::AppAction>,
         formatter: &Option<formatter::Formatter>,
+        parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
         if ui
@@ -101,6 +102,10 @@ impl ViewerTable {
                     msg_keys.sort();
                     for msg_id in msg_keys {
                         let msg = &msgs[&msg_id];
+                        let msg_def = parser
+                            .as_ref()
+                            .map(|p| &p.parser)
+                            .and_then(|p| p.msg_def(msg_id));
                         let signals: Vec<(&str, String)> = msg
                             .decoded
                             .signals
@@ -111,13 +116,25 @@ impl ViewerTable {
                                         sig_name.as_str(),
                                         format!("{} ({})", enum_label, signal.value.int_rounded()),
                                     )
-                                } else if signal.unit.is_empty() {
-                                    (sig_name.as_str(), format!("{:.2}", signal.value.physical))
                                 } else {
-                                    (
-                                        sig_name.as_str(),
-                                        format!("{:.2} {}", signal.value.physical, signal.unit),
-                                    )
+                                    let raw = if let Some(sig_def) = msg_def.and_then(|md| {
+                                        md.signals.iter().find(|s| s.name == *sig_name)
+                                    }) {
+                                        formatter::try_format(
+                                            formatter,
+                                            &msg.decoded.name,
+                                            sig_name,
+                                            sig_def.clone(),
+                                            &signal.value,
+                                        )
+                                    } else {
+                                        format!("{:.2}", signal.value.physical)
+                                    };
+                                    if signal.unit.is_empty() {
+                                        (sig_name.as_str(), raw)
+                                    } else {
+                                        (sig_name.as_str(), format!("{} {}", raw, signal.unit))
+                                    }
                                 }
                             })
                             .collect();

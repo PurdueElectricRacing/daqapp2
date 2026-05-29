@@ -1,4 +1,4 @@
-use crate::{action, app, messages, ui, formatter};
+use crate::{action, app, formatter, messages, ui};
 use eframe::egui;
 
 pub enum Widget {
@@ -54,7 +54,7 @@ impl Widget {
         }
 
         match self {
-            Widget::ViewerTable(w) => w.show(ui, action_queue, formatter),
+            Widget::ViewerTable(w) => w.show(ui, action_queue, formatter, parser),
             Widget::ViewerList(w) => w.show(ui),
             Widget::Bootloader(w) => w.show(ui),
             Widget::Scope(w) => w.show(ui),

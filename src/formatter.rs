@@ -150,7 +150,7 @@ impl Formatter {
 }
 
 pub fn try_format(
-    formatter: Option<&Formatter>,
+    formatter: &Option<Formatter>,
     msg_name: &str,
     signal_name: &str,
     sig_def: can_dbc::Signal,
