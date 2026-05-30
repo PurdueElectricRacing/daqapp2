@@ -302,7 +302,7 @@ impl SendUi {
                     let mut updates_to_send = Vec::new();
                     for idx in (0..self.sending_messages.len()).rev() {
                         if let Some(action) =
-                            self.sending_messages[idx].ui(ui, idx, &mut updates_to_send)
+                            self.sending_messages[idx].ui(ui, formatter, idx, &mut updates_to_send)
                         {
                             all_actions.push(action);
                         }
@@ -393,6 +393,7 @@ impl SendingMessage {
     fn ui(
         &mut self,
         ui: &mut egui::Ui,
+        formatter: &Option<formatter::Formatter>,
         msg_idx: usize,
         updates_to_send: &mut Vec<usize>,
     ) -> Option<SendUiActions> {
@@ -457,12 +458,18 @@ impl SendingMessage {
                             ui.with_layout(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
+                                    let expected_decimals = formatter
+                                        .as_ref()
+                                        .map(|f| f.expected_decimals(&self.msg_name, &signal.name))
+                                        .unwrap_or(2);
+
                                     if self.adjustable_values_enabled {
+                                        let speed = 10f64.powi(-(expected_decimals as i32));
                                         if ui
                                             .add(
                                                 egui::DragValue::new(&mut signal.value)
                                                     .range(signal.min..=signal.max)
-                                                    .speed(0.1),
+                                                    .speed(speed),
                                             )
                                             .changed()
                                         {
@@ -470,8 +477,11 @@ impl SendingMessage {
                                         }
                                     } else {
                                         ui.label(
-                                            egui::RichText::new(format!("{:.2}", signal.value))
-                                                .monospace(),
+                                            egui::RichText::new(format!(
+                                                "{:.*}",
+                                                expected_decimals, signal.value
+                                            ))
+                                            .monospace(),
                                         );
                                     }
                                 },
