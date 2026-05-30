@@ -24,8 +24,8 @@ impl TxNodeSearch {
     fn matches(&self, tx_node: &str) -> bool {
         match self {
             TxNodeSearch::Any => true,
-            TxNodeSearch::Unparsed => tx_node.to_lowercase() == "unparsed",
-            TxNodeSearch::Node(node) => tx_node.to_lowercase() == node.to_lowercase(),
+            TxNodeSearch::Unparsed => tx_node.eq_ignore_ascii_case("Unparsed"),
+            TxNodeSearch::Node(node) => tx_node.eq_ignore_ascii_case(node),
         }
     }
 }
