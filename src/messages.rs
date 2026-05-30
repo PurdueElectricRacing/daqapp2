@@ -9,6 +9,7 @@ pub enum MsgFromUi {
 
 pub enum MsgFromCan {
     ParsedMessage(ParsedMessage),
+    UnparsedMessage(UnparsedMessage),
     Disconnection,
     ConnectionSuccessful,
     ConnectionFailed(String),
@@ -73,4 +74,11 @@ pub struct ParsedMessage {
     pub timestamp: chrono::DateTime<chrono::Local>,
     pub raw_bytes: Vec<u8>,
     pub decoded: can_decode::DecodedMessage,
+}
+
+#[derive(Clone)]
+pub struct UnparsedMessage {
+    pub timestamp: chrono::DateTime<chrono::Local>,
+    pub raw_bytes: Vec<u8>,
+    pub msg_id: u32, // without the extended ID flag
 }

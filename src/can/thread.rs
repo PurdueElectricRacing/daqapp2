@@ -12,37 +12,58 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
             let raw_msg_id = util::can::slcan_to_u32_without_extid_flag(&frame2.id());
 
             let data = frame2.data().unwrap_or(&[]);
+            let timestamp = chrono::Local::now();
+            let raw_bytes = data.to_vec();
 
-            if let Some(parser) = state.parser.as_ref() {
-                if let Some(decoded) = parser.decode_msg(decode_msg_id, data) {
+            let decoded = state
+                .parser
+                .as_ref()
+                .and_then(|parser| parser.decode_msg(decode_msg_id, data));
+
+            match decoded {
+                Some(decoded) => {
                     let parsed_msg = messages::ParsedMessage {
-                        timestamp: chrono::Local::now(),
-                        raw_bytes: data.to_vec(),
+                        timestamp,
+                        raw_bytes,
                         decoded,
                     };
                     state
                         .can_to_ui_tx
                         .send(messages::MsgFromCan::ParsedMessage(parsed_msg))
                         .expect("Failed to send parsed CAN message");
-                } else {
-                    log::error!(
-                        "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
-                        raw_msg_id,
-                        raw_msg_id,
-                        data
-                    );
                 }
-            } else {
-                log::warn!(
-                    "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
-                    raw_msg_id,
-                    raw_msg_id,
-                    data
-                );
+                None => {
+                    if state.parser.is_some() {
+                        log::error!(
+                            "Failed to parse: frame ID 0x{:X} ({}), data: {:02X?}",
+                            raw_msg_id,
+                            raw_msg_id,
+                            data
+                        );
+                    } else {
+                        log::warn!(
+                            "No DBC loaded. Received frame ID 0x{:X} ({}), data: {:02X?}",
+                            raw_msg_id,
+                            raw_msg_id,
+                            data
+                        );
+                    }
+
+                    let unparsed_msg = messages::UnparsedMessage {
+                        timestamp,
+                        raw_bytes,
+                        msg_id: raw_msg_id,
+                    };
+                    state
+                        .can_to_ui_tx
+                        .send(messages::MsgFromCan::UnparsedMessage(unparsed_msg))
+                        .expect("Failed to send unparsed CAN message");
+                }
             }
 
             data.len()
         }
+
         slcan::CanFrame::CanFd(frame_fd) => {
             let msg_id_raw = util::can::slcan_to_u32_without_extid_flag(&frame_fd.id());
             log::warn!(
@@ -50,9 +71,7 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
                 msg_id_raw,
                 frame_fd.data().len()
             );
-
-            let data = frame_fd.data();
-            data.len()
+            frame_fd.data().len()
         }
     }
 }

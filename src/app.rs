@@ -304,6 +304,7 @@ impl eframe::App for DAQApp {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
                 messages::MsgFromCan::ParsedMessage(_)
+                | messages::MsgFromCan::UnparsedMessage(_)
                 | messages::MsgFromCan::MessageSent { .. }
                 | messages::MsgFromCan::BusLoad { .. } => {
                     // Nothing special to do here, the message will be handled
