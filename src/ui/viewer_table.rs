@@ -4,12 +4,20 @@ use eframe::egui;
 type DecodedMsgMap = hashbrown::HashMap<u32, messages::ParsedMessage>;
 type UndecodedMsgMap = hashbrown::HashMap<u32, messages::UnparsedMessage>;
 
+#[derive(Clone, PartialEq, Eq)]
+enum TxNodeSearch {
+    Any,
+    Unparsed,
+    Node(String),
+}
+
 pub struct ViewerTable {
     pub title: String,
     decoded_msgs: frozen::Frozen<DecodedMsgMap>,
     undecoded_msgs: frozen::Frozen<UndecodedMsgMap>,
     paused: bool,
     search: String,
+    tx_node: TxNodeSearch,
 }
 
 impl ViewerTable {
@@ -20,6 +28,7 @@ impl ViewerTable {
             undecoded_msgs: frozen::Frozen::new(UndecodedMsgMap::new()),
             paused: false,
             search: String::new(),
+            tx_node: TxNodeSearch::Any,
         }
     }
 
@@ -66,6 +75,33 @@ impl ViewerTable {
                 ui.horizontal(|ui| {
                     ui.label("Search:");
                     ui.text_edit_singleline(&mut self.search);
+
+                    ui.add_space(8.0);
+
+                    let mut all_tx_nodes = self
+                        .decoded_msgs
+                        .get()
+                        .values()
+                        .map(|msg| msg.decoded.tx_node.clone())
+                        .collect::<Vec<_>>();
+                    all_tx_nodes.sort_unstable();
+                    all_tx_nodes.dedup();
+                    ui.label("Tx Node:");
+                    egui::ComboBox::from_id_salt("tx_node_filter")
+                        .selected_text(match &self.tx_node {
+                            TxNodeSearch::Any => "Any".to_string(),
+                            TxNodeSearch::Unparsed => "Unparsed".to_string(),
+                            TxNodeSearch::Node(node) => node.clone(),
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.tx_node, TxNodeSearch::Any, "Any");
+                            for tx_node in all_tx_nodes {
+                                ui.selectable_value(&mut self.tx_node, TxNodeSearch::Node(tx_node.clone()), tx_node);
+                            }
+                            if !self.undecoded_msgs.get().is_empty() {
+                                ui.selectable_value(&mut self.tx_node, TxNodeSearch::Unparsed, "Unparsed");
+                            }
+                        });
                 });
                 ui.add_space(8.0);
 
