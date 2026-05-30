@@ -31,19 +31,27 @@ impl ViewerTable {
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
-        if ui
-            .button(if self.paused { "Resume" } else { "Pause" })
-            .clicked()
-        {
-            self.paused = !self.paused;
-            if self.paused {
-                self.decoded_msgs.freeze();
-                self.undecoded_msgs.freeze();
-            } else {
-                self.decoded_msgs.unfreeze();
-                self.undecoded_msgs.unfreeze();
+
+        ui.horizontal(|ui| {
+            if ui
+                .button(if self.paused { "Resume" } else { "Pause" })
+                .clicked()
+            {
+                self.paused = !self.paused;
+                if self.paused {
+                    self.decoded_msgs.freeze();
+                    self.undecoded_msgs.freeze();
+                } else {
+                    self.decoded_msgs.unfreeze();
+                    self.undecoded_msgs.unfreeze();
+                }
             }
-        }
+
+            if ui.button("Clear").clicked() {
+                self.decoded_msgs.apply_both(|ms| ms.clear());
+                self.undecoded_msgs.apply_both(|ms| ms.clear());
+            }
+        });
 
         self.clean_undecoded();
 
