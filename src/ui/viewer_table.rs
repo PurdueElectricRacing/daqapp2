@@ -97,7 +97,7 @@ impl ViewerTable {
                     all_tx_nodes.sort_unstable();
                     all_tx_nodes.dedup();
                     ui.label("Tx Node:");
-                    egui::ComboBox::from_id_salt("tx_node_filter")
+                    egui::ComboBox::from_id_salt(("tx_node_filter", &self.title))
                         .selected_text(match &self.tx_node {
                             TxNodeSearch::Any => "Any".to_string(),
                             TxNodeSearch::Unparsed => "Unparsed".to_string(),
