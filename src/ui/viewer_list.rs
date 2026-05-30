@@ -33,17 +33,25 @@ impl ViewerList {
         parser: Option<&app::ParserInfo>,
     ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
-        if ui
-            .button(if self.paused { "Resume" } else { "Pause" })
-            .clicked()
-        {
-            self.paused = !self.paused;
-            if self.paused {
-                self.msgs.freeze();
-            } else {
-                self.msgs.unfreeze();
+
+        ui.horizontal(|ui| {
+            if ui
+                .button(if self.paused { "Resume" } else { "Pause" })
+                .clicked()
+            {
+                self.paused = !self.paused;
+                if self.paused {
+                    self.msgs.freeze();
+                } else {
+                    self.msgs.unfreeze();
+                }
             }
-        }
+
+            if ui.button("Clear").clicked() {
+                self.msgs.apply_both(|ms| ms.clear());
+            }
+        });
+
         ui.separator();
 
         egui_extras::TableBuilder::new(ui)
