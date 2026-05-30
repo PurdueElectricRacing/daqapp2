@@ -4,12 +4,30 @@ use eframe::egui;
 type DecodedMsgMap = hashbrown::HashMap<u32, messages::ParsedMessage>;
 type UndecodedMsgMap = hashbrown::HashMap<u32, messages::UnparsedMessage>;
 
+#[derive(Clone, PartialEq, Eq)]
+enum TxNodeSearch {
+    Any,
+    Unparsed,
+    Node(String),
+}
+
 pub struct ViewerTable {
     pub title: String,
     decoded_msgs: frozen::Frozen<DecodedMsgMap>,
     undecoded_msgs: frozen::Frozen<UndecodedMsgMap>,
     paused: bool,
     search: String,
+    tx_node: TxNodeSearch,
+}
+
+impl TxNodeSearch {
+    fn matches(&self, tx_node: &str) -> bool {
+        match self {
+            TxNodeSearch::Any => true,
+            TxNodeSearch::Unparsed => tx_node.eq_ignore_ascii_case("Unparsed"),
+            TxNodeSearch::Node(node) => tx_node.eq_ignore_ascii_case(node),
+        }
+    }
 }
 
 impl ViewerTable {
@@ -20,6 +38,7 @@ impl ViewerTable {
             undecoded_msgs: frozen::Frozen::new(UndecodedMsgMap::new()),
             paused: false,
             search: String::new(),
+            tx_node: TxNodeSearch::Any,
         }
     }
 
@@ -66,6 +85,41 @@ impl ViewerTable {
                 ui.horizontal(|ui| {
                     ui.label("Search:");
                     ui.text_edit_singleline(&mut self.search);
+
+                    ui.add_space(8.0);
+
+                    let mut all_tx_nodes = self
+                        .decoded_msgs
+                        .get()
+                        .values()
+                        .map(|msg| msg.decoded.tx_node.clone())
+                        .collect::<Vec<_>>();
+                    all_tx_nodes.sort_unstable();
+                    all_tx_nodes.dedup();
+                    ui.label("Tx Node:");
+                    egui::ComboBox::from_id_salt(("tx_node_filter", &self.title))
+                        .selected_text(match &self.tx_node {
+                            TxNodeSearch::Any => "Any".to_string(),
+                            TxNodeSearch::Unparsed => "Unparsed".to_string(),
+                            TxNodeSearch::Node(node) => node.clone(),
+                        })
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.tx_node, TxNodeSearch::Any, "Any");
+                            for tx_node in all_tx_nodes {
+                                ui.selectable_value(
+                                    &mut self.tx_node,
+                                    TxNodeSearch::Node(tx_node.clone()),
+                                    tx_node,
+                                );
+                            }
+                            if !self.undecoded_msgs.get().is_empty() {
+                                ui.selectable_value(
+                                    &mut self.tx_node,
+                                    TxNodeSearch::Unparsed,
+                                    "Unparsed",
+                                );
+                            }
+                        });
                 });
                 ui.add_space(8.0);
 
@@ -90,6 +144,14 @@ impl ViewerTable {
                         let mut undecoded_msg_keys = undecoded
                             .iter()
                             .filter_map(|(&msg_id, msg)| {
+                                let tx_filter = matches!(
+                                    self.tx_node,
+                                    TxNodeSearch::Any | TxNodeSearch::Unparsed
+                                );
+                                if !tx_filter {
+                                    return None;
+                                }
+
                                 if self.search.is_empty()
                                     || format!("{:03X}", msg.msg_id)
                                         .to_lowercase()
@@ -131,6 +193,11 @@ impl ViewerTable {
                     let mut decoded_msg_keys = decoded
                         .iter()
                         .filter_map(|(&msg_id, msg)| {
+                            let tx_filter = self.tx_node.matches(&msg.decoded.tx_node);
+                            if !tx_filter {
+                                return None;
+                            }
+
                             if self.search.is_empty()
                                 || msg.decoded.name.to_lowercase().contains(&low_search)
                                 || format!("{:03X}", msg.decoded.msg_id)
