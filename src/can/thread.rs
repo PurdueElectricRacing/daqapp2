@@ -42,13 +42,13 @@ impl DaqLogger {
                 (id, frame.data().unwrap_or(&[]))
             }
             slcan::Id::Extended(eid) => {
-                let id = eid.as_raw() | 0x80000000;  // Extended ID flag
+                let id = eid.as_raw() | 0x80000000;
                 (id, frame.data().unwrap_or(&[]))
             }
         };
 
         let identity = if bus_id != 0 {
-            id | 0x40000000  // BUS_ID_MASK
+            id | 0x40000000 
         } else {
             id
         };
