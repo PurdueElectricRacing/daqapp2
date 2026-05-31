@@ -1,6 +1,7 @@
 use crate::{can, connection, messages, util};
 use crate::daq_log_parse::parse::RawFrame;
 use crate::util::get_absolute_path_to;
+use crate::daq_log_parse::consts::{BUS_ID_MASK, IS_EID_MASK};
 
 use std::path::PathBuf;
 use std::fs::{File, create_dir_all};
@@ -46,13 +47,13 @@ impl DaqLogger {
                 (id, frame.data().unwrap_or(&[]))
             }
             slcan::Id::Extended(eid) => {
-                let id = eid.as_raw() | 0x80000000;
+                let id = eid.as_raw() | IS_EID_MASK;
                 (id, frame.data().unwrap_or(&[]))
             }
         };
 
-        let identity = if bus_id != 0 {
-            id | 0x40000000 
+        let frame_identity = if bus_id != 0 {
+            id | BUS_ID_MASK 
         } else {
             id
         };
@@ -63,8 +64,8 @@ impl DaqLogger {
         let ticks_ms = self.start_time.elapsed().as_millis() as u32;
 
         let raw_frame = RawFrame {
-            ticks_ms,
-            identity,
+            ticks_ms: ticks_ms,
+            identity: frame_identity,
             data: data_array,
         };
 
