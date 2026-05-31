@@ -4,6 +4,8 @@ mod assets;
 mod can;
 mod connection;
 mod daq_log_parse;
+mod formatter;
+mod frozen;
 mod messages;
 mod settings;
 mod shortcuts;

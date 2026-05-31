@@ -33,7 +33,7 @@ pub fn parse_log_files(
         .collect::<Vec<_>>();
     file_paths.sort();
     for path in file_paths {
-        println!("Parsing log file: {}", path.display());
+        log::info!("Parsing log file: {}", path.display());
         let parsed = parse_log_file(&path, parser_bus_0, parser_bus_1);
         all_parsed.extend(parsed);
     }

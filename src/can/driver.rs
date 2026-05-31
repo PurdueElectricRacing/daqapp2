@@ -1,4 +1,4 @@
-use crate::connection::ConnectionSource;
+use crate::connection::{CanBusSpeed, ConnectionSource};
 use crate::util;
 use rand::prelude::*;
 use serialport::{ClearBuffer, SerialPort};
@@ -37,6 +37,8 @@ pub trait Driver {
 
     fn is_connected(&self) -> bool;
 
+    fn bus_speed(&self) -> Option<CanBusSpeed>;
+
     fn close(&mut self) -> DriverResult<()>;
 }
 
@@ -44,10 +46,11 @@ pub trait Driver {
 pub struct SerialDriver {
     socket: CanSocket<Box<dyn SerialPort>>,
     connected: bool,
+    bus_speed: CanBusSpeed,
 }
 
 impl SerialDriver {
-    pub fn new(port_path: &str) -> DriverResult<Self> {
+    pub fn new(port_path: &str, speed: CanBusSpeed) -> DriverResult<Self> {
         let port = serialport::new(port_path, SERIAL_BAUD_RATE)
             .timeout(Duration::from_millis(SERIAL_TIMEOUT_MS))
             .open()
@@ -65,12 +68,13 @@ impl SerialDriver {
             })?;
 
         socket
-            .open(NominalBitRate::Rate500Kbit)
+            .open(speed.to_slcan_bitrate())
             .map_err(|e| DriverError::ConnectionFailed(format!("Failed to open CAN: {}", e)))?;
 
         Ok(Self {
             socket,
             connected: true,
+            bus_speed: speed,
         })
     }
 }
@@ -113,6 +117,10 @@ impl Driver for SerialDriver {
 
     fn is_connected(&self) -> bool {
         self.connected
+    }
+
+    fn bus_speed(&self) -> Option<CanBusSpeed> {
+        Some(self.bus_speed)
     }
 
     fn close(&mut self) -> DriverResult<()> {
@@ -186,6 +194,10 @@ impl Driver for UdpDriver {
 
     fn is_connected(&self) -> bool {
         self.connected
+    }
+
+    fn bus_speed(&self) -> Option<CanBusSpeed> {
+        None
     }
 
     fn close(&mut self) -> DriverResult<()> {
@@ -273,6 +285,10 @@ impl Driver for SimulatedDriver {
         self.connected
     }
 
+    fn bus_speed(&self) -> Option<CanBusSpeed> {
+        None
+    }
+
     fn close(&mut self) -> DriverResult<()> {
         self.connected = false;
         Ok(())
@@ -323,6 +339,10 @@ impl Driver for LoopbackDriver {
         self.connected
     }
 
+    fn bus_speed(&self) -> Option<CanBusSpeed> {
+        None
+    }
+
     fn close(&mut self) -> DriverResult<()> {
         self.connected = false;
         self.queued_frames.clear();
@@ -339,7 +359,7 @@ pub fn parse_udp_buffer(
             "Received packet too small: {} bytes",
             num_bytes
         ))));
-    } else if num_bytes % UDP_RAW_FRAME_SIZE != 0 {
+    } else if !num_bytes.is_multiple_of(UDP_RAW_FRAME_SIZE) {
         log::warn!(
             "Received packet of size {} which is not a multiple of raw frame size {}; some data may be ignored",
             num_bytes,
@@ -403,7 +423,7 @@ pub fn parse_udp_buffer(
 
 pub fn create_driver(source: &ConnectionSource) -> DriverResult<Box<dyn Driver>> {
     match source {
-        ConnectionSource::Serial(path) => Ok(Box::new(SerialDriver::new(path)?)),
+        ConnectionSource::Serial(path, speed) => Ok(Box::new(SerialDriver::new(path, *speed)?)),
         ConnectionSource::Udp(port) => Ok(Box::new(UdpDriver::new(*port)?)),
         ConnectionSource::Simulated(connected, dbc_path) => Ok(Box::new(SimulatedDriver::new(
             *connected,

@@ -1,4 +1,4 @@
-use crate::{action, app, messages, widgets};
+use crate::{action, app, formatter, messages, widgets};
 use eframe::egui;
 
 pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
@@ -15,6 +15,7 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 action_queue: &mut app.action_queue,
                 parser: app.parser.as_ref(),
                 ui_to_can_tx: app.ui_to_can_tx.clone(),
+                formatter: &app.value_formatter,
             };
             app.tile_tree.ui(&mut behavior, ui);
         }
@@ -26,6 +27,7 @@ struct WorkspaceTileBehavior<'a> {
     action_queue: &'a mut Vec<action::AppAction>,
     parser: Option<&'a app::ParserInfo>,
     ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+    formatter: &'a Option<formatter::Formatter>,
 }
 
 impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
@@ -41,6 +43,7 @@ impl egui_tiles::Behavior<widgets::Widget> for WorkspaceTileBehavior<'_> {
             self.action_queue,
             self.parser,
             self.ui_to_can_tx.clone(),
+            self.formatter,
         )
     }
 

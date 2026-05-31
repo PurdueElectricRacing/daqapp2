@@ -1,39 +1,57 @@
-use crate::messages;
+use crate::{app, formatter, frozen, messages};
 use eframe::egui;
 use std::collections::VecDeque;
 
 const MAX_MESSAGES: usize = 200;
 
+#[derive(Clone)]
+enum Msg {
+    Decoded(messages::ParsedMessage),
+    Undecoded(messages::UnparsedMessage),
+}
+type MsgList = VecDeque<Msg>;
+
 pub struct ViewerList {
     pub title: String,
-    pub decoded_msgs: VecDeque<messages::ParsedMessage>,
-    pub frozen_msgs: Option<VecDeque<messages::ParsedMessage>>,
-    pub paused: bool,
+    msgs: frozen::Frozen<MsgList>,
+    paused: bool,
 }
 
 impl ViewerList {
     pub fn new(instance_num: usize) -> Self {
         Self {
             title: format!("CAN Viewer Table #{}", instance_num),
-            decoded_msgs: VecDeque::new(),
-            frozen_msgs: None,
+            msgs: frozen::Frozen::new(VecDeque::with_capacity(MAX_MESSAGES)),
             paused: false,
         }
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        formatter: &Option<formatter::Formatter>,
+        parser: Option<&app::ParserInfo>,
+    ) -> egui_tiles::UiResponse {
         ui.heading(format!("🚗 {}", self.title));
-        if ui
-            .button(if self.paused { "Resume" } else { "Pause" })
-            .clicked()
-        {
-            self.paused = !self.paused;
-            if self.paused {
-                self.frozen_msgs = Some(self.decoded_msgs.clone());
-            } else {
-                self.frozen_msgs = None;
+
+        ui.horizontal(|ui| {
+            if ui
+                .button(if self.paused { "Resume" } else { "Pause" })
+                .clicked()
+            {
+                self.paused = !self.paused;
+                if self.paused {
+                    self.msgs.freeze();
+                } else {
+                    self.msgs.unfreeze();
+                }
             }
-        }
+
+            if ui.button("Clear").clicked() {
+                self.msgs.apply_both(|ms| ms.clear());
+            }
+        });
+
         ui.separator();
 
         egui_extras::TableBuilder::new(ui)
@@ -57,43 +75,75 @@ impl ViewerList {
                 });
             })
             .body(|mut body| {
-                let msgs = if let Some(frozen) = &self.frozen_msgs {
-                    frozen
-                } else {
-                    &self.decoded_msgs
-                };
-                for msg in msgs.iter().rev() {
-                    for (sig_name, signal) in msg.decoded.signals.iter() {
-                        body.row(18.0, |mut row| {
-                            row.col(|ui| {
-                                ui.label(msg.timestamp.format("%H:%M:%S:%3f").to_string());
+                for msg in self.msgs.get().iter().rev() {
+                    match msg {
+                        Msg::Decoded(decoded_msg) => {
+                            let msg_def = parser
+                                .as_ref()
+                                .map(|p| &p.parser)
+                                .and_then(|p| p.msg_def(decoded_msg.decoded.msg_id));
+
+                            for (sig_name, signal) in decoded_msg.decoded.signals.iter() {
+                                body.row(18.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label(
+                                            decoded_msg
+                                                .timestamp
+                                                .format("%H:%M:%S:%3f")
+                                                .to_string(),
+                                        );
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(format!(
+                                            "{} (0x{:X})",
+                                            decoded_msg.decoded.name, decoded_msg.decoded.msg_id
+                                        ));
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(sig_name.to_string());
+                                    });
+                                    row.col(|ui| {
+                                        let sig_def = msg_def.and_then(|md| {
+                                            md.signals.iter().find(|s| s.name == *sig_name)
+                                        });
+                                        {
+                                            ui.label(formatter::try_format(
+                                                formatter,
+                                                &decoded_msg.decoded.name,
+                                                sig_name,
+                                                sig_def,
+                                                Some(&signal.unit),
+                                                &signal.value,
+                                            ));
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                        Msg::Undecoded(unparsed_msg) => {
+                            body.row(18.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label(
+                                        unparsed_msg.timestamp.format("%H:%M:%S:%3f").to_string(),
+                                    );
+                                });
+                                row.col(|ui| {
+                                    ui.label(format!("0x{:X}", unparsed_msg.msg_id));
+                                });
+                                row.col(|ui| {
+                                    ui.label("(Error: Unknown)");
+                                });
+                                row.col(|ui| {
+                                    let hex_bytes = unparsed_msg
+                                        .raw_bytes
+                                        .iter()
+                                        .map(|b| format!("{:02X}", b))
+                                        .collect::<Vec<_>>()
+                                        .join(" ");
+                                    ui.label(hex_bytes);
+                                });
                             });
-                            row.col(|ui| {
-                                ui.label(format!(
-                                    "{} (0x{:X})",
-                                    msg.decoded.name, msg.decoded.msg_id
-                                ));
-                            });
-                            row.col(|ui| {
-                                ui.label(sig_name.to_string());
-                            });
-                            row.col(|ui| {
-                                if let Some(ref enum_label) = signal.value.enum_label {
-                                    ui.label(format!(
-                                        "{} ({})",
-                                        enum_label,
-                                        signal.value.int_rounded()
-                                    ));
-                                } else if signal.unit.is_empty() {
-                                    ui.label(format!("{:.2}", signal.value.physical));
-                                } else {
-                                    ui.label(format!(
-                                        "{:.2} {}",
-                                        signal.value.physical, signal.unit
-                                    ));
-                                }
-                            });
-                        });
+                        }
                     }
                 }
             });
@@ -103,13 +153,28 @@ impl ViewerList {
         egui_tiles::UiResponse::None
     }
 
-    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
-        if let messages::MsgFromCan::ParsedMessage(parsed_msg) = msg {
-            while self.decoded_msgs.len() >= MAX_MESSAGES - 1 {
-                self.decoded_msgs.pop_front();
-            }
+    fn make_space_for_new_message(&mut self) {
+        let msgs = self.msgs.get_mut();
+        while msgs.len() >= MAX_MESSAGES - 1 {
+            msgs.pop_front();
+        }
+    }
 
-            self.decoded_msgs.push_back(parsed_msg.clone());
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
+        match msg {
+            messages::MsgFromCan::ParsedMessage(parsed_msg) => {
+                self.make_space_for_new_message();
+                self.msgs
+                    .get_mut()
+                    .push_back(Msg::Decoded(parsed_msg.clone()));
+            }
+            messages::MsgFromCan::UnparsedMessage(unparsed_msg) => {
+                self.make_space_for_new_message();
+                self.msgs
+                    .get_mut()
+                    .push_back(Msg::Undecoded(unparsed_msg.clone()));
+            }
+            _ => {}
         }
     }
 }

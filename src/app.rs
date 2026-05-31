@@ -1,5 +1,6 @@
 use crate::{
-    action, connection, messages, settings, shortcuts, theme, ui, util, widgets, workspace,
+    action, connection, formatter, messages, settings, shortcuts, theme, ui, util, widgets,
+    workspace,
 };
 use eframe::egui;
 
@@ -34,6 +35,7 @@ pub enum ConnectionStatus {
 
 pub struct DAQApp {
     pub connection_status: ConnectionStatus,
+    pub value_formatter: Option<formatter::Formatter>,
     pub is_sidebar_open: bool,
     pub command_palette: ui::command_palette::CommandPalette,
     pub tile_tree: egui_tiles::Tree<widgets::Widget>,
@@ -57,6 +59,7 @@ pub struct DAQApp {
     pub pixels_per_point: Option<f32>,
     pub serial_ports: Vec<serialport::SerialPortInfo>,
     pub parser: Option<ParserInfo>,
+    pub can_bus_speed: connection::CanBusSpeed,
     pub udp_port: u16,
     pub can_messages: Vec<messages::MsgFromCan>,
 }
@@ -66,6 +69,7 @@ impl DAQApp {
         let settings = settings::Settings {
             dbc_path: self.parser.as_ref().map(|p| p.dbc_path.clone()),
             selected_source: self.selected_source.clone(),
+            selected_speed: self.can_bus_speed,
             udp_port: self.udp_port,
             theme: self.theme_selection,
             pixels_per_point: self.pixels_per_point,
@@ -86,6 +90,7 @@ impl DAQApp {
 
         Self {
             connection_status: ConnectionStatus::Disconnected,
+            value_formatter: formatter::Formatter::try_load(),
             is_sidebar_open: true,
             command_palette: ui::command_palette::CommandPalette::new(),
             tile_tree: egui_tiles::Tree::empty("workspace_tree"),
@@ -109,6 +114,7 @@ impl DAQApp {
             pixels_per_point: settings.pixels_per_point,
             serial_ports: util::get_available_serial_ports(),
             parser: ParserInfo::new_maybe(settings.dbc_path),
+            can_bus_speed: settings.selected_speed,
             udp_port: settings.udp_port,
             can_messages: Vec::new(),
         }
@@ -298,6 +304,7 @@ impl eframe::App for DAQApp {
                     self.connection_status = ConnectionStatus::Disconnected;
                 }
                 messages::MsgFromCan::ParsedMessage(_)
+                | messages::MsgFromCan::UnparsedMessage(_)
                 | messages::MsgFromCan::MessageSent { .. }
                 | messages::MsgFromCan::BusLoad { .. } => {
                     // Nothing special to do here, the message will be handled
