@@ -14,6 +14,7 @@ use std::time::Instant;
 const NO_CONNECTION_SLEEP_MS: u64 = 200;
 const READ_RETRY_SLEEP_MS: u64 = 2;
 const BUS_LOAD_UPDATE_MS: u128 = 200;
+const LOG_FRAMES_MS: u128 = 1000;
 
 const LOG_FOLDER_PATH: &str = "logs";
 
@@ -72,7 +73,7 @@ impl DaqLogger {
     fn add_frame(&mut self, frame: RawFrame) {
         self.buffer.push(frame);
 
-        if self.buffer.len() >= self.buffer_capacity {
+        if self.buffer.len() >= self.buffer_capacity || self.last_flush.elapsed().as_millis() >= LOG_FRAMES_MS {
             self.flush();
         }
     }
@@ -80,6 +81,10 @@ impl DaqLogger {
     pub fn flush(&mut self) {
         if self.buffer.is_empty() {
             return;
+        }
+
+        if self.file.is_some() && self.last_flush.elapsed().as_millis() >= LOG_FRAMES_MS {
+            self.file = None;
         }
 
         if self.file.is_none() {
