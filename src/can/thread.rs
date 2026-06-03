@@ -3,28 +3,22 @@ use crate::daq_log_parse::parse::RawFrame;
 use crate::util::byte_to_bcd_format;
 use crate::util::get_absolute_path_to;
 use crate::{can, connection, messages, util};
-use chrono::{Datelike, Timelike};
+use crate::daq_log_parse::consts::{NO_CONNECTION_SLEEP_MS, READ_RETRY_SLEEP_MS, BUS_LOAD_UPDATE_MS, LOG_FRAMES_MS, LOG_FOLDER_PATH};
 
-use bytemuck::{Pod, Zeroable};
+use chrono::{Datelike, Timelike};
 use std::fs::{File, create_dir_all};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::Instant;
 
-const NO_CONNECTION_SLEEP_MS: u64 = 200;
-const READ_RETRY_SLEEP_MS: u64 = 2;
-const BUS_LOAD_UPDATE_MS: u128 = 200;
-const LOG_FRAMES_MS: u128 = 1000;
-
-const LOG_FOLDER_PATH: &str = "logs";
-
 pub struct DaqLogger {
-    file: Option<File>,
-    folder_path: PathBuf,
-    buffer: Vec<RawFrame>,
-    last_flush: Instant,
-    start_time: Instant,
-    buffer_capacity: usize,
+    pub(crate) file: Option<File>,
+    pub(crate) folder_path: PathBuf,
+    pub(crate) buffer: Vec<RawFrame>,
+    pub(crate) file_created_at: Instant,
+    pub(crate) start_time: Instant,
+    pub(crate) last_flush: Instant,
+    pub(crate) buffer_capacity: usize,
 }
 
 impl DaqLogger {
@@ -36,8 +30,9 @@ impl DaqLogger {
             file: None,
             folder_path: path,
             buffer: Vec::with_capacity(10000),
-            last_flush: Instant::now(),
+            file_created_at: Instant::now(),
             start_time: Instant::now(),
+            last_flush: Instant::now(),
             buffer_capacity: 5000,
         }
     }
@@ -73,7 +68,8 @@ impl DaqLogger {
     fn add_frame(&mut self, frame: RawFrame) {
         self.buffer.push(frame);
 
-        if self.buffer.len() >= self.buffer_capacity || self.last_flush.elapsed().as_millis() >= LOG_FRAMES_MS {
+        //Flush every 1 second
+        if self.buffer.len() >= self.buffer_capacity || self.last_flush.elapsed().as_millis() >= 1000 {
             self.flush();
         }
     }
@@ -83,12 +79,15 @@ impl DaqLogger {
             return;
         }
 
-        if self.file.is_some() && self.last_flush.elapsed().as_millis() >= LOG_FRAMES_MS {
+        // Create new file if time of creation has exceed threshold
+        if self.file.is_some() && self.file_created_at.elapsed().as_millis() >= LOG_FRAMES_MS {
             self.file = None;
         }
 
         if self.file.is_none() {
             let now = chrono::Local::now();
+            self.file_created_at = Instant::now();
+
             let year_bcd = byte_to_bcd_format((now.year() % 100) as u8);
             let month_bcd = byte_to_bcd_format(now.month() as u8);
             let day_bcd = byte_to_bcd_format(now.day() as u8);
