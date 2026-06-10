@@ -193,7 +193,7 @@ impl DAQApp {
                         widgets::Widget::BusLoad(ui::bus_load::BusLoad::new(self.next_bus_load_num))
                     }
                     action::WidgetType::BatteryViewer => widgets::Widget::BatteryViewer(
-                        ui::battery::BatteryViewer::new(self.next_battery_viewer_num),
+                        ui::battery_voltage::BatteryViewer::new(self.next_battery_viewer_num),
                     ),
                     action::WidgetType::GgPlot => {
                         widgets::Widget::GgPlot(ui::gg_plot::GgPlot::new(self.next_gg_plot_num))

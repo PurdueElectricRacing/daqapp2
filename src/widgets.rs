@@ -9,7 +9,7 @@ pub enum Widget {
     LogParser(ui::log_parser::LogParser),
     SendUi(ui::send::SendUi),
     BusLoad(ui::bus_load::BusLoad),
-    BatteryViewer(ui::battery::BatteryViewer),
+    BatteryViewer(ui::battery_voltage::BatteryViewer),
     GgPlot(ui::gg_plot::GgPlot),
     Dynamics(ui::dynamics::Dynamics),
     Jitter(ui::jitter::Jitter),

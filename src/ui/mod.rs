@@ -1,4 +1,4 @@
-pub mod battery;
+pub mod battery_voltage;
 pub mod bootloader;
 pub mod bus_load;
 pub mod command_palette;
