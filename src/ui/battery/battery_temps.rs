@@ -68,9 +68,8 @@ impl BatteryTemps {
                 && thermistor_num < self.modules[module_num].len()
             {
                 self.modules[module_num][thermistor_num].temperature = temperature;
+                self.ui_state.mark_updated();
             }
-
-            self.ui_state.mark_updated();
         }
     }
 
