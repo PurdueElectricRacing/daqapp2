@@ -93,9 +93,8 @@ impl BatteryVoltage {
                     {
                         self.modules[module_num][cell_num].voltage = voltage;
                         self.modules[module_num][cell_num].balancing = balancing;
+                        self.ui_state.mark_updated();
                     }
-
-                    self.ui_state.mark_updated();
                 }
                 "charging_telemetry" => {
                     for (_, sig) in parsed.decoded.signals.iter() {
