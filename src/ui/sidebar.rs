@@ -78,8 +78,13 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
 
             if ui.button("Add Battery Voltage").clicked() {
                 app.action_queue.push(action::AppAction::SpawnWidget(
-                    action::WidgetType::BatteryViewer,
                     action::WidgetType::BatteryVoltage,
+                ));
+            }
+
+            if ui.button("Add Battery Temps").clicked() {
+                app.action_queue.push(action::AppAction::SpawnWidget(
+                    action::WidgetType::BatteryTemps,
                 ));
             }
 

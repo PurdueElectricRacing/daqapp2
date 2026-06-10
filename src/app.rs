@@ -47,6 +47,7 @@ pub struct DAQApp {
     pub next_send_ui_num: usize,
     pub next_bus_load_num: usize,
     pub next_battery_voltage_num: usize,
+    pub next_battery_temps_num: usize,
     pub next_gg_plot_num: usize,
     pub next_dynamics_num: usize,
     pub next_jitter_num: usize,
@@ -102,6 +103,7 @@ impl DAQApp {
             next_send_ui_num: 1,
             next_bus_load_num: 1,
             next_battery_voltage_num: 1,
+            next_battery_temps_num: 1,
             next_gg_plot_num: 1,
             next_dynamics_num: 1,
             next_jitter_num: 1,
@@ -195,6 +197,9 @@ impl DAQApp {
                     action::WidgetType::BatteryVoltage => widgets::Widget::BatteryVoltage(
                         ui::battery_voltage::BatteryVoltage::new(self.next_battery_voltage_num),
                     ),
+                    action::WidgetType::BatteryTemps => widgets::Widget::BatteryTemps(
+                        ui::battery_temps::BatteryTemps::new(self.next_battery_temps_num),
+                    ),
                     action::WidgetType::GgPlot => {
                         widgets::Widget::GgPlot(ui::gg_plot::GgPlot::new(self.next_gg_plot_num))
                     }
@@ -232,6 +237,9 @@ impl DAQApp {
                     }
                     action::WidgetType::BatteryVoltage => {
                         self.next_battery_voltage_num += 1;
+                    }
+                    action::WidgetType::BatteryTemps => {
+                        self.next_battery_temps_num += 1;
                     }
                     action::WidgetType::GgPlot => {
                         self.next_gg_plot_num += 1;
