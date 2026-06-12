@@ -1,36 +1,30 @@
+use super::common::{self, BatteryUiState};
 use crate::{messages, ui, util};
 use eframe::egui::{self, Color32, Frame, RichText, Stroke};
 
-const NUM_MODULES: usize = 8;
-const CELLS_PER_MODULE: usize = 16;
 const V_MIN: f64 = 2.7;
 const V_MAX: f64 = 4.2;
 const V_NOM: f64 = 3.7;
-const STALE_TIMEOUT_SECONDS: u64 = 1;
 
 #[derive(Default, Clone)]
-pub struct CellData {
+pub struct CellVoltage {
     pub voltage: f64,
     pub balancing: bool,
 }
-impl CellData {
+
+impl CellVoltage {
     pub fn color(&self) -> Color32 {
-        // Blue override for discharge
         if self.balancing {
             return Color32::from_rgb(33, 150, 243);
         }
 
-        // Clamp voltage range
-        let v = self.voltage.clamp(V_MIN, V_MAX);
+        let voltage = self.voltage.clamp(V_MIN, V_MAX);
 
-        // Piecewise interpolate hue
-        let hue = if v <= V_NOM {
-            // V_MIN -> V_NOM maps 0° -> 45°
-            let t = (v - V_MIN) / (V_NOM - V_MIN);
+        let hue = if voltage <= V_NOM {
+            let t = (voltage - V_MIN) / (V_NOM - V_MIN);
             util::lerp(0.0, 45.0, t)
         } else {
-            // V_NOM -> V_MAX maps 45° -> 120°
-            let t = (v - V_NOM) / (V_MAX - V_NOM);
+            let t = (voltage - V_NOM) / (V_MAX - V_NOM);
             util::lerp(45.0, 120.0, t)
         };
 
@@ -39,31 +33,30 @@ impl CellData {
 }
 
 #[derive(Default)]
-struct ChargingTelemetry {
+struct ChargingVoltageTelemetry {
     pack_voltage: f64,
     pack_current: f64,
     min_cell_voltage: f64,
     max_cell_voltage: f64,
 }
 
-pub struct BatteryViewer {
+pub struct BatteryVoltage {
     pub title: String,
-
-    modules: Vec<Vec<CellData>>, // [module_idx][cell_idx]
-    charging_telemetry: Option<ChargingTelemetry>,
-
-    last_update: std::time::Instant,
-    is_data_stale: bool,
+    modules: Vec<Vec<CellVoltage>>,
+    charging_telemetry: Option<ChargingVoltageTelemetry>,
+    ui_state: BatteryUiState,
 }
 
-impl BatteryViewer {
+impl BatteryVoltage {
     pub fn new(instance_num: usize) -> Self {
         Self {
-            title: format!("Battery Viewer #{}", instance_num),
-            modules: vec![vec![CellData::default(); CELLS_PER_MODULE]; NUM_MODULES],
+            title: format!("Battery Voltage #{}", instance_num),
+            modules: vec![
+                vec![CellVoltage::default(); common::CELLS_PER_MODULE];
+                common::NUM_MODULES
+            ],
             charging_telemetry: None,
-            last_update: std::time::Instant::now() - std::time::Duration::from_secs(10),
-            is_data_stale: true,
+            ui_state: BatteryUiState::new(),
         }
     }
 
@@ -93,17 +86,15 @@ impl BatteryViewer {
                         }
                     }
 
-                    if let (Some(m), Some(c), Some(v), Some(b)) =
+                    if let (Some(module_num), Some(cell_num), Some(voltage), Some(balancing)) =
                         (module_num, cell_num, voltage, balancing)
-                        && m < self.modules.len()
-                        && c < self.modules[m].len()
+                        && module_num < self.modules.len()
+                        && cell_num < self.modules[module_num].len()
                     {
-                        self.modules[m][c].voltage = v;
-                        self.modules[m][c].balancing = b;
+                        self.modules[module_num][cell_num].voltage = voltage;
+                        self.modules[module_num][cell_num].balancing = balancing;
+                        self.ui_state.mark_updated();
                     }
-
-                    self.last_update = std::time::Instant::now();
-                    self.is_data_stale = false;
                 }
                 "charging_telemetry" => {
                     for (_, sig) in parsed.decoded.signals.iter() {
@@ -130,8 +121,7 @@ impl BatteryViewer {
                         }
                     }
 
-                    self.last_update = std::time::Instant::now();
-                    self.is_data_stale = false;
+                    self.ui_state.mark_updated();
                 }
                 _ => {}
             }
@@ -140,13 +130,8 @@ impl BatteryViewer {
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         let theme = ui::theme::get_theme(ui.ctx());
+        let (stale, elapsed) = self.ui_state.refresh();
 
-        self.is_data_stale =
-            self.last_update.elapsed() > std::time::Duration::from_secs(STALE_TIMEOUT_SECONDS);
-        let stale = self.is_data_stale;
-        let elapsed = self.last_update.elapsed().as_secs_f64();
-
-        // Extract summary values for header cards
         let pack_sum = self.charging_telemetry.as_ref().map(|t| t.pack_voltage);
         let current = self.charging_telemetry.as_ref().map(|t| t.pack_current);
         let pack_min = self.charging_telemetry.as_ref().map(|t| t.min_cell_voltage);
@@ -162,42 +147,9 @@ impl BatteryViewer {
             ui.heading(&self.title);
             ui.add_space(4.0);
 
-            // Staleness banner
-            {
-                let (bg, dot, text) = if stale {
-                    let c = theme.warning_color();
-                    (
-                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 30),
-                        c,
-                        format!("No data — last message {:.1} s ago", elapsed),
-                    )
-                } else {
-                    let c = theme.success_color();
-                    (
-                        Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), 30),
-                        c,
-                        format!("Live — last message {:.1} s ago", elapsed),
-                    )
-                };
-                Frame::NONE
-                    .fill(bg)
-                    .stroke(Stroke::new(1.0, dot.linear_multiply(0.5)))
-                    .inner_margin(egui::Margin::symmetric(10, 6))
-                    .corner_radius(egui::CornerRadius::same(4))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            let (rect, _) = ui
-                                .allocate_exact_size(egui::Vec2::splat(8.0), egui::Sense::hover());
-                            ui.painter().circle_filled(rect.center(), 4.0, dot);
-                            ui.add_space(4.0);
-                            ui.colored_label(dot, &text);
-                        });
-                    });
-            }
+            common::stale_banner(ui, &theme, stale, elapsed);
 
             ui.add_space(8.0);
-
-            // Pack summary cards
             ui.label(
                 RichText::new("PACK SUMMARY")
                     .size(10.0)
@@ -206,21 +158,21 @@ impl BatteryViewer {
             ui.add_space(4.0);
 
             ui.columns(5, |cols| {
-                Self::stat_card(&mut cols[0], &theme, "PACK SUM", pack_sum, "V", stale, None);
-                Self::stat_card(&mut cols[1], &theme, "CURRENT", current, "A", stale, None);
-                Self::stat_card(&mut cols[2], &theme, "CELL MIN", pack_min, "V", stale, None);
-                Self::stat_card(&mut cols[3], &theme, "CELL MAX", pack_max, "V", stale, None);
-                Self::stat_card(
+                common::stat_card(&mut cols[0], &theme, "PACK SUM", pack_sum, "V", stale, None);
+                common::stat_card(&mut cols[1], &theme, "CURRENT", current, "A", stale, None);
+                common::stat_card(&mut cols[2], &theme, "CELL MIN", pack_min, "V", stale, None);
+                common::stat_card(&mut cols[3], &theme, "CELL MAX", pack_max, "V", stale, None);
+                common::stat_card(
                     &mut cols[4],
                     &theme,
                     "DELTA",
                     pack_delta,
                     "V",
                     stale,
-                    pack_delta.map(|d| {
-                        if d > 0.050 {
+                    pack_delta.map(|delta| {
+                        if delta > 0.050 {
                             theme.error_color()
-                        } else if d > 0.020 {
+                        } else if delta > 0.020 {
                             theme.warning_color()
                         } else {
                             theme.success_color()
@@ -231,13 +183,18 @@ impl BatteryViewer {
 
             ui.add_space(12.0);
 
-            // Per module panels with dynamic cell bars
-            for (mi, module) in self.modules.iter().enumerate() {
-                let mod_sum: f64 = module.iter().map(|c| c.voltage).sum();
-                let mod_min = module.iter().map(|c| c.voltage).fold(f64::MAX, f64::min);
-                let mod_max = module.iter().map(|c| c.voltage).fold(f64::MIN, f64::max);
-                let mod_delta = if mod_min < f64::MAX {
-                    mod_max - mod_min
+            for (module_index, module) in self.modules.iter().enumerate() {
+                let module_sum: f64 = module.iter().map(|cell| cell.voltage).sum();
+                let module_min = module
+                    .iter()
+                    .map(|cell| cell.voltage)
+                    .fold(f64::MAX, f64::min);
+                let module_max = module
+                    .iter()
+                    .map(|cell| cell.voltage)
+                    .fold(f64::MIN, f64::max);
+                let module_delta = if module_min < f64::MAX {
+                    module_max - module_min
                 } else {
                     0.0
                 };
@@ -248,31 +205,34 @@ impl BatteryViewer {
                     .inner_margin(egui::Margin::same(10))
                     .corner_radius(egui::CornerRadius::same(4))
                     .show(ui, |ui| {
-                        // module header row
                         ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!("MODULE {mi}")).size(11.0).strong());
+                            ui.label(
+                                RichText::new(format!("MODULE {module_index}"))
+                                    .size(11.0)
+                                    .strong(),
+                            );
                             ui.add_space(8.0);
                             ui.label(
-                                RichText::new(format!("sum {:.2} V", mod_sum))
+                                RichText::new(format!("sum {:.2} V", module_sum))
                                     .size(10.0)
                                     .color(theme.text_color().linear_multiply(0.55)),
                             );
                             ui.label(
-                                RichText::new(format!("min {:.3} V", mod_min))
+                                RichText::new(format!("min {:.3} V", module_min))
                                     .size(10.0)
                                     .color(theme.text_color().linear_multiply(0.55)),
                             );
                             ui.label(
-                                RichText::new(format!("max {:.3} V", mod_max))
+                                RichText::new(format!("max {:.3} V", module_max))
                                     .size(10.0)
                                     .color(theme.text_color().linear_multiply(0.55)),
                             );
                             ui.label(
-                                RichText::new(format!("Δ {:.3} V", mod_delta))
+                                RichText::new(format!("Δ {:.3} V", module_delta))
                                     .size(10.0)
-                                    .color(if mod_delta > 0.050 {
+                                    .color(if module_delta > 0.050 {
                                         theme.error_color()
-                                    } else if mod_delta > 0.020 {
+                                    } else if module_delta > 0.020 {
                                         theme.warning_color()
                                     } else {
                                         theme.text_color().linear_multiply(0.55)
@@ -282,15 +242,15 @@ impl BatteryViewer {
 
                         ui.add_space(6.0);
 
-                        // Dynamic cell grid with bars
-                        let available = ui.available_width();
-                        let cell_spacing = ui.spacing().item_spacing.x; // actual egui spacing, ~4px
-                        let cells = CELLS_PER_MODULE as f32;
-                        let bar_w = ((available - cell_spacing * cells) / cells).max(8.0);
+                        let available_width = ui.available_width();
+                        let cell_spacing = ui.spacing().item_spacing.x;
+                        let cell_count = common::CELLS_PER_MODULE as f32;
+                        let bar_width =
+                            ((available_width - cell_spacing * cell_count) / cell_count).max(8.0);
 
                         ui.horizontal(|ui| {
                             for cell in module.iter() {
-                                Self::cell_bar(ui, &theme, cell, stale, bar_w);
+                                Self::cell_bar(ui, &theme, cell, stale, bar_width);
                             }
                         });
                     });
@@ -302,66 +262,14 @@ impl BatteryViewer {
         egui_tiles::UiResponse::None
     }
 
-    // ─── helpers ──────────────────────────────────────────────────────────────
-
-    fn stat_card(
-        ui: &mut egui::Ui,
-        theme: &ui::theme::ThemeColors,
-        label: &str,
-        value: Option<f64>,
-        unit: &str,
-        stale: bool,
-        override_color: Option<Color32>,
-    ) {
-        Frame::NONE
-            .fill(theme.panel_color())
-            .stroke(Stroke::new(1.0, theme.accent_color()))
-            .inner_margin(egui::Margin::same(10))
-            .corner_radius(egui::CornerRadius::same(4))
-            .show(ui, |ui| {
-                ui.set_min_width(ui.available_width());
-                ui.vertical(|ui| {
-                    ui.label(
-                        RichText::new(label)
-                            .size(10.0)
-                            .color(theme.text_color().linear_multiply(0.5)),
-                    );
-                    ui.add_space(2.0);
-                    let val_color = override_color.unwrap_or(theme.info_color());
-                    if stale {
-                        ui.label(
-                            RichText::new("—")
-                                .size(20.0)
-                                .color(theme.text_color().linear_multiply(0.25)),
-                        );
-                    } else {
-                        ui.label(
-                            RichText::new(if let Some(v) = value {
-                                format!("{:.2}", v)
-                            } else {
-                                "—".to_string()
-                            })
-                            .size(20.0)
-                            .color(val_color),
-                        );
-                        ui.label(
-                            RichText::new(unit)
-                                .size(10.0)
-                                .color(theme.text_color().linear_multiply(0.4)),
-                        );
-                    }
-                });
-            });
-    }
-
     fn cell_bar(
         ui: &mut egui::Ui,
         theme: &ui::theme::ThemeColors,
-        cell: &CellData,
+        cell: &CellVoltage,
         stale: bool,
         bar_w: f32,
     ) {
-        use egui::{Align2, FontId, Stroke};
+        use egui::{Align2, FontId};
 
         let fill_color = if stale {
             theme.text_color().linear_multiply(0.12)
@@ -378,10 +286,7 @@ impl BatteryViewer {
                 ui.allocate_exact_size(egui::Vec2::new(bar_w, 20.0), egui::Sense::hover());
 
             let painter = ui.painter();
-
-            // Background track
             painter.rect_filled(outer_rect, 3.0, theme.text_color().linear_multiply(0.06));
-
             painter.rect_stroke(
                 outer_rect,
                 3.0,
@@ -389,24 +294,19 @@ impl BatteryViewer {
                 egui::StrokeKind::Inside,
             );
 
-            // Filled portion (bottom-anchored)
-            let fill_h = outer_rect.height() * fill_frac;
-
+            let fill_height = outer_rect.height() * fill_frac;
             let fill_rect = egui::Rect::from_min_max(
-                egui::pos2(outer_rect.min.x, outer_rect.max.y - fill_h),
+                egui::pos2(outer_rect.min.x, outer_rect.max.y - fill_height),
                 outer_rect.max,
             );
-
             painter.rect_filled(fill_rect, 2.0, fill_color);
 
-            // Voltage text (inside bar)
             let text = if stale {
                 "—".to_string()
             } else {
                 format!("{:.2}", cell.voltage)
             };
 
-            // Contrast-aware text color
             let text_color = if stale {
                 theme.text_color().linear_multiply(0.25)
             } else if fill_frac > 0.5 {
