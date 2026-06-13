@@ -2,7 +2,7 @@
 	"$schema": "../schema.json",
 
 	"name": "Critical Heartbeats",
-	"description": "Check that we receive a heartbeat (version hash) from every drive crtitical board",
+	"description": "Check that we receive a heartbeat (version hash) from every drive critical board",
 
 	"expect": [
 		{
