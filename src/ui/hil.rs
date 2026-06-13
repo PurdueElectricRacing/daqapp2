@@ -44,7 +44,7 @@ impl Hil {
 
         self.hil_state = hil::run::HilState::Running {
             start_time: std::time::Instant::now(),
-            preset_name: None,
+            preset_info: None,
             tests: vec![test],
         };
     }
@@ -74,7 +74,7 @@ impl Hil {
 
         self.hil_state = hil::run::HilState::Running {
             start_time: std::time::Instant::now(),
-            preset_name: Some(preset.name.clone()),
+            preset_info: Some(preset.clone()),
             tests,
         };
     }
@@ -123,7 +123,56 @@ impl Hil {
                     }
                 }
             }
-            _ => {}
+            hil::run::HilState::Running {
+                start_time,
+                preset_info,
+                tests,
+            } => {
+                let time_since_start = start_time.elapsed().as_secs_f64();
+                ui.label(format!(
+                    "HIL is running... {:.2} seconds since start",
+                    time_since_start
+                ));
+                ui.separator();
+
+                if let Some(preset) = preset_info {
+                    ui.heading(format!("Preset: {}", preset.name));
+                    ui.label(format!("Tests: {}", preset.tests.join(", ")));
+                    ui.separator();
+                }
+
+                for test in tests {
+                    ui.heading(&test.name);
+                    ui.label(&test.description);
+
+                    ui.label(format!(
+                        "TX Remaining: {} messages",
+                        test.tx_remaining.len()
+                    ));
+
+                    let (not_in_window, in_progress, completed) = test.expect_counts();
+                    ui.label(format!(
+                        "Expects: {}/{}/{}",
+                        not_in_window, in_progress, completed
+                    ));
+
+                    for ipe in &test.in_progress_expects {
+                        let status = ipe.result.as_str();
+                        ui.label(format!(
+                            "Expect: {} [{} - {}] - {}",
+                            ipe.expect.msg_name, ipe.expect.window[0], ipe.expect.window[1], status
+                        ));
+                        for (sig_name, sig_window) in &ipe.expect.signals {
+                            ui.label(format!(
+                                "  Signal: {} [{} - {}]",
+                                sig_name, sig_window[0], sig_window[1]
+                            ));
+                        }
+                    }
+
+                    ui.separator();
+                }
+            }
         });
         egui_tiles::UiResponse::None
     }
