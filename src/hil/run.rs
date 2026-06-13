@@ -80,7 +80,7 @@ impl HilRunningTest {
         })
     }
 
-    fn update_expect_statuses(&mut self, start_time: std::time::Instant) {
+    pub fn update_expect_statuses(&mut self, start_time: std::time::Instant) {
         let ts = start_time.elapsed().as_millis();
         for expect in &mut self.in_progress_expects {
             match expect.result {

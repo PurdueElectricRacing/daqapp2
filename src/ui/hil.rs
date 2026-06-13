@@ -90,6 +90,8 @@ impl Hil {
     }
 
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+        let mut idle_requestedd = false;
+
         egui::ScrollArea::vertical().show(ui, |ui| match &mut self.hil_state {
             hil::run::HilState::Idle => {
                 ui.label("HIL is idle. Select a preset or test to run.");
@@ -138,11 +140,28 @@ impl Hil {
                 preset_info,
                 tests,
             } => {
-                let time_since_start = start_time.elapsed().as_secs_f64() * 1000.0; // ms
-                ui.label(format!(
-                    "HIL is running... {:.0} ms since start",
-                    time_since_start
-                ));
+                // Actually run the test
+                tests.iter_mut().for_each(|t| t.update_expect_statuses(*start_time));
+                let all_finished = tests.iter().all(|t| t.is_finished());
+
+                ui.add_space(4.0);
+                if all_finished {
+                    // ui.label("HIL finished! Review the results below.");
+                    ui.horizontal(|ui| {
+                        if ui.button("Exit").clicked() {
+                            idle_requestedd = true;
+                        }
+                        ui.label("HIL finished! Review the results below.");
+                    });
+                } else {
+                    ui.horizontal(|ui| {
+                        if ui.button("Stop").clicked() {
+                            idle_requestedd = true;
+                        }
+                        let time_since_start = start_time.elapsed().as_millis();
+                        ui.label(format!("HIL is running... {:.0} ms since start", time_since_start));
+                    });
+                }
                 ui.separator();
 
                 if let Some(preset) = preset_info {
@@ -161,6 +180,11 @@ impl Hil {
                 }
             }
         });
+
+        if idle_requestedd {
+            self.hil_state = hil::run::HilState::Idle;
+        }
+
         egui_tiles::UiResponse::None
     }
 
