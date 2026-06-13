@@ -2,26 +2,16 @@
 	"$schema": "../schema.json",
 
 	"name": "Non-Critical Heartbeats",
-	"description": "Check that we recieve a heartbeat from every non-critical board",
+	"description": "Check that we recieve a heartbeat (version hash) from non-critical boards",
 
-	"tx": [
-		{
-			"timestamp": 15,
-			"msg_name": "pack_stats",
-			"signals": {
-				"pack_voltage": 540.0,
-				"pack_current": 10.0,
-				"max_temp": 35.0
-			}
-		}
-	],
 	"expect": [
 		{
-			"window": [15, 20],
-			"msg_name": "thermistor_telemetry",
-			"signals": {
-				"temperature": [30.0, 40.0]
-			}
+			"window": [0, 10000],
+			"msg_name": "front_driveline_version"
+		},
+		{
+			"window": [0, 10000],
+			"msg_name": "rear_driveline_version"
 		}
 	]
 }

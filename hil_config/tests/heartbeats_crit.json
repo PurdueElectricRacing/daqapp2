@@ -2,26 +2,24 @@
 	"$schema": "../schema.json",
 
 	"name": "Critical Heartbeats",
-	"description": "Check that we recieve a heartbeat from every drive crtitical board",
+	"description": "Check that we recieve a heartbeat (version hash) from every drive crtitical board",
 
-	"tx": [
-		{
-			"timestamp": 15,
-			"msg_name": "pack_stats",
-			"signals": {
-				"pack_voltage": 540.0,
-				"pack_current": 10.0,
-				"max_temp": 35.0
-			}
-		}
-	],
 	"expect": [
 		{
-			"window": [15, 20],
-			"msg_name": "thermistor_telemetry",
-			"signals": {
-				"temperature": [30.0, 40.0]
-			}
+			"window": [0, 10000],
+			"msg_name": "abox_version"
+		},
+		{
+			"window": [0, 10000],
+			"msg_name": "dash_version"
+		},
+		{
+			"window": [0, 10000],
+			"msg_name": "main_version"
+		},
+		{
+			"window": [0, 10000],
+			"msg_name": "pdu_version"
 		}
 	]
 }
