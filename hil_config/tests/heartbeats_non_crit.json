@@ -1,8 +1,8 @@
 {
 	"$schema": "../schema.json",
 
-	"name": "Critical Heartbeats",
-	"description": "Check that we recieve a heartbeat from every drive crtitical board",
+	"name": "Non-Critical Heartbeats",
+	"description": "Check that we recieve a heartbeat from every non-critical board",
 
 	"tx": [
 		{

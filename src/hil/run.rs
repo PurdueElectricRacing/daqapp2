@@ -16,9 +16,7 @@ pub struct InProgressExpect {
 }
 
 pub struct HilRunningTest {
-    pub name: String,
-    pub description: String,
-
+    pub test_info: hil::config::TestInfo,
     pub tx_remaining: Vec<hil::config::TxMessage>,
     pub in_progress_expects: Vec<InProgressExpect>,
 }
@@ -75,8 +73,7 @@ impl HilRunningTest {
         in_progress_expects
             .sort_by(|a, b| a.expect.window[0].partial_cmp(&b.expect.window[0]).unwrap());
         Ok(Self {
-            name: test_info.name.clone(),
-            description: test_info.description.clone(),
+            test_info: test_info.clone(),
             tx_remaining: test.tx,
             in_progress_expects,
         })
@@ -96,6 +93,12 @@ impl HilRunningTest {
         }
 
         (not_in_window, in_progress, completed)
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.in_progress_expects
+            .iter()
+            .all(|e| e.result.is_finished())
     }
 }
 
