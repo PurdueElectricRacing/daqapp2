@@ -128,7 +128,8 @@ impl Hil {
                 preset_info,
                 tests,
             } => {
-                let time_since_start = start_time.elapsed().as_secs_f64();
+                let time_since_start = start_time.elapsed().as_secs_f64() * 1000.0; // ms
+
                 ui.label(format!(
                     "HIL is running... {:.0} ms since start",
                     time_since_start * 1000.0
@@ -136,42 +137,71 @@ impl Hil {
                 ui.separator();
 
                 if let Some(preset) = preset_info {
-                    ui.heading(format!("Preset: {}", preset.name));
-                    ui.label(format!("Tests: {}", preset.tests.join(", ")));
-                    ui.separator();
+                    ui.label(format!(
+                        "Preset: {}  ({} tests)",
+                        preset.name,
+                        preset.tests.len()
+                    ));
                 }
+                ui.separator();
 
                 for test in tests {
-                    ui.heading(&test.name);
-                    ui.label(&test.description);
+                    egui::CollapsingHeader::new(&test.name)
+                        .id_salt(&test.name)
+                        .default_open(true)
+                        .show(ui, |ui| {
+                            ui.label(&test.description);
 
-                    ui.label(format!(
-                        "TX Remaining: {} messages",
-                        test.tx_remaining.len()
-                    ));
+                            let (not_in_window, in_progress, completed) = test.expect_counts();
+                            let total = not_in_window + in_progress + completed;
+                            if total > 0 {
+                                let frac = completed as f32 / total as f32;
+                                ui.add(
+                                    egui::ProgressBar::new(frac)
+                                        .text(format!("{}/{} expects complete", completed, total)),
+                                );
+                            }
+                            ui.label(format!("TX remaining: {}", test.tx_remaining.len()));
 
-                    let (not_in_window, in_progress, completed) = test.expect_counts();
-                    ui.label(format!(
-                        "Expects: {}/{}/{}",
-                        not_in_window, in_progress, completed
-                    ));
+                            ui.add_space(4.0);
+                            egui::Grid::new(format!("expects_{}", test.name))
+                                .num_columns(4)
+                                .striped(true)
+                                .show(ui, |ui| {
+                                    ui.strong("Message");
+                                    ui.strong("Window (ms)");
+                                    ui.strong("Status");
+                                    ui.strong("Signals");
+                                    ui.end_row();
 
-                    for ipe in &test.in_progress_expects {
-                        ui.label(format!(
-                            "Expect: {} [{} - {} ms] - {}",
-                            ipe.expect.msg_name,
-                            ipe.expect.window[0],
-                            ipe.expect.window[1],
-                            ipe.result.as_str()
-                        ));
-                        for (sig_name, sig_range) in &ipe.expect.signals {
-                            ui.label(format!(
-                                "  Signal: {} [{} - {} value]",
-                                sig_name, sig_range[0], sig_range[1]
-                            ));
-                        }
-                    }
+                                    for ipe in &test.in_progress_expects {
+                                        ui.label(&ipe.expect.msg_name);
+                                        ui.label(format!(
+                                            "{:.0} - {:.0}",
+                                            ipe.expect.window[0], ipe.expect.window[1]
+                                        ));
 
+                                        let color = ipe.result.as_color32();
+                                        let text = ipe.result.as_str();
+                                        ui.colored_label(color, text);
+
+                                        if ipe.expect.signals.is_empty() {
+                                            ui.label("—");
+                                        } else {
+                                            let s: Vec<String> = ipe
+                                                .expect
+                                                .signals
+                                                .iter()
+                                                .map(|(n, r)| {
+                                                    format!("{}: [{}, {}]", n, r[0], r[1])
+                                                })
+                                                .collect();
+                                            ui.label(s.join(", "));
+                                        }
+                                        ui.end_row();
+                                    }
+                                });
+                        });
                     ui.separator();
                 }
             }
