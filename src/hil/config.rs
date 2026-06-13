@@ -60,24 +60,38 @@ pub fn list_available_tests() -> (Vec<PresetInfo>, Vec<TestInfo>, Vec<String>) {
     let mut individual_tests = Vec::new();
     if let Ok(entries) = std::fs::read_dir(TESTS_FOLDER) {
         for entry in entries.flatten() {
-            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                if let Ok(test_data) = serde_json::from_str::<TestFile>(&content) {
-                    individual_tests.push(TestInfo {
-                        basename: entry
-                            .path()
-                            .file_stem()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string(),
-                        name: test_data.name,
-                        description: test_data.description,
-                    });
-                } else {
-                    errors.push(format!("Failed to parse test file: {:?}", entry.path()));
-                }
-            } else {
-                errors.push(format!("Failed to read test file: {:?}", entry.path()));
+            let path = entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
             }
+
+            let basename = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(stem) if !stem.is_empty() => stem.to_string(),
+                _ => {
+                    errors.push(format!(
+                        "Failed to determine test basename for file: {:?}",
+                        path
+                    ));
+                    continue;
+                }
+            };
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => {
+                    errors.push(format!("Failed to read test file: {:?}", path));
+                    continue;
+                }
+            };
+
+            match serde_json::from_str::<TestFile>(&content) {
+                Ok(test_data) => individual_tests.push(TestInfo {
+                    basename,
+                    name: test_data.name,
+                    description: test_data.description,
+                }),
+                Err(_) => errors.push(format!("Failed to parse test file: {:?}", path)),
+            };
         }
     } else {
         errors.push(format!("Failed to read tests directory: {}", TESTS_FOLDER));
