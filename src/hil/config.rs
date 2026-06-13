@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const PRESETS_FILE: &str = "../../hil_config/presets.json";
-pub const TESTS_FOLDER: &str = "../../hil_config/tests/";
+pub const PRESETS_FILE: &str = "hil_config/presets.json";
+pub const TESTS_FOLDER: &str = "hil_config/tests/";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -60,7 +60,12 @@ pub fn list_available_tests() -> (Vec<PresetInfo>, Vec<TestInfo>, Vec<String>) {
             if let Ok(content) = std::fs::read_to_string(entry.path()) {
                 if let Ok(test_data) = serde_json::from_str::<TestFile>(&content) {
                     individual_tests.push(TestInfo {
-                        basename: entry.file_name().to_string_lossy().to_string(),
+                        basename: entry
+                            .path()
+                            .file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string(),
                         name: test_data.name,
                         description: test_data.description,
                     });
@@ -71,6 +76,8 @@ pub fn list_available_tests() -> (Vec<PresetInfo>, Vec<TestInfo>, Vec<String>) {
                 errors.push(format!("Failed to read test file: {:?}", entry.path()));
             }
         }
+    } else {
+        errors.push(format!("Failed to read tests directory: {}", TESTS_FOLDER));
     }
 
     // Load presets
