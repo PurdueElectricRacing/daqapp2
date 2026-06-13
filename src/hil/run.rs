@@ -80,6 +80,14 @@ impl HilRunningTest {
         })
     }
 
+    pub fn update_tx(
+        &mut self,
+        start_time: std::time::Instant,
+        parser: &can_decode::Parser,
+    ) -> Vec<messages::AddSendMessage> {
+        todo!()
+    }
+
     pub fn update_expect_statuses(&mut self, start_time: std::time::Instant) {
         let ts = start_time.elapsed().as_millis();
         for expect in &mut self.in_progress_expects {

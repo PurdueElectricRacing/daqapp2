@@ -67,7 +67,7 @@ impl Widget {
             Widget::GgPlot(w) => w.show(ui),
             Widget::Dynamics(w) => w.show(ui),
             Widget::Jitter(w) => w.show(ui, parser),
-            Widget::Hil(w) => w.show(ui),
+            Widget::Hil(w) => w.show(ui, parser, ui_to_can_tx),
         }
     }
 

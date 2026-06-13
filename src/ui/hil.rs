@@ -1,4 +1,4 @@
-use crate::{hil, messages, ui};
+use crate::{app, hil, messages};
 use eframe::egui;
 
 pub struct Hil {
@@ -43,7 +43,11 @@ impl Hil {
         self.load_errors = errors;
     }
 
-    fn try_start_from_test(&mut self, test: &hil::config::TestInfo) {
+    fn try_start_from_test(
+        &mut self,
+        test: &hil::config::TestInfo,
+        parser: Option<&app::ParserInfo>,
+    ) {
         let test = match hil::run::HilRunningTest::new(test) {
             Ok(test) => test,
             Err(err) => {
@@ -51,6 +55,15 @@ impl Hil {
                 return;
             }
         };
+        if parser.is_none() && !test.tx_remaining.is_empty() {
+            self.start_error = Some(format!(
+                "Test '{} [{}]' has {} TX messages but no parser is loaded",
+                test.test_info.name,
+                test.test_info.basename,
+                test.tx_remaining.len()
+            ));
+            return;
+        }
 
         self.hil_state = hil::run::HilState::Running {
             start_time: std::time::Instant::now(),
@@ -59,7 +72,11 @@ impl Hil {
         };
     }
 
-    fn try_start_from_preset(&mut self, preset: &hil::config::PresetInfo) {
+    fn try_start_from_preset(
+        &mut self,
+        preset: &hil::config::PresetInfo,
+        parser: Option<&app::ParserInfo>,
+    ) {
         let mut tests = Vec::new();
         for test_name in &preset.tests {
             let test_info = match self.found_tests.iter().find(|t| t.basename == *test_name) {
@@ -79,6 +96,15 @@ impl Hil {
                     return;
                 }
             };
+            if parser.is_none() && !test.tx_remaining.is_empty() {
+                self.start_error = Some(format!(
+                    "Test '{} [{}]' has {} TX messages but no parser is loaded",
+                    test_info.name,
+                    test_info.basename,
+                    test.tx_remaining.len()
+                ));
+                return;
+            }
             tests.push(test);
         }
 
@@ -89,7 +115,12 @@ impl Hil {
         };
     }
 
-    pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        parser: Option<&app::ParserInfo>,
+        ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
+    ) -> egui_tiles::UiResponse {
         let mut idle_requestedd = false;
 
         egui::ScrollArea::vertical().show(ui, |ui| match &mut self.hil_state {
@@ -116,7 +147,7 @@ impl Hil {
                         }
                     }
                     if let Some(preset) = selected_preset {
-                        self.try_start_from_preset(&preset);
+                        self.try_start_from_preset(&preset, parser);
                     }
                     ui.separator();
                 }
@@ -131,7 +162,7 @@ impl Hil {
                         }
                     }
                     if let Some(test) = selected_test {
-                        self.try_start_from_test(&test);
+                        self.try_start_from_test(&test, parser);
                     }
                 }
             }
