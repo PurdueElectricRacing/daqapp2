@@ -94,6 +94,10 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 app.action_queue
                     .push(action::AppAction::SpawnWidget(action::WidgetType::Jitter));
             }
+            if ui.button("Add HIL").clicked() {
+                app.action_queue
+                    .push(action::AppAction::SpawnWidget(action::WidgetType::Hil));
+            }
 
             ui.separator();
             ui.heading("Connection Settings");
