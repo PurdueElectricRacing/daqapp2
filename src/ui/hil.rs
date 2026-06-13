@@ -41,6 +41,7 @@ impl Hil {
         self.found_presets = presets;
         self.found_tests = tests;
         self.load_errors = errors;
+        self.start_error = None;
     }
 
     fn try_start_from_test(&mut self, test: &hil::config::TestInfo) {
