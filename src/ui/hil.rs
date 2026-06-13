@@ -142,129 +142,147 @@ impl Hil {
                         preset.name,
                         preset.tests.len()
                     ));
-
-                    let finished_tests: Vec<&hil::run::HilRunningTest> =
-                        tests.iter().filter(|t| t.is_finished()).collect();
-
-                    if finished_tests.len() == tests.len() && !tests.is_empty() {
-                        let (mut total_passed, mut total_expects) = (0, 0);
-                        let mut subtests_all_passed = 0;
-                        for t in tests.iter() {
-                            let (_, _, completed) = t.expect_counts();
-                            let total = t.in_progress_expects.len();
-                            let passed = t
-                                .in_progress_expects
-                                .iter()
-                                .filter(|e| matches!(e.result, hil::run::ExpectResult::Passed))
-                                .count();
-                            total_passed += passed;
-                            total_expects += total;
-                            let _ = completed;
-                            if passed == total {
-                                subtests_all_passed += 1;
-                            }
-                        }
-
-                        let color = if total_passed == total_expects {
-                            egui::Color32::GREEN
-                        } else {
-                            egui::Color32::RED
-                        };
-
-                        ui.colored_label(
-                            color,
-                            format!(
-                                "Preset finished: {}/{} expects passed, {}/{} subtests fully passed",
-                                total_passed, total_expects, subtests_all_passed, tests.len()
-                            ),
-                        );
-                    }
+                    Self::show_preset_summary(ui, tests);
                 }
                 ui.separator();
 
                 for test in tests {
-                    egui::CollapsingHeader::new(&test.test_info.name)
-                        .id_salt(&test.test_info.basename)
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            ui.label(&test.test_info.description);
-
-                            let (not_in_window, in_progress, completed) = test.expect_counts();
-                            let total = not_in_window + in_progress + completed;
-                            if total > 0 {
-                                let frac = completed as f32 / total as f32;
-                                ui.add(
-                                    egui::ProgressBar::new(frac)
-                                        .text(format!("{}/{} expects complete", completed, total)),
-                                );
-                            }
-                            ui.label(format!("TX remaining: {}", test.tx_remaining.len()));
-
-                            if test.is_finished() {
-                                let passed = test
-                                    .in_progress_expects
-                                    .iter()
-                                    .filter(|e| matches!(e.result, hil::run::ExpectResult::Passed))
-                                    .count();
-                                let total = test.in_progress_expects.len();
-                                let color = if passed == total {
-                                    egui::Color32::GREEN
-                                } else {
-                                    egui::Color32::RED
-                                };
-                                ui.colored_label(
-                                    color,
-                                    format!(
-                                        "Test finished: {} passed of {} expects",
-                                        passed, total
-                                    ),
-                                );
-                            }
-
-                            ui.add_space(4.0);
-                            egui::Grid::new(format!("expects_{}", test.test_info.basename))
-                                .num_columns(4)
-                                .striped(true)
-                                .show(ui, |ui| {
-                                    ui.strong("Message");
-                                    ui.strong("Window (ms)");
-                                    ui.strong("Status");
-                                    ui.strong("Signals");
-                                    ui.end_row();
-
-                                    for ipe in &test.in_progress_expects {
-                                        ui.label(&ipe.expect.msg_name);
-                                        ui.label(format!(
-                                            "{:.0} - {:.0}",
-                                            ipe.expect.window[0], ipe.expect.window[1]
-                                        ));
-
-                                        ui.colored_label(
-                                            ipe.result.as_color32(),
-                                            ipe.result.as_str(),
-                                        );
-
-                                        if ipe.expect.signals.is_empty() {
-                                            ui.label("—");
-                                        } else {
-                                            let s: Vec<String> = ipe
-                                                .expect
-                                                .signals
-                                                .iter()
-                                                .map(|(n, r)| {
-                                                    format!("{}: [{}, {}]", n, r[0], r[1])
-                                                })
-                                                .collect();
-                                            ui.label(s.join(", "));
-                                        }
-                                        ui.end_row();
-                                    }
-                                });
-                        });
+                    Self::show_test(ui, test);
                     ui.separator();
                 }
             }
         });
         egui_tiles::UiResponse::None
+    }
+
+    fn show_preset_summary(ui: &mut egui::Ui, tests: &[hil::run::HilRunningTest]) {
+        if tests.is_empty() || !tests.iter().all(|t| t.is_finished()) {
+            return;
+        }
+
+        let (mut total_passed, mut total_expects, mut subtests_all_passed) = (0, 0, 0);
+        for t in tests {
+            let total = t.in_progress_expects.len();
+            let passed = t
+                .in_progress_expects
+                .iter()
+                .filter(|e| matches!(e.result, hil::run::ExpectResult::Passed))
+                .count();
+            total_passed += passed;
+            total_expects += total;
+            if passed == total {
+                subtests_all_passed += 1;
+            }
+        }
+
+        let color = if total_passed == total_expects {
+            egui::Color32::GREEN
+        } else {
+            egui::Color32::RED
+        };
+
+        ui.colored_label(
+            color,
+            format!(
+                "Preset finished: {}/{} expects passed, {}/{} subtests fully passed",
+                total_passed,
+                total_expects,
+                subtests_all_passed,
+                tests.len()
+            ),
+        );
+    }
+
+    fn show_test(ui: &mut egui::Ui, test: &hil::run::HilRunningTest) {
+        egui::CollapsingHeader::new(&test.test_info.name)
+            .id_salt(&test.test_info.basename)
+            .default_open(true)
+            .show(ui, |ui| {
+                ui.label(&test.test_info.description);
+
+                Self::show_test_progress(ui, test);
+
+                ui.label(format!("TX remaining: {}", test.tx_remaining.len()));
+
+                Self::show_test_finished_summary(ui, test);
+
+                ui.add_space(4.0);
+                Self::show_expects_grid(ui, test);
+            });
+    }
+
+    fn show_test_progress(ui: &mut egui::Ui, test: &hil::run::HilRunningTest) {
+        let (not_in_window, in_progress, completed) = test.expect_counts();
+        let total = not_in_window + in_progress + completed;
+        if total > 0 {
+            let frac = completed as f32 / total as f32;
+            ui.add(
+                egui::ProgressBar::new(frac)
+                    .text(format!("{}/{} expects complete", completed, total)),
+            );
+        }
+    }
+
+    fn show_test_finished_summary(ui: &mut egui::Ui, test: &hil::run::HilRunningTest) {
+        if !test.is_finished() {
+            return;
+        }
+
+        let total = test.in_progress_expects.len();
+        let passed = test
+            .in_progress_expects
+            .iter()
+            .filter(|e| matches!(e.result, hil::run::ExpectResult::Passed))
+            .count();
+
+        let color = if passed == total {
+            egui::Color32::GREEN
+        } else {
+            egui::Color32::RED
+        };
+
+        ui.colored_label(
+            color,
+            format!("Test finished: {} passed of {} expects", passed, total),
+        );
+    }
+
+    fn show_expects_grid(ui: &mut egui::Ui, test: &hil::run::HilRunningTest) {
+        egui::Grid::new(format!("expects_{}", test.test_info.basename))
+            .num_columns(4)
+            .striped(true)
+            .show(ui, |ui| {
+                ui.strong("Message");
+                ui.strong("Window (ms)");
+                ui.strong("Status");
+                ui.strong("Signals");
+                ui.end_row();
+
+                for ipe in &test.in_progress_expects {
+                    Self::show_expect_row(ui, ipe);
+                }
+            });
+    }
+
+    fn show_expect_row(ui: &mut egui::Ui, ipe: &hil::run::InProgressExpect) {
+        ui.label(&ipe.expect.msg_name);
+        ui.label(format!(
+            "{:.0} - {:.0}",
+            ipe.expect.window[0], ipe.expect.window[1]
+        ));
+        ui.colored_label(ipe.result.as_color32(), ipe.result.as_str());
+
+        if ipe.expect.signals.is_empty() {
+            ui.label("—");
+        } else {
+            let s: Vec<String> = ipe
+                .expect
+                .signals
+                .iter()
+                .map(|(n, r)| format!("{}: [{}, {}]", n, r[0], r[1]))
+                .collect();
+            ui.label(s.join(", "));
+        }
+        ui.end_row();
     }
 }
