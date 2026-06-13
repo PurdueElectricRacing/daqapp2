@@ -1,3 +1,5 @@
+use eframe::egui;
+
 use crate::hil::{self, config};
 
 pub enum ExpectResult {
@@ -38,6 +40,17 @@ impl ExpectResult {
             ExpectResult::Passed => "Passed",
             ExpectResult::FailedNoMessage => "Failed (no message)",
             ExpectResult::FailedValueOutOfRange => "Failed (value out of range)",
+        }
+    }
+
+    pub fn as_color32(&self) -> egui::Color32 {
+        match self {
+            ExpectResult::NotInWindow => egui::Color32::GRAY,
+            ExpectResult::InProgress => egui::Color32::YELLOW,
+            ExpectResult::Passed => egui::Color32::GREEN,
+            ExpectResult::FailedNoMessage | ExpectResult::FailedValueOutOfRange => {
+                egui::Color32::RED
+            }
         }
     }
 
