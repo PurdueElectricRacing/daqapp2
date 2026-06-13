@@ -1,7 +1,8 @@
 use eframe::egui;
 
-use crate::hil::{self, config};
+use crate::{hil, messages};
 
+#[derive(PartialEq, Eq)]
 pub enum ExpectResult {
     NotInWindow,
     InProgress,
@@ -79,6 +80,63 @@ impl HilRunningTest {
         })
     }
 
+    fn update_expect_statuses(&mut self, start_time: std::time::Instant) {
+        let ts = start_time.elapsed().as_millis();
+        for expect in &mut self.in_progress_expects {
+            match expect.result {
+                ExpectResult::NotInWindow => {
+                    if ts >= expect.expect.window[0] as u128 {
+                        expect.result = ExpectResult::InProgress;
+                    }
+                }
+                ExpectResult::InProgress => {
+                    if ts > expect.expect.window[1] as u128 {
+                        expect.result = ExpectResult::FailedNoMessage;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn process_can(
+        &mut self,
+        parsed: &messages::ParsedMessage,
+        start_time: std::time::Instant,
+    ) {
+        self.update_expect_statuses(start_time);
+
+        for expect in &mut self.in_progress_expects {
+            if expect.result == ExpectResult::InProgress && expect.matches_message(&parsed.decoded)
+            {
+                if expect.expect.signals.is_empty() {
+                    expect.result = ExpectResult::Passed;
+                } else {
+                    let mut all_signals_in_range = true;
+                    for (sig_name, sig_range) in &expect.expect.signals {
+                        if let Some(sig_value) = parsed.decoded.signals.get(sig_name) {
+                            if sig_value.value.physical < sig_range[0]
+                                || sig_value.value.physical > sig_range[1]
+                            {
+                                all_signals_in_range = false;
+                                break;
+                            }
+                        } else {
+                            all_signals_in_range = false;
+                            break;
+                        }
+                    }
+
+                    expect.result = if all_signals_in_range {
+                        ExpectResult::Passed
+                    } else {
+                        ExpectResult::FailedValueOutOfRange
+                    };
+                }
+            }
+        }
+    }
+
     pub fn expect_counts(&self) -> (usize, usize, usize) {
         let mut not_in_window = 0;
         let mut in_progress = 0;
@@ -108,5 +166,9 @@ impl InProgressExpect {
             expect,
             result: ExpectResult::NotInWindow,
         }
+    }
+
+    pub fn matches_message(&self, decoded: &can_decode::DecodedMessage) -> bool {
+        self.expect.msg_name == decoded.name
     }
 }
