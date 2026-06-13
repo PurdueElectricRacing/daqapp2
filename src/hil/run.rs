@@ -1,4 +1,4 @@
-use crate::hil;
+use crate::hil::{self, config};
 
 pub enum ExpectResult {
     NotInWindow,
@@ -17,7 +17,7 @@ pub struct HilRunningTest {
     pub description: String,
 
     pub tx_remaining: Vec<hil::config::TxMessage>,
-    pub expect: Vec<hil::config::Expectation>,
+    pub in_progress_expects: Vec<InProgressExpect>,
 }
 
 pub enum HilState {
@@ -27,4 +27,23 @@ pub enum HilState {
         preset_name: Option<String>,
         tests: Vec<HilRunningTest>,
     },
+}
+
+impl HilRunningTest {
+    pub fn new(test_info: &hil::config::TestInfo) -> Result<Self, String> {
+        let test = hil::config::load_test_from_file(&test_info.basename)?;
+        Ok(Self {
+            name: test_info.name.clone(),
+            description: test_info.description.clone(),
+            tx_remaining: test.tx,
+            in_progress_expects: test
+                .expect
+                .into_iter()
+                .map(|expect| InProgressExpect {
+                    expect,
+                    result: ExpectResult::NotInWindow,
+                })
+                .collect(),
+        })
+    }
 }

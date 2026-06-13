@@ -41,9 +41,11 @@ pub struct Expectation {
 
 pub struct PresetInfo {
     pub name: String,
-    pub subtests: Vec<String>,
+    // base names
+    pub tests: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct TestInfo {
     pub basename: String,
     pub name: String,
@@ -115,7 +117,7 @@ pub fn list_available_tests() -> (Vec<PresetInfo>, Vec<TestInfo>, Vec<String>) {
 
                 presets.push(PresetInfo {
                     name: preset_name,
-                    subtests,
+                    tests: subtests,
                 });
             }
         } else {
@@ -126,4 +128,15 @@ pub fn list_available_tests() -> (Vec<PresetInfo>, Vec<TestInfo>, Vec<String>) {
     }
 
     (presets, individual_tests, errors)
+}
+
+pub fn load_test_from_file(basename: &str) -> Result<TestFile, String> {
+    let path = format!("{}{}.json", TESTS_FOLDER, basename);
+    match std::fs::read_to_string(&path) {
+        Ok(content) => match serde_json::from_str::<TestFile>(&content) {
+            Ok(test_data) => Ok(test_data),
+            Err(_) => Err(format!("Failed to parse test file: {}", path)),
+        },
+        Err(_) => Err(format!("Failed to read test file: {}", path)),
+    }
 }

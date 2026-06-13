@@ -6,6 +6,7 @@ pub struct Hil {
     pub found_presets: Vec<hil::config::PresetInfo>,
     pub found_tests: Vec<hil::config::TestInfo>,
     pub load_errors: Vec<String>,
+    pub start_error: Option<String>,
     pub hil_state: hil::run::HilState,
 }
 
@@ -18,6 +19,7 @@ impl Hil {
             found_presets: presets,
             found_tests: tests,
             load_errors: errors,
+            start_error: None,
             hil_state: hil::run::HilState::Idle,
         }
     }
@@ -31,10 +33,29 @@ impl Hil {
         self.load_errors = errors;
     }
 
+    fn try_start_from_test(&mut self, test: &hil::config::TestInfo) {
+        let test = match hil::run::HilRunningTest::new(test) {
+            Ok(test) => test,
+            Err(err) => {
+                self.start_error = Some(format!("Error starting test: {}", err));
+                return;
+            }
+        };
+
+        self.hil_state = hil::run::HilState::Running {
+            start_time: std::time::Instant::now(),
+            preset_name: None,
+            tests: vec![test],
+        };
+    }
+
     pub fn show(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         egui::ScrollArea::vertical().show(ui, |ui| match &mut self.hil_state {
             hil::run::HilState::Idle => {
                 ui.label("HIL is idle. Select a preset or test to run.");
+                if ui.button("Reload Tests").clicked() {
+                    self.reload_tests();
+                }
                 ui.separator();
                 if !self.load_errors.is_empty() {
                     ui.label("Errors loading tests:");
@@ -46,7 +67,8 @@ impl Hil {
                 if !self.found_presets.is_empty() {
                     ui.label("Presets:");
                     for preset in &self.found_presets {
-                        if ui.button(&preset.name).clicked() {
+                        let preset_info = format!("{} - {}", preset.name, preset.tests.join(", "));
+                        if ui.button(&preset_info).clicked() {
                             self.hil_state = hil::run::HilState::Running {
                                 start_time: std::time::Instant::now(),
                                 preset_name: Some(preset.name.clone()),
@@ -58,21 +80,16 @@ impl Hil {
                 }
                 if !self.found_tests.is_empty() {
                     ui.label("Individual Tests:");
+                    let mut selected_test = None;
                     for test in &self.found_tests {
-                        let test_info = format!("{}: {}", test.name, test.basename);
+                        let test_info =
+                            format!("{} [{}]: {}", test.name, test.basename, test.description);
                         if ui.button(&test_info).clicked() {
-                            self.hil_state = hil::run::HilState::Running {
-                                start_time: std::time::Instant::now(),
-                                preset_name: None,
-                                // tests: vec![hil::run::HilRunningTest {
-                                // 	name: test.name.clone(),
-                                // 	description: test.description.clone(),
-                                // 	tx_remaining: test.tx.clone(),
-                                // 	expect: test.expect.clone(),
-                                // }],
-                                tests: Vec::new(),
-                            };
+                            selected_test = Some(test.clone());
                         }
+                    }
+                    if let Some(test) = selected_test {
+                        self.try_start_from_test(&test);
                     }
                 }
             }
