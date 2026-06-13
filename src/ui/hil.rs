@@ -24,7 +24,17 @@ impl Hil {
         }
     }
 
-    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {}
+    pub fn handle_can_message(&mut self, msg: &messages::MsgFromCan) {
+        if let messages::MsgFromCan::ParsedMessage(parsed) = msg
+            && let hil::run::HilState::Running {
+                start_time, tests, ..
+            } = &mut self.hil_state
+        {
+            for test in tests {
+                test.process_can(parsed, *start_time);
+            }
+        }
+    }
 
     fn reload_tests(&mut self) {
         let (presets, tests, errors) = hil::config::list_available_tests();
@@ -129,7 +139,6 @@ impl Hil {
                 tests,
             } => {
                 let time_since_start = start_time.elapsed().as_secs_f64() * 1000.0; // ms
-
                 ui.label(format!(
                     "HIL is running... {:.0} ms since start",
                     time_since_start
@@ -216,10 +225,7 @@ impl Hil {
         let total = not_in_window + in_progress + completed;
         if total > 0 {
             let frac = completed as f32 / total as f32;
-            ui.add(
-                egui::ProgressBar::new(frac)
-                    .text(format!("{}/{} expects complete", completed, total)),
-            );
+            ui.add(egui::ProgressBar::new(frac).text(format!("{}/{} complete", completed, total)));
         }
     }
 
