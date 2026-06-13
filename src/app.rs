@@ -51,6 +51,7 @@ pub struct DAQApp {
     pub next_gg_plot_num: usize,
     pub next_dynamics_num: usize,
     pub next_jitter_num: usize,
+    pub next_hil_num: usize,
     pub can_to_ui_rx: std::sync::mpsc::Receiver<messages::MsgFromCan>,
     pub ui_to_can_tx: std::sync::mpsc::Sender<messages::MsgFromUi>,
     pub action_queue: Vec<action::AppAction>,
@@ -107,6 +108,7 @@ impl DAQApp {
             next_gg_plot_num: 1,
             next_dynamics_num: 1,
             next_jitter_num: 1,
+            next_hil_num: 1,
             can_to_ui_rx,
             ui_to_can_tx,
             action_queue: Vec::new(),
@@ -211,6 +213,9 @@ impl DAQApp {
                     action::WidgetType::Jitter => {
                         widgets::Widget::Jitter(ui::jitter::Jitter::new(self.next_jitter_num))
                     }
+                    action::WidgetType::Hil => {
+                        widgets::Widget::Hil(ui::hil::Hil::new(self.next_hil_num))
+                    }
                 };
                 self.add_widget_to_tree(widget);
 
@@ -251,6 +256,9 @@ impl DAQApp {
                     }
                     action::WidgetType::Jitter => {
                         self.next_jitter_num += 1;
+                    }
+                    action::WidgetType::Hil => {
+                        self.next_hil_num += 1;
                     }
                 }
             }

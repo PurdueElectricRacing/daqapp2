@@ -25,6 +25,7 @@ pub enum WidgetType {
     GgPlot,
     Dynamics,
     Jitter,
+    Hil,
 }
 
 impl AppAction {
@@ -41,6 +42,7 @@ impl AppAction {
             ("Spawn G-G Plot", WidgetType::GgPlot),
             ("Spawn Dynamics", WidgetType::Dynamics),
             ("Spawn Jitter", WidgetType::Jitter),
+            ("Spawn HIL", WidgetType::Hil),
         ]
     }
 }
