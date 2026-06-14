@@ -12,6 +12,7 @@ pub struct Settings {
     pub udp_port: u16,
     pub theme: theme::ThemeSelection,
     pub pixels_per_point: Option<f32>,
+    pub log_folder: Option<std::path::PathBuf>,
 }
 
 impl Default for Settings {
@@ -23,6 +24,7 @@ impl Default for Settings {
             udp_port: DEFAULT_UDP_PORT,
             theme: theme::ThemeSelection::Default,
             pixels_per_point: None,
+            log_folder: None,
         }
     }
 }

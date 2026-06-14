@@ -35,8 +35,12 @@ fn main() -> eframe::Result<()> {
             .expect("Failed to send connect message to CAN thread");
     }
 
-    let _can_thread =
-        can::thread::start_can_thread(can_to_ui_tx, ui_to_can_rx, settings.selected_source.clone());
+    let _can_thread = can::thread::start_can_thread(
+        can_to_ui_tx,
+        ui_to_can_rx,
+        settings.selected_source.clone(),
+        settings.log_folder.clone(),
+    );
 
     let per_img = eframe::icon_data::from_png_bytes(assets::PER_LOGO_BYTES)
         .expect("Failed to load logo image");

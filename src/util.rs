@@ -1,3 +1,6 @@
+use std::env;
+use std::path::PathBuf;
+
 pub fn get_available_serial_ports() -> Vec<serialport::SerialPortInfo> {
     match serialport::available_ports() {
         Ok(ports) => ports
@@ -100,4 +103,24 @@ pub mod can {
             can_dbc::NumericValue::Double(v) => *v,
         }
     }
+}
+
+pub fn get_absolute_path_to(path_segment: &str) -> PathBuf {
+    if let Ok(cargo_dir) = env::var("CARGO_MANIFEST_DIR") {
+        let mut path = PathBuf::from(cargo_dir);
+        path.push(path_segment);
+        return path;
+    }
+
+    if let Ok(exe_path) = env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        let mut path = PathBuf::from(exe_dir);
+        path.push(path_segment);
+        return path;
+    }
+
+    let mut path = PathBuf::from(".");
+    path.push(path_segment);
+    path
 }

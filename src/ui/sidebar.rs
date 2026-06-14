@@ -1,3 +1,4 @@
+use crate::can;
 use crate::{action, app, assets, connection, formatter, messages, util};
 use eframe::egui;
 
@@ -266,6 +267,21 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
                 } else {
                     ui.label("DBC: None selected");
                 }
+            });
+
+            ui.horizontal(|ui| {
+                if ui.button("📁 Select Log Folder").clicked()
+                    && let Some(path) = rfd::FileDialog::new().pick_folder()
+                {
+                    app.log_folder = Some(path);
+                    app.save_settings();
+                }
+
+                let log_display = app
+                    .log_folder
+                    .as_deref()
+                    .unwrap_or(std::path::Path::new(can::daq_logger::LOG_FOLDER_PATH));
+                ui.label(format!("{}", log_display.display()));
             });
 
             ui.separator();

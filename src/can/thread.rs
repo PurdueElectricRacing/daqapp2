@@ -1,11 +1,11 @@
 use crate::{can, connection, messages, util};
 
-const NO_CONNECTION_SLEEP_MS: u64 = 200;
-const READ_RETRY_SLEEP_MS: u64 = 2;
-const BUS_LOAD_UPDATE_MS: u128 = 200;
+pub const NO_CONNECTION_SLEEP_MS: u64 = 200;
+pub const READ_RETRY_SLEEP_MS: u64 = 2;
+pub const BUS_LOAD_UPDATE_MS: u128 = 200;
 
 // Returns the number of payload data bytes in the CAN frame if it was a Can2 frame
-fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize {
+fn process_can_frame(frame: &slcan::CanFrame, state: &can::state::State) -> usize {
     match frame {
         slcan::CanFrame::Can2(frame2) => {
             let decode_msg_id = util::can::slcan_to_u32_with_extid_flag(&frame2.id());
@@ -64,15 +64,7 @@ fn process_can_frame(frame: slcan::CanFrame, state: &can::state::State) -> usize
             data.len()
         }
 
-        slcan::CanFrame::CanFd(frame_fd) => {
-            let msg_id_raw = util::can::slcan_to_u32_without_extid_flag(&frame_fd.id());
-            log::warn!(
-                "Received CAN FD frame id=0x{:X} len={}",
-                msg_id_raw,
-                frame_fd.data().len()
-            );
-            frame_fd.data().len()
-        }
+        slcan::CanFrame::CanFd(frame_fd) => frame_fd.data().len(),
     }
 }
 
@@ -80,9 +72,11 @@ pub fn start_can_thread(
     can_to_ui_tx: std::sync::mpsc::Sender<messages::MsgFromCan>,
     ui_to_can_rx: std::sync::mpsc::Receiver<messages::MsgFromUi>,
     selected_source: Option<connection::ConnectionSource>,
+    log_folder: Option<std::path::PathBuf>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut state = can::state::State::new(can_to_ui_tx, ui_to_can_rx, selected_source);
+        let mut daq_logger = can::daq_logger::DaqLogger::new(log_folder);
 
         // MAIN LOOP
         loop {
@@ -118,6 +112,7 @@ pub fn start_can_thread(
                     }
                 }
             }
+
             let msgs_to_send = state.send_this_tick();
             for msg in msgs_to_send {
                 if let Some(ref mut active_driver) = state.driver {
@@ -133,6 +128,7 @@ pub fn start_can_thread(
                         );
                         None
                     };
+
                     if let Some(id) = id {
                         if let Some(can2_frame) = slcan::Can2Frame::new_data(id, &msg.msg_bytes) {
                             let frame = slcan::CanFrame::Can2(can2_frame);
@@ -229,9 +225,17 @@ pub fn start_can_thread(
             match active_driver.read_frames() {
                 Ok(frames) => {
                     for frame in frames {
-                        let data_bytes = process_can_frame(frame, &state);
+                        let data_bytes = process_can_frame(&frame, &state);
                         state.bus_load_tracker.record_frame(data_bytes);
+
+                        match &frame {
+                            slcan::CanFrame::Can2(f2) => daq_logger.log_frame(f2, 0),
+                            slcan::CanFrame::CanFd(_) => {
+                                log::error!("CAN FD Message Could Not Be Logged")
+                            }
+                        }
                     }
+
                     // Send bus load updates periodically
                     if state.last_bus_load_update.elapsed().as_millis() >= BUS_LOAD_UPDATE_MS {
                         state.bus_load_tracker.cleanup();
@@ -288,6 +292,7 @@ pub fn start_can_thread(
                 }
             }
         }
+
         unreachable!("CAN thread should never exit on its own");
     })
 }

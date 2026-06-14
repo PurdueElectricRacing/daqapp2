@@ -6,10 +6,10 @@ pub enum ConnectionSource {
     Loopback,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq, Debug)]
-
+#[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq, Debug, Default)]
 pub enum CanBusSpeed {
     Kbps250,
+    #[default]
     Kbps500,
 }
 
@@ -56,11 +56,5 @@ impl CanBusSpeed {
 
     pub fn options() -> Vec<CanBusSpeed> {
         vec![CanBusSpeed::Kbps250, CanBusSpeed::Kbps500]
-    }
-}
-
-impl Default for CanBusSpeed {
-    fn default() -> Self {
-        CanBusSpeed::Kbps500
     }
 }
