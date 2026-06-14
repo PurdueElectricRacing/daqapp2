@@ -68,7 +68,7 @@ impl DaqLogger {
         let ticks_ms = self.start_time.elapsed().as_millis() as u32;
 
         let raw_frame = RawFrame {
-            ticks_ms: ticks_ms,
+            ticks_ms,
             identity: frame_identity,
             data: data_array,
         };

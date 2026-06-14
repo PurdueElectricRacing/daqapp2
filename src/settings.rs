@@ -1,4 +1,4 @@
-use crate::{can::daq_logger, connection, theme};
+use crate::{connection, theme};
 
 pub const SETTINGS_PATH: &str = "settings.json";
 const DEFAULT_UDP_PORT: u16 = 5005;

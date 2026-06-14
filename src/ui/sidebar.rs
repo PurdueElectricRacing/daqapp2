@@ -264,12 +264,11 @@ pub fn show(app: &mut app::DAQApp, ctx: &egui::Context) {
             });
 
             ui.horizontal(|ui| {
-                if ui.button("📁 Select Log Folder").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                if ui.button("📁 Select Log Folder").clicked()
+                    && let Some(path) = rfd::FileDialog::new().pick_folder() {
                         app.log_folder = Some(path);
                         app.save_settings();
                     }
-                }
 
                 let log_display = app
                     .log_folder

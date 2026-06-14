@@ -8,8 +8,10 @@ pub enum ConnectionSource {
 
 #[derive(serde::Serialize, serde::Deserialize, Copy, Clone, PartialEq, Debug)]
 
+#[derive(Default)]
 pub enum CanBusSpeed {
     Kbps250,
+    #[default]
     Kbps500,
 }
 
@@ -59,8 +61,3 @@ impl CanBusSpeed {
     }
 }
 
-impl Default for CanBusSpeed {
-    fn default() -> Self {
-        CanBusSpeed::Kbps500
-    }
-}
